@@ -1,0 +1,28 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets and local state
+.env
+.env.*
+!.env.example
+
+# Frontend
+node_modules/
+dist/
+build/
+
+# Test and tool output
+htmlcov/
+.coverage
+playwright-report/
+test-results/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
