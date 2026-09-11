@@ -7,8 +7,11 @@ Maps to:
 """
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.sessions.models import Session
 from django.core.cache import cache
 from rest_framework.test import APIClient
+
+from accounts.services import deactivate_user
 
 User = get_user_model()
 
@@ -127,23 +130,19 @@ def test_inactive_credential_cannot_authenticate(anon_client, inactive_user):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.django_db
-def test_inactive_account_on_authed_session_cannot_mutate(anon_client, active_user):
+def test_deactivation_revokes_existing_session_and_rejects_requests(anon_client, active_user):
     token = _csrf(anon_client)
     assert anon_client.post(
         "/api/v1/auth/login",
         {"email": "sabah@example.com", "password": "correct-horse-battery"},
         HTTP_X_CSRFTOKEN=token,
     ).status_code == 200
+    session_key = anon_client.session.session_key
+    assert Session.objects.filter(session_key=session_key).exists()
 
-    # Deactivate outside the request cycle (as HR administration would).
-    active_user.is_active = False
-    active_user.save(update_fields=["is_active"])
+    deactivate_user(user=active_user)
 
-    fresh = anon_client.cookies["heya_fawda_csrftoken"].value
-    out = anon_client.post("/api/v1/auth/logout", HTTP_X_CSRFTOKEN=fresh)
-    # Mutation (logout is a mutation too) is refused once is_active fails:
-    # DRF SessionAuthentication rejects the request as unauthenticated.
-    assert out.status_code == 401
+    assert not Session.objects.filter(session_key=session_key).exists()
     assert anon_client.get("/api/v1/auth/me").status_code == 401
 
 
