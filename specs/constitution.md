@@ -1,6 +1,6 @@
 # هي فوضى؟ Constitution
 
-**Status:** Draft — requires user approval before application implementation.
+**Status:** Approved baseline — application implementation remains blocked until the open policy decisions are resolved.
 
 ## 1. Product boundary
 

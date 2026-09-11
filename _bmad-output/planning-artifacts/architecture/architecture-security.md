@@ -1,6 +1,6 @@
 ---
 title: "هي فوضى؟ / Heya Fawda? — Architecture and Security Solutioning"
-status: solutioning-draft-pending-review
+status: approved-baseline-with-open-policy-decisions
 created: 2026-09-11
 updated: 2026-09-11
 workflow: BMAD BMM

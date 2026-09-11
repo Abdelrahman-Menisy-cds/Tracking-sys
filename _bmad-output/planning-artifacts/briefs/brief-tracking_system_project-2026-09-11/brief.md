@@ -1,6 +1,6 @@
 ---
 title: "هي فوضى؟ / Heya Fawda? — Product Brief"
-status: draft-pending-user-approval
+status: approved-baseline-with-open-policy-decisions
 created: 2026-09-11
 updated: 2026-09-11
 workflow: BMAD BMM product-definition fast path

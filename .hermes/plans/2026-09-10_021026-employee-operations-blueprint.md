@@ -276,11 +276,11 @@ registered tool costs context.
 - [x] Create dedicated Tracking-sys project context and draft constitution (`docs/PROJECT_CONTEXT.md`, `specs/constitution.md`) and push — `32145f1` (2026-09-11)
 - [x] Create 7 isolated Tracking-sys Hermes profiles, project-only rules/personas/memories, model assignments, and live smoke-test them (`OK` verified in each profile `state.db`) (2026-09-11)
 - [x] Record completed work by delivery level in `docs/WORK_LOG.md`; lock the Franco name `Heya Fawda?` and System/Light/Dark appearance policy (System default) (2026-09-11)
-- [ ] Approve constitution, then write product brief + permission matrix + state machines into `specs/` (product_lead work, user-reviewed)
+- [x] Approve constitution and baseline product/UX/architecture direction (user approval recorded 2026-09-11); policy-specific specs remain blocked pending §9 decisions
 - [ ] Configure Phase-1 MCPs + project-local skills
 - [x] Produce provisional UX/brand and architecture/security solutioning artifacts; UX `bfd565e`, architecture `e36a1cd` (2026-09-11)
-- [ ] Approve constitution, product brief, UX direction, and architecture/security; resolve §9 decisions
-- [ ] BMAD planning phase → approved PRD/specs, epics/stories, and implementation backlog
+- [x] Approve constitution, product brief, UX direction, and architecture/security baseline (user approval recorded 2026-09-11); §9 policy decisions remain open
+- [ ] BMAD planning phase → resolve §9 decisions, then produce approved PRD/specs, epics/stories, and implementation backlog
 - [ ] Then implementation begins (no app code before approval gates)
 
 ## 11. Sources

@@ -1,6 +1,6 @@
 ---
 title: "هي فوضى؟ / Heya Fawda? — UX and Brand Direction"
-status: proposed-solutioning-pending-review
+status: approved-baseline-with-open-policy-decisions
 owner: ux_brand_designer
 workflow: BMAD BMM
 scope: design-only; no application implementation authorization
