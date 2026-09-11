@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     # Project apps
     "accounts",
     "notifications",
+    "reqs",
 ]
 
 # The Django admin is deliberately not installed for Story 1.1 (HR is an

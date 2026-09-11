@@ -1,0 +1,72 @@
+"""Request draft serializers (Story 2.1): server-authoritative field allowlist.
+
+Client-set status / manager / assignee fields are rejected as protected
+(422 field errors) without mutation, matching the approved contract.
+"""
+from rest_framework import serializers
+
+from .models import EmployeeRequest, RequestType
+
+
+class RequestTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RequestType
+        fields = ["id", "name", "requires_hr_approval"]
+
+
+class EmployeeRequestSerializer(serializers.ModelSerializer):
+    request_type = RequestTypeSerializer(read_only=True)
+    status = serializers.CharField(read_only=True)
+    version = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = EmployeeRequest
+        fields = [
+            "id",
+            "request_type",
+            "title",
+            "details",
+            "status",
+            "version",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class DraftCreateSerializer(serializers.Serializer):
+    request_type_id = serializers.IntegerField()
+    title = serializers.CharField(max_length=255, trim_whitespace=True)
+    details = serializers.CharField(required=False, allow_blank=True, max_length=10_000, trim_whitespace=False)
+
+    def validate_request_type_id(self, value):
+        try:
+            request_type = RequestType.objects.get(pk=value)
+        except RequestType.DoesNotExist:
+            raise serializers.ValidationError("Unknown request type.")
+        if not request_type.is_active:
+            raise serializers.ValidationError("This request type is not active.")
+        return request_type
+
+    def validate(self, attrs):
+        protected = set(self.initial_data) - {"request_type_id", "title", "details"}
+        if protected:
+            raise serializers.ValidationError(
+                {field: ["This field is managed by the server."] for field in sorted(protected)}
+            )
+        attrs.setdefault("details", "")
+        return attrs
+
+
+class DraftEditSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=255, trim_whitespace=True, required=False)
+    details = serializers.CharField(required=False, allow_blank=True, max_length=10_000, trim_whitespace=False)
+
+    def validate(self, attrs):
+        protected = set(self.initial_data) - {"title", "details"}
+        if protected:
+            raise serializers.ValidationError(
+                {field: ["This field is managed by the server."] for field in sorted(protected)}
+            )
+        if not attrs:
+            raise serializers.ValidationError({"non_field_errors": ["No permitted fields to update."]})
+        return attrs

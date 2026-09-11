@@ -68,6 +68,27 @@ class EmployeePagination(PageNumberPagination):
         )
 
 
+class RequestPagination(PageNumberPagination):
+    """Bounded list pagination for requester-scoped request lists (Story 2.1)."""
+
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 50
+
+    def get_paginated_response(self, data):
+        return Response(
+            {
+                "data": data,
+                "meta": {
+                    "page": self.page.number,
+                    "page_size": self.get_page_size(self.request),
+                    "count": self.page.paginator.count,
+                    "total_pages": self.page.paginator.num_pages,
+                },
+            }
+        )
+
+
 def error_payload(*, code, message, fields, request):
     return {
         "error": {
