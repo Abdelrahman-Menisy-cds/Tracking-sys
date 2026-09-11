@@ -45,6 +45,33 @@ def _normalized_email(user, raw_email):
     return email
 
 
+def _normalize_email_for_compare(raw_email):
+    # Emails are immutable identifiers here; strip + lower on both sides so
+    # create and update apply the exact same comparison (case-insensitive).
+    return raw_email.strip().lower()
+
+
+def _normalize_employee_number(raw_number):
+    # Duplicate policy for employee_number: strip surrounding whitespace and
+    # casefold so 'EMP-001', ' emp-001 ' and 'emp-001' are the same number.
+    # Both create and update must use this identical normalization — the DB
+    # unique index is raw, so app-level comparison is the real contract gate.
+    return raw_number.strip().casefold()
+
+
+def _validate_employee_number_unique(*, profile_owner_pk, raw_number):
+    """Raise a field error if another employee already holds this number."""
+    normalized = _normalize_employee_number(raw_number)
+    conflict = EmployeeProfile.objects.filter(
+        employee_number__iexact=normalized
+    ).exclude(user_id=profile_owner_pk).exists()
+    if conflict:
+        raise EmployeeValidationError(
+            "employee_number", "An employee with this employee number already exists."
+        )
+    return raw_number.strip() or None
+
+
 def _validate_manager(user, manager_pk):
     """Return the manager or None; raise field-level errors for bad ones."""
     if manager_pk is None:
@@ -102,7 +129,14 @@ def create_employee(*, actor, validated_data):
     user_fields.setdefault("role", User.Role.EMPLOYEE)
     user_fields.setdefault("is_active", True)
     user_fields.setdefault("full_name", "")
-    user_fields["email"] = user_fields["email"].strip().lower()
+    user_fields["email"] = _normalize_email_for_compare(user_fields["email"])
+    # Field-level duplicate checks run BEFORE anything is staged so a rejected
+    # create never leaves a half-built user/profile (and never becomes a 500
+    # IntegrityError). Create has no owner yet, so use a sentinel negative pk.
+    if User.objects.filter(email=user_fields["email"]).exists():
+        raise EmployeeValidationError("email", "A user with this email already exists.")
+    if "employee_number" in validated_data:
+        _validate_employee_number_unique(profile_owner_pk=-1, raw_number=validated_data["employee_number"])
 
     probe = User(**user_fields)
     manager = _validate_manager(probe, manager_pk)
@@ -171,6 +205,23 @@ def update_employee(*, actor, user, validated_data):
         for f in ("employee_number", "job_title")
         if f in validated_data
     }
+    if "employee_number" in profile_fields:
+        if profile_fields["employee_number"] is None:
+            pass
+        else:
+            # Mirror of _normalized_email(): a stripped/casefolded duplicate
+            # collision on employee_number is a field error, not a 500.
+            normalized = _normalize_employee_number(profile_fields["employee_number"])
+            if normalized == _normalize_employee_number(
+                getattr(getattr(user, "employee_profile", None), "employee_number", "") or ""
+            ):
+                # Same-value reassignment (any casing/spacing) is a normalized
+                # no-op and intentionally allowed (documented contract test).
+                profile_fields["employee_number"] = (profile_fields["employee_number"] or "").strip()
+            else:
+                _validate_employee_number_unique(
+                    profile_owner_pk=user.pk, raw_number=profile_fields["employee_number"]
+                )
 
     audit_changes = {}
     if user_fields:

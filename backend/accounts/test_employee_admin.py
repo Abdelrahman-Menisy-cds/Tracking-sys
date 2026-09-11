@@ -268,6 +268,101 @@ def test_update_email_rejects_duplicates_with_field_error_and_no_save(db):
     assert not AuditEvent.objects.filter(subject=employee, action="employee.updated").exists()
 
 
+# --- duplicate email on create ------------------------------------------------
+
+def test_create_rejects_duplicate_email_with_field_error(db):
+    client, _ = hr_client()
+    client.defaults["HTTP_X_CSRFTOKEN"] = "test-csrf-token"
+    make_user("taken-create@x.test")
+    response = client.post(
+        "/api/v1/employees",
+        {"email": "Taken-Create@X.TEST", "full_name": "Dup"},
+        format="json",
+    )
+    assert response.status_code == 422, response.data
+    assert "email" in response.data["error"]["fields"]
+    assert User.objects.filter(email__iexact="taken-create@x.test").count() == 1
+    assert not AuditEvent.objects.filter(action="employee.created").exists()
+
+
+# --- duplicate email on update (normalized collision) --------------------------
+
+def test_update_rejects_email_changed_to_taken_normalized(db):
+    client, _ = hr_client()
+    client.defaults["HTTP_X_CSRFTOKEN"] = "test-csrf-token"
+    hm = make_user("Hr.Manager@X.TEST")
+    make_user("real@x.test")
+    client.force_authenticate(user=make_user("hon@x.test", role=User.Role.HR))
+    employee = make_user("e6@x.test")
+    response = client.patch(
+        f"/api/v1/employees/{employee.pk}",
+        {"email": "Real@X.TEST"},
+        format="json",
+    )
+    assert response.status_code == 422
+    assert "email" in response.data["error"]["fields"]
+    employee.refresh_from_db()
+    assert employee.email == "e6@x.test"
+    assert User.objects.get(email=hm.email).pk == hm.pk
+
+
+# --- duplicate employee_number on create --------------------------------------
+
+def test_create_rejects_duplicate_employee_number_with_field_error(db):
+    client, _ = hr_client()
+    client.defaults["HTTP_X_CSRFTOKEN"] = "test-csrf-token"
+    existing = make_user("num-owner@x.test")
+    EmployeeProfile.objects.create(user=existing, employee_number="EMP-TAKEN")
+    response = client.post(
+        "/api/v1/employees",
+        {"email": "dup-num@x.test", "employee_number": "EMP-TAKEN"},
+        format="json",
+    )
+    assert response.status_code == 422, response.data
+    assert "employee_number" in response.data["error"]["fields"]
+    assert not User.objects.filter(email="dup-num@x.test").exists()   # nothing partially created
+
+
+# --- duplicate employee_number on update --------------------------------------
+
+def test_update_rejects_employee_number_taken_by_other(db):
+    client, _ = hr_client()
+    client.defaults["HTTP_X_CSRFTOKEN"] = "test-csrf-token"
+    other = make_user("num-owner2@x.test")
+    EmployeeProfile.objects.create(user=other, employee_number="EMP-777")
+    employee = make_user("e7@x.test")
+    response = client.patch(
+        f"/api/v1/employees/{employee.pk}",
+        {"employee_number": "EMP-777", "job_title": "Must not apply"},
+        format="json",
+    )
+    assert response.status_code == 422
+    assert "employee_number" in response.data["error"]["fields"]
+    assert not EmployeeProfile.objects.filter(user=employee).exists()   # nothing staged
+    assert not AuditEvent.objects.filter(subject=employee, action="employee.updated").exists()
+
+
+def test_update_employee_number_normalized_duplicate_rejected_and_same_value_allowed(db):
+    # Policy: employee_number is compared after strip()+casefold(); re-setting
+    # an employee's own current number (even in a different case) is a no-op
+    # and allowed, while a different employee's number (normalized) is 422.
+    client, _ = hr_client()
+    client.defaults["HTTP_X_CSRFTOKEN"] = "test-csrf-token"
+    other = make_user("num-owner3@x.test")
+    EmployeeProfile.objects.create(user=other, employee_number="emp-shared")
+    employee = make_user("e8@x.test")
+    EmployeeProfile.objects.create(user=employee, employee_number="OWN-123")
+
+    # Another employee's number, only differing by case/spacing -> rejected.
+    take = client.patch(f"/api/v1/employees/{employee.pk}", {"employee_number": "  EMP-Shared "}, format="json")
+    assert take.status_code == 422, take.data
+    assert "employee_number" in take.data["error"]["fields"]
+
+    # Own number in a different case is a normalized no-op -> allowed.
+    ok = client.patch(f"/api/v1/employees/{employee.pk}", {"employee_number": " own-123 "}, format="json")
+    assert ok.status_code == 200, ok.data
+
+
 # --- deactivation must not drop sibling fields -------------------------------
 
 def test_deactivation_with_sibling_fields_persists_both(db):
