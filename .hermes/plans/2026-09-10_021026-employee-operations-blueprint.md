@@ -268,7 +268,7 @@ registered tool costs context.
 - [x] Repo + model assignments provided by user; consolidated into this file
 - [x] Local git repo initialized; remote `origin` added; initial commit pushed
 - [x] Install BMAD project-local — BMM v6.12.0 stable + BMad Core v6.12.0, configured for Hermes; 29 project-local skills installed under `.agents/skills`; output root `_bmad-output/` created (2026-09-10)
-- [ ] Commit the BMAD installation (`_bmad/` + `.agents/`; exclude generated `_bmad-output/`) to `main`
+- [x] Commit the BMAD installation (`_bmad/` + `.agents/`; generated `_bmad-output/` excluded) and push it to `main` — `f683cc2` (2026-09-10)
 - [ ] Write constitution + product brief + permission matrix + state machines into `specs/` (product_lead work, user-reviewed)
 - [ ] Create 7 Hermes profiles (`--clone`), set per-profile models (§2), write SOUL.md personas, distribute shared rules
 - [ ] Smoke-test every profile: `timeout 90 hermes -p <name> chat -q "reply OK"`, verify the reply in the profile's `state.db`
