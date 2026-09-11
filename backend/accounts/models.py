@@ -4,6 +4,7 @@ Owns identity only (approved architecture-security.md §3). Roles are
 application roles (EMPLOYEE / MANAGER / HR) and are NOT Django superuser
 status.
 """
+from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 from django.utils import timezone
@@ -83,3 +84,68 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def get_short_name(self) -> str:
         return self.full_name or self.email
+
+
+class EmployeeProfile(models.Model):
+    """Organization-authoritative employee data (Story 1.3).
+
+    Owns reporting line and employee-specific organization fields that are
+    NOT identity: a nullable self-referencing manager FK, employee number,
+    and job title. Role, active status, and full name stay on User so auth
+    behavior remains unchanged. HR-only writes; profile.py owns the model
+    contract per architecture-security.md §3.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="employee_profile",
+    )
+    manager = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="direct_reports",
+    )
+    employee_number = models.CharField(max_length=32, unique=True, null=True, blank=True)
+    job_title = models.CharField(max_length=100, blank=True, default="")
+
+    class Meta:
+        verbose_name = "employee profile"
+        verbose_name_plural = "employee profiles"
+
+    def __str__(self) -> str:
+        return f"{self.user.email} (#{self.employee_number or '-'})"
+
+
+class AuditEvent(models.Model):
+    """Append-only, HR-created audit record for employee administration.
+
+    No update/delete through the app (policy item 11): actor, subject,
+    UTC timestamp, actor request id, and before/after snapshots.
+    """
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="audit_events_as_actor",
+    )
+    subject = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="audit_events_as_subject",
+    )
+    action = models.CharField(max_length=64)
+    occurred_at = models.DateTimeField(default=timezone.now, db_index=True)
+    request_id = models.CharField(max_length=128, blank=True, default="")
+    before = models.JSONField(default=dict, blank=True)
+    after = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-occurred_at", "-id"]
+        verbose_name = "audit event"
+        verbose_name_plural = "audit events"
+
+    def __str__(self) -> str:
+        return f"{self.action} on {self.subject_id} by {self.actor_id} at {self.occurred_at:%Y-%m-%dT%H:%M:%SZ}"
