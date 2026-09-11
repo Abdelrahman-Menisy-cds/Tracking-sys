@@ -62,9 +62,16 @@ Remaining:
 
 ## Level 4 — Solution design
 
-**Status:** Not started
+**Status:** Provisional artifacts complete; approval pending
 
-Planned outputs: approved PRD/specs, UX flows and visual system, brand/logo package, architecture decision records, data model, API contracts, threat model, and implementation backlog.
+Created:
+
+- UX and brand direction: `_bmad-output/planning-artifacts/ux/ux-brand-direction.md` (332 lines; committed as `bfd565e`).
+- Architecture and security design: `_bmad-output/planning-artifacts/architecture/architecture-security.md` (510 lines; committed as `e36a1cd`).
+
+The artifacts define provisional UX flows, brand directions, theme behavior, Django boundaries, data/API/security design, threat controls, and verification scenarios. They remain provisional until the product brief, constitution, and unresolved business rules are approved.
+
+Planned next: consolidate approved decisions into the PRD/spec artifacts and implementation backlog.
 
 ## Level 5 — Build and verification
 

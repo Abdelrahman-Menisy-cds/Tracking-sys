@@ -278,8 +278,10 @@ registered tool costs context.
 - [x] Record completed work by delivery level in `docs/WORK_LOG.md`; lock the Franco name `Heya Fawda?` and System/Light/Dark appearance policy (System default) (2026-09-11)
 - [ ] Approve constitution, then write product brief + permission matrix + state machines into `specs/` (product_lead work, user-reviewed)
 - [ ] Configure Phase-1 MCPs + project-local skills
-- [ ] BMAD planning phase → §9 decisions resolved
-- [ ] Then implementation begins (no app code before the constitution is approved)
+- [x] Produce provisional UX/brand and architecture/security solutioning artifacts; UX `bfd565e`, architecture `e36a1cd` (2026-09-11)
+- [ ] Approve constitution, product brief, UX direction, and architecture/security; resolve §9 decisions
+- [ ] BMAD planning phase → approved PRD/specs, epics/stories, and implementation backlog
+- [ ] Then implementation begins (no app code before approval gates)
 
 ## 11. Sources
 
