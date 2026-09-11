@@ -54,6 +54,41 @@ def test_malformed_request_id_gets_safe_server_generated_id(anon_client, request
     assert generated_id != request_id
 
 
+def test_unknown_api_route_returns_not_found_envelope_with_request_id(anon_client):
+    response = anon_client.get("/api/v1/not-a-route", HTTP_X_REQUEST_ID="support-123")
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "error": {
+            "code": "not_found",
+            "message": "Not found.",
+            "fields": {},
+            "request_id": "support-123",
+        }
+    }
+    assert response["X-Request-ID"] == "support-123"
+
+    root_response = anon_client.get("/api/v1/")
+    assert root_response.status_code == 404
+    assert root_response.json()["error"]["code"] == "not_found"
+
+
+def test_non_api_unknown_route_remains_django_not_found(anon_client):
+    response = anon_client.get("/not-a-route")
+
+    assert response.status_code == 404
+    assert response["Content-Type"].startswith("text/html")
+
+
+def test_ssl_redirect_includes_request_id(settings, anon_client):
+    settings.SECURE_SSL_REDIRECT = True
+
+    response = anon_client.get("/api/v1/auth/csrf", HTTP_X_REQUEST_ID="redirect-123")
+
+    assert response.status_code == 301
+    assert response["X-Request-ID"] == "redirect-123"
+
+
 # ---------------------------------------------------------------------------
 # Profile and preference management
 # ---------------------------------------------------------------------------

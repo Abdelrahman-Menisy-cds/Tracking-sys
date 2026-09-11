@@ -1,6 +1,7 @@
 import re
 from uuid import uuid4
 
+from django.http import JsonResponse
 from django.utils.translation import gettext as _
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -54,6 +55,19 @@ def error_payload(*, code, message, fields, request):
             "request_id": request.request_id,
         }
     }
+
+
+def api_not_found(request):
+    """Return the shared error envelope for unmatched versioned API routes."""
+    return JsonResponse(
+        error_payload(
+            code="not_found",
+            message=_("Not found."),
+            fields={},
+            request=request,
+        ),
+        status=404,
+    )
 
 
 def api_exception_handler(exc, context):
