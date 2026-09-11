@@ -284,7 +284,8 @@ registered tool costs context.
 - [x] Begin implementation after approval gates — Story 1.1 accepted after spec, test, Django-check, migration, compilation, whitespace, and code-quality verification (commits `10e77ab`, `5840e54`, `bbce908`, `d9cffd9`; 2026-09-12)
 - [x] Continue implementation — Story 1.2 accepted after spec, 31-test suite, Django checks, migration drift check, and code-quality review (commits `ae97038`, `fbe4e7b`, `89337b8`, `626dea1`, `48994d9`, `7cc7d3e`, `337f88a`, `bdaeba5`; 2026-09-12)
 - [x] Continue implementation — Story 1.3 accepted after spec + code-quality gate (commits `84e4341`, `25e6f53`; 53 tests, checks clean; 2026-09-12)
-- [ ] Continue implementation with Epic 2 (requests) after contract review
+- [x] Continue implementation — Story 2.1 accepted after spec + code-quality gate (commit `12a4a2f`; 70 tests, checks clean; 2026-09-12)
+- [ ] Continue implementation with Story 2.2 (secure attachments) after contract review
 
 ## 11. Sources
 

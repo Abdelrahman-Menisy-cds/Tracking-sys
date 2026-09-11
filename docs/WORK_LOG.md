@@ -106,7 +106,16 @@ Story 1.3 evidence (accepted 2026-09-12):
 - Commits: `84e4341`, `25e6f53`.
 - Known minor: a concurrent-create race can still surface an unhandled `IntegrityError` 500; deferred to a later hardening pass. HR-created accounts receive no usable password yet (issuance/reset is a separate story).
 
-Planned outputs: remaining Django/DRF backend (Epic 2 requests), React frontend, PostgreSQL schema on provisioned DB, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
+Story 2.1 evidence (accepted 2026-09-12):
+
+- New `backend/reqs` app: `RequestType` (name/description/requires_hr_approval/is_active), `EmployeeRequest` (UUID pk, requester, request_type, title/details, 7-state status matching the approved machine, manager/assignee snapshot fields pre-laid, version), append-only `RequestEvent` (actor, action CREATED/EDITED, from/to status, comment, timestamp).
+- Requester-only `/api/v1/requests`: create draft, bounded paginated list (max 50), detail, PATCH — edits allowed only in `DRAFT`/`RETURNED`; other states return `409 state_conflict` with no mutation and no event.
+- Security/contract: protected server-managed fields → `422` per-field; inactive request type → `422`; cross-user access → `404`-safe envelope identical to missing; unauthenticated → `401`; mutations throttled 60/min/user, GET unthrottled; version bump on edit.
+- Verification on acceptance: 70 tests passed (53 Story 1.x + 17 reqs, no regressions); Django system check clean; migration-drift check clean; `git diff --check` clean; spec + code-quality gate APPROVED.
+- Commits: `12a4a2f`.
+- Scope note: submission/attachments/decisions/cancel belong to Stories 2.2–2.5. Request-event history endpoint intentionally deferred. Minor cleanup candidates (dead ValueError catch, triplicated pagination classes) deferred.
+
+Planned outputs: remaining Epic 2 stories (2.2 attachments, 2.3 submit, 2.4 decisions, 2.5 cancel), Epic 3 timesheets, React frontend, PostgreSQL schema on provisioned DB, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
 
 ## Scope boundary
 
