@@ -141,7 +141,7 @@ def test_me_patch_rejects_invalid_preference_enums(anon_client, active_user, fie
         HTTP_X_CSRFTOKEN=token,
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 422
     assert response.data["error"]["code"] == "validation_error"
     assert response.data["error"]["message"] == "Validation failed."
     assert field_name in response.data["error"]["fields"]
@@ -167,7 +167,7 @@ def test_me_patch_rejects_protected_fields_without_mutation(anon_client, active_
         HTTP_X_CSRFTOKEN=token,
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 422
     assert response.data["error"] == {
         "code": "validation_error",
         "message": "Validation failed.",

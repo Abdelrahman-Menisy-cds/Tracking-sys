@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from django.http import JsonResponse
 from django.utils.translation import gettext as _
+from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
@@ -75,6 +76,9 @@ def api_exception_handler(exc, context):
     if response is None:
         return response
 
+    if isinstance(exc, ValidationError):
+        response.status_code = 422
+
     status_errors = {
         401: ("authentication_failed", _("Authentication credentials were not provided.")),
         403: ("permission_denied", _("You do not have permission to perform this action.")),
@@ -85,6 +89,6 @@ def api_exception_handler(exc, context):
         response.status_code,
         ("validation_error", _("Validation failed.")),
     )
-    fields = response.data if response.status_code == 400 and isinstance(response.data, dict) else {}
+    fields = response.data if response.status_code == 422 and isinstance(response.data, dict) else {}
     response.data = error_payload(code=code, message=message, fields=fields, request=context["request"])
     return response

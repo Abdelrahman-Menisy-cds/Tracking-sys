@@ -175,7 +175,7 @@ def test_notification_read_state_rejects_other_fields(authenticated_client, noti
         HTTP_X_CSRFTOKEN=csrf_token(authenticated_client),
     )
 
-    assert response.status_code == 400
+    assert response.status_code == 422
     assert response.data["error"] == {
         "code": "validation_error",
         "message": "Validation failed.",
