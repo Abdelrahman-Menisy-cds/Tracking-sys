@@ -42,8 +42,20 @@ class User(AbstractBaseUser, PermissionsMixin):
         MANAGER = "MANAGER", "Manager"
         HR = "HR", "HR"
 
+    class Locale(models.TextChoices):
+        ARABIC = "ar", "Arabic"
+        ENGLISH = "en", "English"
+
+    class Appearance(models.TextChoices):
+        SYSTEM = "system", "System"
+        LIGHT = "light", "Light"
+        DARK = "dark", "Dark"
+
     email = models.EmailField("email address", unique=True, db_index=True)
     full_name = models.CharField("full name", max_length=150, blank=True)
+    preferred_locale = models.CharField(max_length=2, choices=Locale.choices, default=Locale.ARABIC)
+    appearance = models.CharField(max_length=6, choices=Appearance.choices, default=Appearance.SYSTEM)
+    timezone_display = models.CharField(max_length=63, default="UTC")
     role = models.CharField(
         max_length=16,
         choices=Role.choices,

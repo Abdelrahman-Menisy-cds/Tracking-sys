@@ -11,10 +11,39 @@ class LoginSerializer(serializers.Serializer):
 
 
 class CurrentUserSerializer(serializers.Serializer):
-    """Authoritative identity representation for /auth/me."""
+    """Authoritative identity and preference representation for /auth/me."""
 
     id = serializers.IntegerField(read_only=True, source="pk")
     email = serializers.EmailField(read_only=True)
     full_name = serializers.CharField(read_only=True)
     role = serializers.CharField(read_only=True)
     is_active = serializers.BooleanField(read_only=True)
+    preferred_locale = serializers.CharField(read_only=True)
+    appearance = serializers.CharField(read_only=True)
+    timezone_display = serializers.CharField(read_only=True)
+
+
+class CurrentUserUpdateSerializer(serializers.Serializer):
+    """The complete allowlist for a signed-in user's own profile changes."""
+
+    full_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    preferred_locale = serializers.ChoiceField(choices=("ar", "en"), required=False)
+    appearance = serializers.ChoiceField(choices=("system", "light", "dark"), required=False)
+    timezone_display = serializers.CharField(max_length=63, required=False, allow_blank=False)
+
+    def validate(self, attrs):
+        protected_fields = set(self.initial_data) - set(self.fields)
+        if protected_fields:
+            raise serializers.ValidationError(
+                {field_name: ["This field is managed by the organization."] for field_name in protected_fields}
+            )
+        return attrs
+
+    def update(self, user, validated_data):
+        for field_name, field_value in validated_data.items():
+            setattr(user, field_name, field_value)
+        user.save(update_fields=list(validated_data))
+        return user
+
+    def create(self, validated_data):
+        raise NotImplementedError("Current-user updates always apply to an existing user.")

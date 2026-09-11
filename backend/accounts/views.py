@@ -3,7 +3,7 @@
 Contract endpoints (architecture-security.md §6):
   POST /api/v1/auth/login
   POST /api/v1/auth/logout
-  GET  /api/v1/auth/me
+  GET/PATCH /api/v1/auth/me
 
 CSRF stays enforced on unsafe methods (no csrf_exempt anywhere).
 """
@@ -22,7 +22,7 @@ class LoginRateThrottle(AnonRateThrottle):
     scope = "login"
 
 
-from accounts.serializers import CurrentUserSerializer, LoginSerializer
+from accounts.serializers import CurrentUserSerializer, CurrentUserUpdateSerializer, LoginSerializer
 from accounts.services import sign_in, sign_out
 
 
@@ -84,3 +84,9 @@ class LogoutView(APIView):
 class MeView(APIView):
     def get(self, request):
         return Response({"data": CurrentUserSerializer(request.user).data})
+
+    def patch(self, request):
+        serializer = CurrentUserUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.update(request.user, serializer.validated_data)
+        return Response({"data": CurrentUserSerializer(user).data})

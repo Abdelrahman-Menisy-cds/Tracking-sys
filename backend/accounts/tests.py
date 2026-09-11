@@ -43,6 +43,101 @@ def _csrf(client, path="/api/v1/auth/csrf"):
 
 
 # ---------------------------------------------------------------------------
+# Profile and preference management
+# ---------------------------------------------------------------------------
+
+@pytest.mark.django_db
+def test_me_patch_persists_permitted_profile_preferences_and_returns_authoritative_values(anon_client, active_user):
+    token = _csrf(anon_client)
+    anon_client.force_login(active_user)
+
+    response = anon_client.patch(
+        "/api/v1/auth/me",
+        {
+            "full_name": "صباح فؤاد",
+            "preferred_locale": "en",
+            "appearance": "dark",
+            "timezone_display": "Africa/Cairo",
+        },
+        format="json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+
+    assert response.status_code == 200
+    assert response.data["data"] == {
+        "id": active_user.pk,
+        "email": "sabah@example.com",
+        "full_name": "صباح فؤاد",
+        "role": User.Role.EMPLOYEE,
+        "is_active": True,
+        "preferred_locale": "en",
+        "appearance": "dark",
+        "timezone_display": "Africa/Cairo",
+    }
+    active_user.refresh_from_db()
+    assert active_user.full_name == "صباح فؤاد"
+    assert active_user.preferred_locale == "en"
+    assert active_user.appearance == "dark"
+    assert active_user.timezone_display == "Africa/Cairo"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("field_name", "invalid_value"), [("preferred_locale", "fr"), ("appearance", "neon")])
+def test_me_patch_rejects_invalid_preference_enums(anon_client, active_user, field_name, invalid_value):
+    token = _csrf(anon_client)
+    anon_client.force_login(active_user)
+
+    response = anon_client.patch(
+        "/api/v1/auth/me",
+        {field_name: invalid_value},
+        format="json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+
+    assert response.status_code == 400
+    active_user.refresh_from_db()
+    assert active_user.preferred_locale == "ar"
+    assert active_user.appearance == "system"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("protected_field", "tampered_value"),
+    [("email", "attacker@example.com"), ("role", User.Role.HR), ("is_active", False)],
+)
+def test_me_patch_rejects_protected_fields_without_mutation(anon_client, active_user, protected_field, tampered_value):
+    token = _csrf(anon_client)
+    anon_client.force_login(active_user)
+
+    response = anon_client.patch(
+        "/api/v1/auth/me",
+        {"full_name": "Attempted Change", protected_field: tampered_value},
+        format="json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+
+    assert response.status_code == 400
+    active_user.refresh_from_db()
+    assert active_user.full_name == "Sabah Fouad"
+    assert active_user.email == "sabah@example.com"
+    assert active_user.role == User.Role.EMPLOYEE
+    assert active_user.is_active is True
+
+
+def test_me_patch_requires_authentication(anon_client):
+    token = _csrf(anon_client)
+
+    response = anon_client.patch(
+        "/api/v1/auth/me",
+        {"appearance": "light"},
+        format="json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+
+    assert response.status_code == 401
+
+
+# ---------------------------------------------------------------------------
 # Sign in: valid active credentials
 # ---------------------------------------------------------------------------
 
