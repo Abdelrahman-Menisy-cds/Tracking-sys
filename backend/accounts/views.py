@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from accounts.authentication import CsrfEnforcedSessionAuthentication
 from accounts.throttles import MutationRateThrottle
+from config.api import error_payload
 
 
 class LoginRateThrottle(AnonRateThrottle):
@@ -62,10 +63,13 @@ class LoginView(APIView):
             password=serializer.validated_data["password"],
         )
         if error is not None:
-            # Generic safe response regardless of cause (invalid password,
-            # unknown email, or inactive account): no account enumeration.
             return Response(
-                {"error": {"code": "invalid_credentials", "message": "Unable to sign in with the provided credentials.", "fields": {}}},
+                error_payload(
+                    code="invalid_credentials",
+                    message="Unable to sign in with the provided credentials.",
+                    fields={},
+                    request=request,
+                ),
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(

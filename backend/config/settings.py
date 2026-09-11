@@ -35,6 +35,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "config.api.RequestIDMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -117,6 +118,7 @@ REST_FRAMEWORK = {
         "accounts.permissions.IsAuthenticated401",
     ],
     "UNAUTHENTICATED_USER": "django.contrib.auth.models.AnonymousUser",
+    "EXCEPTION_HANDLER": "config.api.api_exception_handler",
     "DEFAULT_THROTTLE_RATES": {
         "login": "10/min",
         "mutation": "60/min",

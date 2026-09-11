@@ -42,6 +42,22 @@ def test_notifications_list_is_scoped_to_current_user(authenticated_client, noti
 
     assert response.status_code == 200
     assert [notification["id"] for notification in response.data["data"]] == [own_notification.pk]
+    assert response.data["meta"] == {"page": 1, "page_size": 20, "count": 1, "total_pages": 1}
+
+
+@pytest.mark.django_db
+def test_notifications_list_enforces_page_size_bound(authenticated_client, notification_owner):
+    notifications = [
+        Notification.objects.create(recipient=notification_owner, kind="request_updated", title=f"Notification {number}")
+        for number in range(25)
+    ]
+
+    response = authenticated_client.get("/api/v1/notifications?page=2&page_size=999")
+
+    assert response.status_code == 200
+    assert len(response.data["data"]) == 5
+    assert response.data["meta"] == {"page": 2, "page_size": 20, "count": 25, "total_pages": 2}
+    assert {notification["id"] for notification in response.data["data"]} == {notification.pk for notification in notifications[:5]}
 
 
 @pytest.mark.django_db
@@ -160,6 +176,12 @@ def test_notification_read_state_rejects_other_fields(authenticated_client, noti
     )
 
     assert response.status_code == 400
+    assert response.data["error"] == {
+        "code": "validation_error",
+        "message": "Validation failed.",
+        "fields": {"title": ["This field cannot be updated."]},
+        "request_id": response["X-Request-ID"],
+    }
     notification.refresh_from_db()
     assert notification.title == "Original title"
     assert notification.read_at is None

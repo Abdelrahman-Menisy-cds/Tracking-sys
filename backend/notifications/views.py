@@ -4,14 +4,20 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.throttles import MutationRateThrottle
+from config.api import NotificationPagination
 from notifications.models import Notification
 from notifications.serializers import NotificationReadStateSerializer, NotificationSerializer
 
 
 class NotificationListView(APIView):
     def get(self, request):
-        notifications = Notification.objects.filter(recipient=request.user)
-        return Response({"data": NotificationSerializer(notifications, many=True).data})
+        paginator = NotificationPagination()
+        notification_page = paginator.paginate_queryset(
+            Notification.objects.filter(recipient=request.user),
+            request,
+            view=self,
+        )
+        return paginator.get_paginated_response(NotificationSerializer(notification_page, many=True).data)
 
 
 class NotificationReadStateView(APIView):

@@ -95,6 +95,10 @@ def test_me_patch_rejects_invalid_preference_enums(anon_client, active_user, fie
     )
 
     assert response.status_code == 400
+    assert response.data["error"]["code"] == "validation_error"
+    assert response.data["error"]["message"] == "Validation failed."
+    assert field_name in response.data["error"]["fields"]
+    assert response.data["error"]["request_id"] == response["X-Request-ID"]
     active_user.refresh_from_db()
     assert active_user.preferred_locale == "ar"
     assert active_user.appearance == "system"
@@ -117,6 +121,12 @@ def test_me_patch_rejects_protected_fields_without_mutation(anon_client, active_
     )
 
     assert response.status_code == 400
+    assert response.data["error"] == {
+        "code": "validation_error",
+        "message": "Validation failed.",
+        "fields": {protected_field: ["This field is managed by the organization."]},
+        "request_id": response["X-Request-ID"],
+    }
     active_user.refresh_from_db()
     assert active_user.full_name == "Sabah Fouad"
     assert active_user.email == "sabah@example.com"
@@ -226,7 +236,9 @@ def test_login_unknown_email_and_wrong_password_and_inactive_are_generic(anon_cl
         assert response.status_code == 400
         assert response.data["error"]["code"] == "invalid_credentials"
 
-    # Non-enumerating: identical bodies for unknown email vs wrong password
+    # Non-enumerating: identical credentials error aside from per-request correlation IDs.
+    for response in (unknown, wrong, inactive):
+        response.data["error"].pop("request_id")
     assert response.data == unknown.data == wrong.data
 
     # No session was granted in any failure case
