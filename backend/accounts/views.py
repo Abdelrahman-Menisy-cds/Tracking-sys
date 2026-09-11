@@ -9,10 +9,19 @@ CSRF stays enforced on unsafe methods (no csrf_exempt anywhere).
 """
 from django.middleware.csrf import get_token
 from rest_framework import status
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.authentication import CsrfEnforcedSessionAuthentication
+
+
+class LoginRateThrottle(AnonRateThrottle):
+    """Limit unauthenticated login attempts to 10 per minute per IP."""
+
+    scope = "login"
+
+
 from accounts.serializers import CurrentUserSerializer, LoginSerializer
 from accounts.services import sign_in, sign_out
 
@@ -37,6 +46,7 @@ class LoginView(APIView):
 
     permission_classes = []  # anonymous callers must reach this endpoint
     authentication_classes = []  # anonymous callers; CSRF enforced in post()
+    throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
         # CSRF is enforced here explicitly because this view opts out of the

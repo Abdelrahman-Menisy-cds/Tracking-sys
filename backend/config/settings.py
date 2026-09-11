@@ -118,6 +118,9 @@ REST_FRAMEWORK = {
         "accounts.permissions.IsAuthenticated401",
     ],
     "UNAUTHENTICATED_USER": "django.contrib.auth.models.AnonymousUser",
+    "DEFAULT_THROTTLE_RATES": {
+        "login": "10/min",
+    },
 }
 
 # Session / CSRF / security middleware flags per the approved architecture
@@ -137,8 +140,11 @@ CSRF_COOKIE_SAMESITE = "Lax"
 CSRF_TRUSTED_ORIGINS = [
     o.strip() for o in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000").split(",") if o.strip()
 ]
-CSRF_COOKIE_SECURE = not DEBUG
-SESSION_COOKIE_SECURE = not DEBUG
+# Cookies are Secure by default, including DEBUG mode. For local HTTP-only
+# development, explicitly opt in with DJANGO_ALLOW_INSECURE_COOKIES=1.
+ALLOW_INSECURE_COOKIES = os.getenv("DJANGO_ALLOW_INSECURE_COOKIES", "0") == "1"
+CSRF_COOKIE_SECURE = not ALLOW_INSECURE_COOKIES
+SESSION_COOKIE_SECURE = not ALLOW_INSECURE_COOKIES
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"

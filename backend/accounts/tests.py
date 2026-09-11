@@ -7,6 +7,7 @@ Maps to:
 """
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from rest_framework.test import APIClient
 
 User = get_user_model()
@@ -57,6 +58,7 @@ def test_login_active_user_sets_authenticated_rotated_secure_session(anon_client
     cookie = anon_client.cookies["heya_fawda_sessionid"]
     assert cookie.value
     assert cookie["httponly"] is True
+    assert cookie["secure"] is True
     assert cookie["samesite"] == "Lax"
     # Session key was rotated (different from any pre-login session)
     assert response.wsgi_request.session.session_key
@@ -158,6 +160,15 @@ def test_login_without_csrf_token_is_rejected(anon_client, active_user):
         {"email": "sabah@example.com", "password": "correct-horse-battery"},
     )
     assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_login_is_rate_limited_after_ten_attempts(anon_client):
+    cache.clear()
+    responses = [_login_response(anon_client, "ghost@example.com", "wrong-pass") for _ in range(11)]
+    assert [response.status_code for response in responses[:10]] == [400] * 10
+    assert responses[10].status_code == 429
+    cache.clear()
 
 
 # ---------------------------------------------------------------------------
