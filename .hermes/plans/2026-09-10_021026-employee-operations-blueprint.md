@@ -12,8 +12,9 @@
 
 | Decision | Value | Why / Source |
 |---|---|---|
-| Product name | **هي فوضى؟ — Employee Operations** | User-locked. Arabic brand; English descriptor for repo, docs, URLs, deployment. Never translate the name literally. |
+| Product name | **هي فوضى؟** — Franco / English-facing: **Heh Fawda?**; descriptor: **Employee Operations** | User-locked. Use «هي فوضى؟» in Arabic UI/brand; use `Heh Fawda?` where Latin characters are needed (English UI, domains, docs, deploy labels). Never translate the phrase literally. |
 | UI language | Arabic-first bilingual UI, complete English switch, RTL + LTR from day one | User-locked |
+| Appearance | System, Light, and Dark; **System is default** | System follows `prefers-color-scheme`; a signed-in user override persists server-side and must apply before UI render. |
 | Tagline | من الفوضى إلى النظام — *From chaos to clarity* (recommended, user may still change) | Alternatives: «طلباتك وساعاتك… في مكان واحد»، «كل طلب له صاحب، وكل ساعة لها حساب» |
 | Primary workflow | **BMAD Method (BMM module track)** | User decision: product-team fit outweighs the PDF's SpecKit requirement |
 | Spec artifacts | Keep a SpecKit-compatible `specs/` layout alongside BMAD as the traceability deliverable | BMAD drives the process; `specs/` stays the single requirements authority |
@@ -182,9 +183,12 @@ Original Egyptian-comedy-inspired identity (stressed HR/clipboard mascot asking
 «هي فوضى؟» while the system organizes the mess into requests and time cards) —
 **not** a copy of any specific film, actor, character, or poster. Humor lives in the
 mascot, microcopy, empty states, onboarding; approvals/permissions/reports stay
-professional. Deliverables: Arabic/English wordmark, icon, light/dark variants,
-favicon, accessible palette (primary/secondary/success/warning/error/neutral),
-Arabic+Latin font pairing, spacing/usage rules.
+professional. Deliverables: Arabic wordmark («هي فوضى؟»), Franco/English-facing
+wordmark (`Heh Fawda?`), icon, accessible palette
+(primary/secondary/success/warning/error/neutral), Arabic+Latin font pairing,
+spacing/usage rules, and color tokens validated in System, Light, and Dark modes.
+System is the default and follows `prefers-color-scheme`; Light/Dark are explicit
+user overrides persisted server-side and applied before UI render.
 
 ## 5. Workflow: BMAD primary
 
@@ -269,9 +273,10 @@ registered tool costs context.
 - [x] Local git repo initialized; remote `origin` added; initial commit pushed
 - [x] Install BMAD project-local — BMM v6.12.0 stable + BMad Core v6.12.0, configured for Hermes; 29 project-local skills installed under `.agents/skills`; output root `_bmad-output/` created (2026-09-10)
 - [x] Commit the BMAD installation (`_bmad/` + `.agents/`; generated `_bmad-output/` excluded) and push it to `main` — `f683cc2` (2026-09-10)
-- [ ] Write constitution + product brief + permission matrix + state machines into `specs/` (product_lead work, user-reviewed)
-- [ ] Create 7 Hermes profiles (`--clone`), set per-profile models (§2), write SOUL.md personas, distribute shared rules
-- [ ] Smoke-test every profile: `timeout 90 hermes -p <name> chat -q "reply OK"`, verify the reply in the profile's `state.db`
+- [x] Create dedicated Tracking-sys project context and draft constitution (`docs/PROJECT_CONTEXT.md`, `specs/constitution.md`) and push — `32145f1` (2026-09-11)
+- [x] Create 7 isolated Tracking-sys Hermes profiles, project-only rules/personas/memories, model assignments, and live smoke-test them (`OK` verified in each profile `state.db`) (2026-09-11)
+- [x] Record completed work by delivery level in `docs/WORK_LOG.md`; lock the Franco name `Heh Fawda?` and System/Light/Dark appearance policy (System default) (2026-09-11)
+- [ ] Approve constitution, then write product brief + permission matrix + state machines into `specs/` (product_lead work, user-reviewed)
 - [ ] Configure Phase-1 MCPs + project-local skills
 - [ ] BMAD planning phase → §9 decisions resolved
 - [ ] Then implementation begins (no app code before the constitution is approved)

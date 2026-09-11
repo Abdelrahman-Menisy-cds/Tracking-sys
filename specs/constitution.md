@@ -4,9 +4,10 @@
 
 ## 1. Product boundary
 
-هي فوضى؟ is an Arabic-first bilingual web application for employee requests,
-timesheets, approvals, notifications, and role-scoped reporting. It is not an
-ERP, payroll, biometric attendance, or generic workflow-builder product.
+**هي فوضى؟** (Franco / English-facing name: **Heh Fawda?**) is an Arabic-first
+bilingual web application for employee requests, timesheets, approvals,
+notifications, and role-scoped reporting. It is not an ERP, payroll, biometric
+attendance, or generic workflow-builder product.
 
 ## 2. Architecture
 
@@ -50,19 +51,27 @@ Every screen defines loading, empty, error, validation, disabled, success,
 keyboard, mobile, and responsive behavior. Brand humor must not reduce clarity
 or professionalism in approvals, permissions, and reports.
 
-## 8. Delivery discipline
+## 8. Appearance preference
+
+The application supports `system`, `light`, and `dark` appearance preferences.
+`system` is the default: it follows the operating-system `prefers-color-scheme`
+setting. A signed-in user may explicitly select light or dark; the preference
+must persist server-side and apply before the main UI renders, avoiding a visible
+flash of the wrong theme. The interface must remain accessible in every mode.
+
+## 9. Delivery discipline
 
 BMAD artifacts are the planning authority; Git is the source of truth for code.
 Use focused branches/worktrees and small commits. QA is a read-only release gate.
 No deployment or external production mutation occurs without explicit approval,
 verification, and rollback readiness.
 
-## 9. Evidence and honesty
+## 10. Evidence and honesty
 
 Do not claim an artifact, test, deployment, or integration is complete without
 real tool output. State assumptions, blockers, and residual risks plainly.
 
-## 10. Separation
+## 11. Separation
 
 This constitution, the project Team Rules, BMAD artifacts, project skills,
 profiles, and memories belong only to Tracking-sys. Odoo Team Rules, skills,
