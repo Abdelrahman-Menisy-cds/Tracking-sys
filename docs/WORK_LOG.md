@@ -77,27 +77,36 @@ Planned next: consolidate approved decisions into the PRD/spec artifacts and imp
 
 ## Level 5 — Build and verification
 
-**Status:** In progress — Stories 1.1 and 1.2 accepted; implementation continues
+**Status:** In progress — Stories 1.1–1.3 accepted; implementation continues
 
 Level 5 readiness was validated on 2026-09-11: requirements are covered by five epics and implementation-ready stories.
 
 Story 1.1 evidence:
 
 - Secure Django session authentication with sign-in, sign-out, inactive-account handling, CSRF enforcement, Secure/HttpOnly cookies, login throttling, and active-session revocation on deactivation.
-- Verification: 8 targeted tests passed; Django system checks passed; migration drift check passed; Python compilation and whitespace checks passed.
+- Verification: targeted tests, Django checks, migration-drift check, compilation and whitespace checks passed; QA/code-quality verdict APPROVED.
 - Commits: `10e77ab`, `5840e54`, `bbce908`, `d9cffd9`.
-- QA/code-quality verdict: APPROVED. No application release or PostgreSQL provisioning is claimed.
 
 Story 1.2 evidence (accepted 2026-09-12):
 
 - Profile/preferences (`GET/PATCH /api/v1/auth/me`) with allowlisted `full_name`, `preferred_locale` (`ar`/`en`), `appearance` (`system`/`light`/`dark`), and `timezone_display`; protected-field tampering rejected without mutation.
 - Minimal scoped notifications app: recipient-only `GET /api/v1/notifications` (bounded pagination, max page size 20), `PATCH /api/v1/notifications/{id}` restricted to `is_read` with idempotent `read_at` timestamps.
-- Shared API hardening: stable JSON error envelope with request IDs (validated `[A-Za-z0-9._-]{1,128}`, server-generated UUID for invalid clients), API-scoped 404 envelope, `422` for serializer validation, mutation throttles at 60/min/user, login throttle 10/min/IP, header-generating middleware ordered before security redirects.
-- Verification on acceptance: 31 tests passed (plain project-root `pytest` discovers both suites); Django system checks passed; migration-drift check clean; `git diff --check` clean; spec-compliance and code-quality reviews APPROVED.
+- Shared API hardening: stable JSON error envelope with validated request IDs, API-scoped 404 envelope, `422` for serializer validation, mutation throttles at 60/min/user, login throttle 10/min/IP, middleware ordered before security redirects.
+- Verification on acceptance: 31 tests passed; Django system checks passed; migration-drift check clean; `git diff --check` clean; reviews APPROVED.
 - Commits: `ae97038`, `fbe4e7b`, `89337b8`, `626dea1`, `48994d9`, `7cc7d3e`, `337f88a`, `bdaeba5`.
-- PostgreSQL not provisioned (tests use the SQLite test settings); PDF and planning artifacts untouched.
 
-Planned outputs: remaining Django/DRF backend (Story 1.3 HR employee administration and reporting lines), React frontend, PostgreSQL schema on provisioned DB, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
+Story 1.3 evidence (accepted 2026-09-12):
+
+- HR-only employee administration under `/api/v1/employees`: bounded list (page size 20, max 50), retrieve, create, update; authoritative allowlist (`full_name`, `email`, `employee_number`, `job_title`, `role`, `manager`, `is_active`).
+- Manager validation rejects self-management, missing/inactive managers, and reporting cycles with field-level errors and no partial save.
+- Deactivation reuses `deactivate_user()` so active sessions are revoked; every create/update writes an append-only `AuditEvent` with actor, subject, UTC timestamp, request ID, and before/after values.
+- App-layer duplicate validation: duplicate normalized email or `employee_number` returns field-level `422` instead of DB `IntegrityError` 500; DB unique indexes remain the backstop.
+- Non-HR users receive the same 404-safe envelope as unknown IDs; no employee data disclosure; GET unthrottled, mutations at 60/min/user.
+- Verification on acceptance: 53 tests passed (all suites; no regressions), 22 employee-admin tests; Django system check clean; migration-drift check clean; spec + code-quality gate APPROVED.
+- Commits: `84e4341`, `25e6f53`.
+- Known minor: a concurrent-create race can still surface an unhandled `IntegrityError` 500; deferred to a later hardening pass. HR-created accounts receive no usable password yet (issuance/reset is a separate story).
+
+Planned outputs: remaining Django/DRF backend (Epic 2 requests), React frontend, PostgreSQL schema on provisioned DB, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
 
 ## Scope boundary
 
