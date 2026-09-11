@@ -77,9 +77,9 @@ Planned next: consolidate approved decisions into the PRD/spec artifacts and imp
 
 ## Level 5 — Build and verification
 
-**Status:** In progress — Story 1.1 accepted; implementation continues
+**Status:** In progress — Stories 1.1 and 1.2 accepted; implementation continues
 
-Level 5 readiness was validated on 2026-09-11: requirements are covered by five epics and implementation-ready stories. Story 1.1 was implemented and passed the spec and code-quality gates on 2026-09-12.
+Level 5 readiness was validated on 2026-09-11: requirements are covered by five epics and implementation-ready stories.
 
 Story 1.1 evidence:
 
@@ -88,7 +88,16 @@ Story 1.1 evidence:
 - Commits: `10e77ab`, `5840e54`, `bbce908`, `d9cffd9`.
 - QA/code-quality verdict: APPROVED. No application release or PostgreSQL provisioning is claimed.
 
-Planned outputs: remaining Django/DRF backend, React frontend, PostgreSQL schema, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
+Story 1.2 evidence (accepted 2026-09-12):
+
+- Profile/preferences (`GET/PATCH /api/v1/auth/me`) with allowlisted `full_name`, `preferred_locale` (`ar`/`en`), `appearance` (`system`/`light`/`dark`), and `timezone_display`; protected-field tampering rejected without mutation.
+- Minimal scoped notifications app: recipient-only `GET /api/v1/notifications` (bounded pagination, max page size 20), `PATCH /api/v1/notifications/{id}` restricted to `is_read` with idempotent `read_at` timestamps.
+- Shared API hardening: stable JSON error envelope with request IDs (validated `[A-Za-z0-9._-]{1,128}`, server-generated UUID for invalid clients), API-scoped 404 envelope, `422` for serializer validation, mutation throttles at 60/min/user, login throttle 10/min/IP, header-generating middleware ordered before security redirects.
+- Verification on acceptance: 31 tests passed (plain project-root `pytest` discovers both suites); Django system checks passed; migration-drift check clean; `git diff --check` clean; spec-compliance and code-quality reviews APPROVED.
+- Commits: `ae97038`, `fbe4e7b`, `89337b8`, `626dea1`, `48994d9`, `7cc7d3e`, `337f88a`, `bdaeba5`.
+- PostgreSQL not provisioned (tests use the SQLite test settings); PDF and planning artifacts untouched.
+
+Planned outputs: remaining Django/DRF backend (Story 1.3 HR employee administration and reporting lines), React frontend, PostgreSQL schema on provisioned DB, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
 
 ## Scope boundary
 
