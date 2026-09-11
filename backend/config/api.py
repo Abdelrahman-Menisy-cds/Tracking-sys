@@ -1,3 +1,4 @@
+import re
 from uuid import uuid4
 
 from django.utils.translation import gettext as _
@@ -10,12 +11,16 @@ class RequestIDMiddleware:
     """Attach an identifier to every response for support and audit correlation."""
 
     header_name = "HTTP_X_REQUEST_ID"
+    request_id_pattern = re.compile(r"[A-Za-z0-9._-]{1,128}")
 
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        request.request_id = request.META.get(self.header_name) or uuid4().hex
+        client_request_id = request.META.get(self.header_name, "")
+        if not self.request_id_pattern.fullmatch(client_request_id):
+            client_request_id = uuid4().hex
+        request.request_id = client_request_id
         response = self.get_response(request)
         response["X-Request-ID"] = request.request_id
         return response

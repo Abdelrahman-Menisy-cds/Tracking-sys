@@ -5,6 +5,8 @@ Maps to:
          inactive users cannot authenticate or mutate; session cookie flags.
   Story 1.1 three Given/When/Then blocks.
 """
+import re
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
@@ -40,6 +42,16 @@ def _csrf(client, path="/api/v1/auth/csrf"):
     """Prime the CSRF cookies the SPA receives from the bootstrap GET."""
     client.get(path)
     return client.cookies["heya_fawda_csrftoken"].value
+
+
+@pytest.mark.parametrize("request_id", ["bad\r\nid", "x" * 129, "bad request", "ümlaut"])
+def test_malformed_request_id_gets_safe_server_generated_id(anon_client, request_id):
+    response = anon_client.get("/api/v1/auth/csrf", HTTP_X_REQUEST_ID=request_id)
+
+    assert response.status_code == 200
+    generated_id = response["X-Request-ID"]
+    assert re.fullmatch(r"[0-9a-f]{32}", generated_id)
+    assert generated_id != request_id
 
 
 # ---------------------------------------------------------------------------
