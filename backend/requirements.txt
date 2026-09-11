@@ -1,0 +1,9 @@
+# Heya Fawda? backend dependencies (Story 1.1 baseline)
+Django==5.2.6
+djangorestframework==3.18.1
+python-dotenv==1.2.3
+psycopg==3.3.5
+
+# Test tooling
+pytest==9.1.1
+pytest-django==4.14.0
