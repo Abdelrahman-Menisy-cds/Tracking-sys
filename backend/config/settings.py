@@ -2,12 +2,11 @@
 Django settings for the Heya Fawda? (Tracking-sys) backend.
 
 Local development configuration. Secrets come from environment variables /
-../.env (never committed). PostgreSQL is the target database; a SQLite file is
-used only for the test runner and as a first-run local fallback.
+../.env (never committed). PostgreSQL is the target database; SQLite is an
+explicit local-development fallback.
 """
 from pathlib import Path
 import os
-import sys
 
 from dotenv import load_dotenv
 
@@ -62,9 +61,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# PostgreSQL is the approved database. Tests (and first-run local dev without a
-# provisioned database) use SQLite so the acceptance flow is runnable now.
-if os.getenv("DJANGO_USE_SQLITE", "0") == "1" or "test" in sys.argv:
+# PostgreSQL is the approved database. SQLite is an explicit local fallback.
+if os.getenv("DJANGO_USE_SQLITE", "0") == "1":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
