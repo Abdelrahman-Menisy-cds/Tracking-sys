@@ -1,3 +1,13 @@
+---
+title: "هي فوضى؟ / Heya Fawda? — Architecture and Security Solutioning"
+status: solutioning-draft-pending-review
+created: 2026-09-11
+updated: 2026-09-11
+workflow: BMAD BMM
+owner: architect_security
+scope: architecture-and-security; no application implementation authorization
+---
+
 # هي فوضى؟ / Heya Fawda? — Architecture and Security Solutioning
 
 Status: Solutioning draft; pending approval of the constitution, product brief, UX direction, and unresolved business policies.
