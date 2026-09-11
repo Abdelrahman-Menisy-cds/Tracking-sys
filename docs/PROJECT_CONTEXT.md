@@ -5,7 +5,7 @@ This is the project context for `Tracking-sys` only. It must not be reused for O
 ## Product
 
 - Product name: **هي فوضى؟**
-- Franco / English-facing name: **Heh Fawda?**
+- Franco / English-facing name: **Heya Fawda?**
 - Descriptor: **Employee Operations**
 - Arabic-first bilingual employee requests and time-tracking website.
 - Backend: Django + Django REST Framework.

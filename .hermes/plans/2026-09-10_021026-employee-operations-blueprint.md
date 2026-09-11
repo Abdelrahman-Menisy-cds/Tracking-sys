@@ -12,7 +12,7 @@
 
 | Decision | Value | Why / Source |
 |---|---|---|
-| Product name | **هي فوضى؟** — Franco / English-facing: **Heh Fawda?**; descriptor: **Employee Operations** | User-locked. Use «هي فوضى؟» in Arabic UI/brand; use `Heh Fawda?` where Latin characters are needed (English UI, domains, docs, deploy labels). Never translate the phrase literally. |
+| Product name | **هي فوضى؟** — Franco / English-facing: **Heya Fawda?**; descriptor: **Employee Operations** | User-locked. Use «هي فوضى؟» in Arabic UI/brand; use `Heya Fawda?` where Latin characters are needed (English UI, domains, docs, deploy labels). Never translate the phrase literally. |
 | UI language | Arabic-first bilingual UI, complete English switch, RTL + LTR from day one | User-locked |
 | Appearance | System, Light, and Dark; **System is default** | System follows `prefers-color-scheme`; a signed-in user override persists server-side and must apply before UI render. |
 | Tagline | من الفوضى إلى النظام — *From chaos to clarity* (recommended, user may still change) | Alternatives: «طلباتك وساعاتك… في مكان واحد»، «كل طلب له صاحب، وكل ساعة لها حساب» |
@@ -184,7 +184,7 @@ Original Egyptian-comedy-inspired identity (stressed HR/clipboard mascot asking
 **not** a copy of any specific film, actor, character, or poster. Humor lives in the
 mascot, microcopy, empty states, onboarding; approvals/permissions/reports stay
 professional. Deliverables: Arabic wordmark («هي فوضى؟»), Franco/English-facing
-wordmark (`Heh Fawda?`), icon, accessible palette
+wordmark (`Heya Fawda?`), icon, accessible palette
 (primary/secondary/success/warning/error/neutral), Arabic+Latin font pairing,
 spacing/usage rules, and color tokens validated in System, Light, and Dark modes.
 System is the default and follows `prefers-color-scheme`; Light/Dark are explicit
@@ -275,7 +275,7 @@ registered tool costs context.
 - [x] Commit the BMAD installation (`_bmad/` + `.agents/`; generated `_bmad-output/` excluded) and push it to `main` — `f683cc2` (2026-09-10)
 - [x] Create dedicated Tracking-sys project context and draft constitution (`docs/PROJECT_CONTEXT.md`, `specs/constitution.md`) and push — `32145f1` (2026-09-11)
 - [x] Create 7 isolated Tracking-sys Hermes profiles, project-only rules/personas/memories, model assignments, and live smoke-test them (`OK` verified in each profile `state.db`) (2026-09-11)
-- [x] Record completed work by delivery level in `docs/WORK_LOG.md`; lock the Franco name `Heh Fawda?` and System/Light/Dark appearance policy (System default) (2026-09-11)
+- [x] Record completed work by delivery level in `docs/WORK_LOG.md`; lock the Franco name `Heya Fawda?` and System/Light/Dark appearance policy (System default) (2026-09-11)
 - [ ] Approve constitution, then write product brief + permission matrix + state machines into `specs/` (product_lead work, user-reviewed)
 - [ ] Configure Phase-1 MCPs + project-local skills
 - [ ] BMAD planning phase → §9 decisions resolved

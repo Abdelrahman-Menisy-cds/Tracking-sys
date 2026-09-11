@@ -4,7 +4,7 @@
 
 ## 1. Product boundary
 
-**هي فوضى؟** (Franco / English-facing name: **Heh Fawda?**) is an Arabic-first
+**هي فوضى؟** (Franco / English-facing name: **Heya Fawda?**) is an Arabic-first
 bilingual web application for employee requests, timesheets, approvals,
 notifications, and role-scoped reporting. It is not an ERP, payroll, biometric
 attendance, or generic workflow-builder product.

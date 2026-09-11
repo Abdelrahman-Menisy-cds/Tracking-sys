@@ -1,4 +1,4 @@
-# Heh Fawda? — Work Log
+# Heya Fawda? — Work Log
 
 > Chronological, evidence-backed log for the Tracking-sys project only.
 > Times use EEST (UTC+03:00). “Level” indicates delivery maturity, not effort.
@@ -49,7 +49,7 @@
 
 Completed:
 
-- Product identity fixed to **Heh Fawda?** (Franco rendering of «هي فوضى؟»).
+- Product identity fixed to **Heya Fawda?** (Franco rendering of «هي فوضى؟»).
 - Arabic-first bilingual direction and original Egyptian-comedy-inspired brand direction established.
 - Theme policy defined: System is the default; Light and Dark are user-selectable overrides.
 - Initial actors, permission matrix, request/timesheet state-machine direction, MVP boundary, API outline, and test baseline captured in the master plan.
