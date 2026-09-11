@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "rest_framework",
     # Project apps
     "accounts",
+    "notifications",
 ]
 
 # The Django admin is deliberately not installed for Story 1.1 (HR is an

@@ -1,0 +1,117 @@
+import pytest
+from django.contrib.auth import get_user_model
+from rest_framework.test import APIClient
+
+from notifications.models import Notification
+
+User = get_user_model()
+
+
+@pytest.fixture
+def notification_owner(db):
+    return User.objects.create_user(email="owner@example.com", password="secure-password")
+
+
+@pytest.fixture
+def other_user(db):
+    return User.objects.create_user(email="other@example.com", password="secure-password")
+
+
+@pytest.fixture
+def authenticated_client(notification_owner):
+    client = APIClient(enforce_csrf_checks=True)
+    client.force_login(notification_owner)
+    client.get("/api/v1/auth/csrf")
+    return client
+
+
+def csrf_token(client):
+    return client.cookies["heya_fawda_csrftoken"].value
+
+
+@pytest.mark.django_db
+def test_notifications_list_is_scoped_to_current_user(authenticated_client, notification_owner, other_user):
+    own_notification = Notification.objects.create(
+        recipient=notification_owner, kind="request_updated", title="Own notification"
+    )
+    Notification.objects.create(recipient=other_user, kind="request_updated", title="Other notification")
+
+    response = authenticated_client.get("/api/v1/notifications")
+
+    assert response.status_code == 200
+    assert [notification["id"] for notification in response.data["data"]] == [own_notification.pk]
+
+
+@pytest.mark.django_db
+def test_notification_read_state_can_be_marked_and_unmarked(authenticated_client, notification_owner):
+    notification = Notification.objects.create(
+        recipient=notification_owner, kind="request_updated", title="Needs attention"
+    )
+
+    marked_read = authenticated_client.patch(
+        f"/api/v1/notifications/{notification.pk}",
+        {"is_read": True},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token(authenticated_client),
+    )
+
+    assert marked_read.status_code == 200
+    assert marked_read.data["data"]["is_read"] is True
+    notification.refresh_from_db()
+    assert notification.read_at is not None
+
+    marked_unread = authenticated_client.patch(
+        f"/api/v1/notifications/{notification.pk}",
+        {"is_read": False},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token(authenticated_client),
+    )
+
+    assert marked_unread.status_code == 200
+    notification.refresh_from_db()
+    assert notification.read_at is None
+
+
+@pytest.mark.django_db
+def test_other_users_notification_cannot_be_updated(authenticated_client, other_user):
+    notification = Notification.objects.create(
+        recipient=other_user, kind="request_updated", title="Private notification"
+    )
+
+    response = authenticated_client.patch(
+        f"/api/v1/notifications/{notification.pk}",
+        {"is_read": True},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token(authenticated_client),
+    )
+
+    assert response.status_code == 404
+    notification.refresh_from_db()
+    assert notification.read_at is None
+
+
+@pytest.mark.django_db
+def test_notification_endpoints_require_authentication():
+    client = APIClient(enforce_csrf_checks=True)
+
+    assert client.get("/api/v1/notifications").status_code == 401
+    assert client.patch("/api/v1/notifications/1", {"is_read": True}, format="json").status_code == 403
+
+
+@pytest.mark.django_db
+def test_notification_read_state_rejects_other_fields(authenticated_client, notification_owner):
+    notification = Notification.objects.create(
+        recipient=notification_owner, kind="request_updated", title="Original title"
+    )
+
+    response = authenticated_client.patch(
+        f"/api/v1/notifications/{notification.pk}",
+        {"is_read": True, "title": "Tampered title"},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token(authenticated_client),
+    )
+
+    assert response.status_code == 400
+    notification.refresh_from_db()
+    assert notification.title == "Original title"
+    assert notification.read_at is None
