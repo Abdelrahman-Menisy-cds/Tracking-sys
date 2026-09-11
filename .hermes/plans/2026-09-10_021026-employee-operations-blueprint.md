@@ -281,7 +281,8 @@ registered tool costs context.
 - [x] Produce provisional UX/brand and architecture/security solutioning artifacts; UX `bfd565e`, architecture `e36a1cd` (2026-09-11)
 - [x] Approve constitution, product brief, UX direction, and architecture/security baseline (user approval recorded 2026-09-11); §9 policy decisions remain open
 - [ ] BMAD planning phase → resolve §9 decisions, then produce approved PRD/specs, epics/stories, and implementation backlog
-- [ ] Then implementation begins (no app code before approval gates)
+- [x] Begin implementation after approval gates — Story 1.1 accepted after spec, test, Django-check, migration, compilation, whitespace, and code-quality verification (commits `10e77ab`, `5840e54`, `bbce908`, `d9cffd9`; 2026-09-12)
+- [ ] Continue implementation with Story 1.2 only after its contract is reviewed
 
 ## 11. Sources
 

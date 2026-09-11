@@ -77,11 +77,18 @@ Planned next: consolidate approved decisions into the PRD/spec artifacts and imp
 
 ## Level 5 — Build and verification
 
-**Status:** Ready for development; implementation not started
+**Status:** In progress — Story 1.1 accepted; implementation continues
 
-Level 5 readiness was validated on 2026-09-11: requirements are covered by five epics and implementation-ready stories; no application code or release evidence exists yet.
+Level 5 readiness was validated on 2026-09-11: requirements are covered by five epics and implementation-ready stories. Story 1.1 was implemented and passed the spec and code-quality gates on 2026-09-12.
 
-Planned outputs: Django/DRF backend, React frontend, PostgreSQL schema, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
+Story 1.1 evidence:
+
+- Secure Django session authentication with sign-in, sign-out, inactive-account handling, CSRF enforcement, Secure/HttpOnly cookies, login throttling, and active-session revocation on deactivation.
+- Verification: 8 targeted tests passed; Django system checks passed; migration drift check passed; Python compilation and whitespace checks passed.
+- Commits: `10e77ab`, `5840e54`, `bbce908`, `d9cffd9`.
+- QA/code-quality verdict: APPROVED. No application release or PostgreSQL provisioning is claimed.
+
+Planned outputs: remaining Django/DRF backend, React frontend, PostgreSQL schema, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
 
 ## Scope boundary
 
