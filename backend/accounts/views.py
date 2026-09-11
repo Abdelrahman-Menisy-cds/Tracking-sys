@@ -9,11 +9,12 @@ CSRF stays enforced on unsafe methods (no csrf_exempt anywhere).
 """
 from django.middleware.csrf import get_token
 from rest_framework import status
-from rest_framework.throttling import AnonRateThrottle
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
 from accounts.authentication import CsrfEnforcedSessionAuthentication
+from accounts.throttles import MutationRateThrottle
 
 
 class LoginRateThrottle(AnonRateThrottle):
@@ -82,6 +83,13 @@ class LogoutView(APIView):
 
 
 class MeView(APIView):
+    throttle_classes = [MutationRateThrottle]
+
+    def get_throttles(self):
+        if self.request.method == "GET":
+            return []
+        return super().get_throttles()
+
     def get(self, request):
         return Response({"data": CurrentUserSerializer(request.user).data})
 

@@ -119,6 +119,7 @@ REST_FRAMEWORK = {
     "UNAUTHENTICATED_USER": "django.contrib.auth.models.AnonymousUser",
     "DEFAULT_THROTTLE_RATES": {
         "login": "10/min",
+        "mutation": "60/min",
     },
 }
 

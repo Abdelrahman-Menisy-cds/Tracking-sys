@@ -137,6 +137,27 @@ def test_me_patch_requires_authentication(anon_client):
     assert response.status_code == 401
 
 
+@pytest.mark.django_db
+def test_me_patch_is_throttled_after_sixty_mutations(anon_client, active_user):
+    cache.clear()
+    token = _csrf(anon_client)
+    anon_client.force_login(active_user)
+
+    responses = [
+        anon_client.patch(
+            "/api/v1/auth/me",
+            {"appearance": "light"},
+            format="json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        for _ in range(61)
+    ]
+
+    assert [response.status_code for response in responses[:60]] == [200] * 60
+    assert responses[60].status_code == 429
+    cache.clear()
+
+
 # ---------------------------------------------------------------------------
 # Sign in: valid active credentials
 # ---------------------------------------------------------------------------

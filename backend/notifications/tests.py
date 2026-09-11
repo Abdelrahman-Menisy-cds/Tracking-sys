@@ -1,5 +1,7 @@
 import pytest
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from notifications.models import Notification
@@ -70,6 +72,52 @@ def test_notification_read_state_can_be_marked_and_unmarked(authenticated_client
     assert marked_unread.status_code == 200
     notification.refresh_from_db()
     assert notification.read_at is None
+
+
+@pytest.mark.django_db
+def test_repeated_mark_read_preserves_original_read_at(authenticated_client, notification_owner):
+    original_read_at = timezone.now()
+    notification = Notification.objects.create(
+        recipient=notification_owner,
+        kind="request_updated",
+        title="Already read",
+        read_at=original_read_at,
+    )
+
+    response = authenticated_client.patch(
+        f"/api/v1/notifications/{notification.pk}",
+        {"is_read": True},
+        format="json",
+        HTTP_X_CSRFTOKEN=csrf_token(authenticated_client),
+    )
+
+    assert response.status_code == 200
+    notification.refresh_from_db()
+    assert notification.read_at == original_read_at
+    assert response.data["data"]["read_at"] == original_read_at.isoformat().replace("+00:00", "Z")
+
+
+@pytest.mark.django_db
+def test_notification_read_state_is_throttled_after_sixty_mutations(authenticated_client, notification_owner):
+    cache.clear()
+    notification = Notification.objects.create(
+        recipient=notification_owner, kind="request_updated", title="Needs attention"
+    )
+    token = csrf_token(authenticated_client)
+
+    responses = [
+        authenticated_client.patch(
+            f"/api/v1/notifications/{notification.pk}",
+            {"is_read": True},
+            format="json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+        for _ in range(61)
+    ]
+
+    assert [response.status_code for response in responses[:60]] == [200] * 60
+    assert responses[60].status_code == 429
+    cache.clear()
 
 
 @pytest.mark.django_db
