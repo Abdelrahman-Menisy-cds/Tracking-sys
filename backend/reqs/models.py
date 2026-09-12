@@ -93,6 +93,9 @@ class RequestEvent(models.Model):
         CREATED = "CREATED", "Created"
         EDITED = "EDITED", "Edited"
         SUBMITTED = "SUBMITTED", "Submitted"
+        APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
+        RETURNED = "RETURNED", "Returned"
 
     request = models.ForeignKey(
         EmployeeRequest,
@@ -228,3 +231,32 @@ class SubmissionIdempotencyRecord(models.Model):
     class Meta:
         verbose_name = "submission idempotency record"
         verbose_name_plural = "submission idempotency records"
+
+
+class DecisionIdempotencyRecord(models.Model):
+    """Stored decision idempotency (Story 2.4): key hash + payload hash + snapshot.
+
+    Same key + same payload (request id + version + action + comment) replays
+    the original 200 response without a duplicate transition; differing
+    payload -> 409. The user FK scopes lookup per reviewer (submission_services
+    note): the view looks up by (key_hash, user) so a key reused by a different
+    reviewer is simply unknown to them, while the same key held by two users
+    never leaks one reviewer's snapshot to the other.
+    """
+
+    key_hash = models.CharField(max_length=64, db_index=True)
+    payload_hash = models.CharField(max_length=64)
+    response_snapshot = models.JSONField()
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="decision_idempotency_records",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["key_hash", "user"], name="uniq_decision_idem_key_user")
+        ]
+        verbose_name = "decision idempotency record"
+        verbose_name_plural = "decision idempotency records"

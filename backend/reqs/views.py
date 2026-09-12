@@ -1,4 +1,8 @@
-"""Request draft endpoints (Story 2.1): requester-scoped create/list/detail/patch."""
+"""Request draft endpoints (Story 2.1): requester-scoped create/list/detail/patch.
+
+Story 2.4 adds RequestDecisionView: reviewer-scope decide endpoint with
+idempotency, 404-safe out-of-scope denials, and 409/422 error envelopes.
+"""
 from django.http import Http404
 from rest_framework import status
 from rest_framework.response import Response
@@ -8,14 +12,23 @@ from accounts.throttles import MutationRateThrottle
 from config.api import RequestPagination, error_payload
 from reqs import serializers as rs
 from reqs import attachment_views  # re-exported for reqs.urls (Story 2.2)
-from reqs.models import EmployeeRequest, SubmissionIdempotencyRecord
+from reqs.models import (
+    DecisionIdempotencyRecord,
+    EmployeeRequest,
+    SubmissionIdempotencyRecord,
+)
 from reqs.services import create_draft, edit_draft
 from reqs.submission_services import (
     SubmissionError,
-    VersionConflict,
+    VersionConflict as SubmitVersionConflict,
     idempotency_fingerprint,
     record_idempotency,
     submit_request,
+)
+from reqs.decision_services import (
+    DecisionStateError,
+    VersionConflict,
+    decide_request,
 )
 
 
@@ -158,7 +171,7 @@ class RequestSubmitView(APIView):
                 ),
                 status=422,
             )
-        except VersionConflict:
+        except SubmitVersionConflict:
             return Response(
                 error_payload(
                     code="version_conflict",
@@ -187,3 +200,136 @@ class RequestSubmitView(APIView):
             snapshot=body,
         )
         return Response(body, status=status.HTTP_200_OK)
+
+
+def _get_request_for_review(user, pk):
+    """Fetch any request the user may review; 404 when it does not exist.
+
+    Scope (manager-of / HR-role) is enforced inside the service under the
+    row lock; out-of-scope there maps back to this same 404 so an
+    unauthorized reviewer learns nothing about the request's existence
+    (permission-matrix.md 404 policy).
+    """
+    try:
+        return EmployeeRequest.objects.get(pk=pk)
+    except (EmployeeRequest.DoesNotExist, ValueError):
+        raise Http404
+
+
+class RequestDecisionView(APIView):
+    """POST /api/v1/requests/{id}/decision (Story 2.4).
+
+    Idempotency-Key required; action approve/reject/return with a
+    non-blank bounded comment for reject/return; version for optimistic
+    concurrency. Same key + payload replays the original response;
+    differing payload -> 409. Idempotency lookup is scoped by reviewer
+    (key_hash, user) so one reviewer's stored snapshot is never visible
+    to another user who guesses the key.
+    """
+
+    throttle_classes = [MutationRateThrottle]
+
+    def post(self, request, pk):
+        request_obj = _get_request_for_review(request.user, pk)
+
+        idempotency_key = request.headers.get("Idempotency-Key", "").strip()
+        if not idempotency_key:
+            return Response(
+                error_payload(
+                    code="idempotency_key_required",
+                    message="An Idempotency-Key header is required to decide a request.",
+                    fields={"idempotency_key": ["Missing Idempotency-Key header."]},
+                    request=request,
+                ),
+                status=422,
+            )
+
+        serializer = rs.DecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        action = serializer.validated_data["action"]
+        comment = serializer.validated_data["comment"]
+        expected_version = serializer.validated_data["version"]
+
+        payload_hash = _decision_payload_hash(
+            request_id=request_obj.pk, version=expected_version, action=action, comment=comment
+        )
+        key_hash = _decision_key_hash(idempotency_key)
+
+        existing = DecisionIdempotencyRecord.objects.filter(
+            key_hash=key_hash, user=request.user
+        ).first()
+        if existing is not None:
+            if existing.payload_hash == payload_hash:
+                return Response(existing.response_snapshot, status=status.HTTP_200_OK)
+            return Response(
+                error_payload(
+                    code="idempotency_conflict",
+                    message="This idempotency key was already used with a different payload.",
+                    fields={"idempotency_key": ["Key reused with different payload."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        try:
+            decided = decide_request(
+                reviewer=request.user,
+                request_obj=request_obj,
+                action=action,
+                comment=comment,
+                version=expected_version,
+            )
+        except VersionConflict:
+            return Response(
+                error_payload(
+                    code="version_conflict",
+                    message="This request changed since you last saw it. Reload and try again.",
+                    fields={"version": ["The provided version is stale."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except DecisionStateError:
+            return Response(
+                error_payload(
+                    code="state_conflict",
+                    message="This action is not possible in the request's current state.",
+                    fields={"status": ["No matching transition for this action and state."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except PermissionError:
+            return Response(
+                error_payload(
+                    code="self_decision_forbidden",
+                    message="You cannot decide your own request.",
+                    fields={"action": ["Self-approval is forbidden."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except LookupError:
+            # Out of scope: same envelope as a nonexistent request (404 policy).
+            raise Http404
+
+        body = {"data": rs.EmployeeRequestSerializer(decided).data}
+        DecisionIdempotencyRecord.objects.create(
+            key_hash=key_hash,
+            payload_hash=payload_hash,
+            response_snapshot=body,
+            user=request.user,
+        )
+        return Response(body, status=status.HTTP_200_OK)
+
+
+def _decision_key_hash(key: str) -> str:
+    from hashlib import sha256
+
+    return sha256(key.encode()).hexdigest()
+
+
+def _decision_payload_hash(*, request_id, version: int, action: str, comment: str) -> str:
+    from hashlib import sha256
+
+    return sha256(f"{request_id}:{version}:{action}:{comment}".encode()).hexdigest()
