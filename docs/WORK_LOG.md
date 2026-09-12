@@ -115,7 +115,19 @@ Story 2.1 evidence (accepted 2026-09-12):
 - Commits: `12a4a2f`.
 - Scope note: submission/attachments/decisions/cancel belong to Stories 2.2–2.5. Request-event history endpoint intentionally deferred. Minor cleanup candidates (dead ValueError catch, triplicated pagination classes) deferred.
 
-Planned outputs: remaining Epic 2 stories (2.2 attachments, 2.3 submit, 2.4 decisions, 2.5 cancel), Epic 3 timesheets, React frontend, PostgreSQL schema on provisioned DB, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
+Story 2.2 evidence (accepted 2026-09-12):
+
+- Secure request attachments on `backend/reqs`: `RequestAttachment` (opaque UUID storage key, sanitized display filename, declared+detected content types, `scan_status`), plus upload idempotency records.
+- Upload path (attach + replace): magic-number content sniffing (PDF/PNG/JPEG/DOCX) must agree with declared type and extension; quotas enforced (10 MB/file with pinned `DATA_UPLOAD`/`FILE_UPLOAD` caps, 5 files/request, 25 MB/request); `Idempotency-Key` required — same key+payload replays the original response, differing → `409`; separate `20/hour/user` upload throttle (mutations 60/min/user, GET unthrottled).
+- Private storage: explicit `MEDIA_ROOT = BASE_DIR / "attachments"` (no `MEDIA_URL`, no public media route); opaque uuid paths read/written via `safe_join`; no public URLs ever — bytes only served by `AttachmentDownloadView`.
+- Scan pipeline: pluggable scanner, deterministic dev stub (real AV integration deferred by plan-level agreement, separate story); quarantine until `CLEAN`; `PENDING`/`FAILED`/`REJECTED` downloads blocked with localized stable errors and audited blocked-download event, zero bytes exposed.
+- State gating: attach/replace/delete only in `DRAFT`/`RETURNED`; submitted/decided attachments immutable (`409 state_conflict`, no file or event mutation); replacement swaps file within quotas.
+- Every meaningful action (upload/replace/delete/download/blocked) writes the existing append-only `AuditEvent` with actor, subject, UTC timestamp, request ID, before/after.
+- Verification on acceptance: 100 tests passed (70 prior + 30 attachments, no regressions); Django system check clean; migration-drift check clean; `git diff --check` clean; spec/security review findings (localized errors F1, pinned storage root F2, imports M1, safe_join M2) fixed and final gate APPROVED.
+- Commits: `839d8b8`, `f1de7c9`, merge `a696f28`.
+- Deferred: real AV vendor integration; view-layer English strings beyond service messages flagged for a future i18n pass.
+
+Planned outputs: Story 2.3 (server-derived submit), 2.4 (decisions), 2.5 (cancel), Epic 3 timesheets, React frontend, PostgreSQL on provisioned DB, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
 
 ## Scope boundary
 
