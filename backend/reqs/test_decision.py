@@ -158,6 +158,21 @@ class ManagerDecisionTests(DecisionTestBase):
         self.assertEqual(notification.body, "No.")
         self.assertIsNone(notification.read_at)
 
+    def test_notification_scheduling_failure_preserves_committed_decision(self):
+        with mock_patch(
+            "reqs.decision_services.notify_requester_of_decision",
+            side_effect=RuntimeError("notification scheduler unavailable"),
+        ):
+            response = self.decide(user=self.manager, action="approve", key="n-2")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.json())
+        request_obj = self.refresh()
+        self.assertEqual(request_obj.status, EmployeeRequest.Status.APPROVED)
+        self.assertEqual(request_obj.version, 3)
+        self.assertEqual(RequestEvent.objects.filter(request=request_obj).count(), 1)
+        self.assertEqual(AuditEvent.objects.filter(subject=self.employee).count(), 1)
+        self.assertEqual(DecisionIdempotencyRecord.objects.filter(user=self.manager).count(), 1)
+
 
 class HRDecisionTests(DecisionTestBase):
     def setUp(self):

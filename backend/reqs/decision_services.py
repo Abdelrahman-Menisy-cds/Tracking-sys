@@ -16,13 +16,16 @@ version += 1, append-only RequestEvent + AuditEvent, post-commit
 notification to the requester (failure-isolated). Invalid action/state
 combos raise DecisionStateError (409) with no mutation and no event.
 """
+import logging
+
 from django.db import IntegrityError, transaction
 
-from accounts.models import AuditEvent
+from accounts.models import AuditEvent, User
 from reqs.decision_notifications import notify_requester_of_decision
 from reqs.models import DecisionIdempotencyRecord, EmployeeRequest, RequestEvent
-from accounts.models import User
 from reqs.serializers import EmployeeRequestSerializer
+
+logger = logging.getLogger(__name__)
 
 DECISION_ACTIONS = ("approve", "reject", "return")
 
@@ -266,6 +269,13 @@ def decide_request(
             # transition + events roll back (zero second event).
             raise IdempotencyReplay(winner[1])
 
-        notify_requester_of_decision(request_id, action, comment)
-
+    _schedule_decision_notification(request_id, action, comment)
     return locked
+
+
+def _schedule_decision_notification(request_id: str, action: str, comment: str) -> None:
+    """Schedule a committed decision notification without risking its outcome."""
+    try:
+        notify_requester_of_decision(request_id, action, comment)
+    except Exception:  # noqa: BLE001 - scheduling must not undo a decision
+        logger.exception("decision notification scheduling failed request_id=%s", request_id)
