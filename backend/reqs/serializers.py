@@ -128,3 +128,27 @@ class DecisionSerializer(serializers.Serializer):
             )
         attrs["comment"] = comment
         return attrs
+
+
+class CancelRequestSerializer(serializers.Serializer):
+    """Cancel payload (Story 2.5): explicit confirmation + known version.
+
+    The contract is {confirm: true, version: <int>}: a missing or falsy
+    confirm is rejected 422 with no mutation. Any other field
+    (status/manager/assignee/...) is rejected as protected.
+    """
+
+    confirm = serializers.BooleanField()
+    version = serializers.IntegerField()
+
+    def validate(self, attrs):
+        protected = set(self.initial_data) - {"confirm", "version"}
+        if protected:
+            raise serializers.ValidationError(
+                {field: ["This field is managed by the server."] for field in sorted(protected)}
+            )
+        if attrs.get("confirm") is not True:
+            raise serializers.ValidationError(
+                {"confirm": ["Explicit confirmation (confirm=true) is required to cancel a request."]}
+            )
+        return attrs

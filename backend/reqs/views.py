@@ -31,6 +31,13 @@ from reqs.decision_services import (
     VersionConflict,
     decide_request,
 )
+from reqs.cancel_services import (
+    CancelStateError,
+    IdempotencyConflict as CancelIdempotencyConflict,
+    IdempotencyReplay as CancelIdempotencyReplay,
+    VersionConflict as CancelVersionConflict,
+    cancel_request,
+)
 
 
 def _get_own_request(user, pk):
@@ -325,6 +332,107 @@ def _decision_key_hash(key: str) -> str:
     from hashlib import sha256
 
     return sha256(key.encode()).hexdigest()
+
+
+def _cancel_key_hash(key: str) -> str:
+    return _decision_key_hash(key)
+
+
+def _cancel_payload_hash(*, request_id, version: int) -> str:
+    from hashlib import sha256
+
+    return sha256(f"{request_id}:{version}".encode()).hexdigest()
+
+
+class RequestCancelView(APIView):
+    """POST /api/v1/requests/{id}/cancel (Story 2.5).
+
+    Requester-only cancellation before any decision. Contract: Idempotency-Key
+    header required; payload {confirm: true, version: <int>}. Missing key or
+    missing/false confirm -> 422 with no mutation. Cross-user access is the
+    same 404 as a nonexistent request (404 policy). Idempotency lookup AND
+    record insert run inside the locked cancellation transaction
+    (cancel_services.cancel_request): identical payload replays the winner's
+    200 with exactly one transition/event; differing payload -> 409
+    idempotency_conflict. The post-commit requester notification is
+    failure-isolated (Story 2.4 pattern).
+    """
+
+    throttle_classes = [MutationRateThrottle]
+
+    def post(self, request, pk):
+        request_obj = _get_own_request(request.user, pk)
+
+        idempotency_key = request.headers.get("Idempotency-Key", "").strip()
+        if not idempotency_key:
+            return Response(
+                error_payload(
+                    code="idempotency_key_required",
+                    message="An Idempotency-Key header is required to cancel a request.",
+                    fields={"idempotency_key": ["Missing Idempotency-Key header."]},
+                    request=request,
+                ),
+                status=422,
+            )
+
+        serializer = rs.CancelRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        expected_version = serializer.validated_data["version"]
+
+        key_hash = _cancel_key_hash(idempotency_key)
+        payload_hash = _cancel_payload_hash(
+            request_id=request_obj.pk, version=expected_version
+        )
+
+        try:
+            cancelled = cancel_request(
+                requester=request.user,
+                request_obj=request_obj,
+                version=expected_version,
+                key_hash=key_hash,
+                payload_hash=payload_hash,
+            )
+        except CancelVersionConflict:
+            return Response(
+                error_payload(
+                    code="version_conflict",
+                    message="This request changed since you last saw it. Reload and try again.",
+                    fields={"version": ["The provided version is stale."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except CancelStateError:
+            return Response(
+                error_payload(
+                    code="state_conflict",
+                    message="A decided or already-cancelled request cannot be cancelled.",
+                    fields={"status": ["Cancellation is only possible before a decision."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except CancelIdempotencyReplay as replay:
+            # Lost a concurrent same-key race with the identical payload: the
+            # winner's cancellation stands; replay its response (200).
+            return Response(replay.snapshot, status=status.HTTP_200_OK)
+        except CancelIdempotencyConflict:
+            return Response(
+                error_payload(
+                    code="idempotency_conflict",
+                    message="This idempotency key was already used with a different payload.",
+                    fields={"idempotency_key": ["Key reused with different payload."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except LookupError:
+            # Not the requester: same envelope as a nonexistent request
+            # (404 policy, no existence disclosure).
+            raise Http404
+
+        body = {"data": rs.EmployeeRequestSerializer(cancelled).data}
+        return Response(body, status=status.HTTP_200_OK)
 
 
 def _decision_payload_hash(*, request_id, version: int, action: str, comment: str) -> str:
