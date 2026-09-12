@@ -287,7 +287,8 @@ registered tool costs context.
 - [x] Continue implementation — Story 2.1 accepted after spec + code-quality gate (commit `12a4a2f`; 70 tests, checks clean; 2026-09-12)
 - [x] Continue implementation — Story 2.2 accepted after spec/security review + fix merge (commits `839d8b8`, `f1de7c9`, merge `a696f28`; 100 tests, checks clean; 2026-09-12)
 - [x] Continue implementation — Story 2.3 accepted after security review (commit `af744c3`; 128 tests, checks clean; 2026-09-12)
-- [ ] Continue implementation with Story 2.4 (review decisions) after contract review
+- [x] Continue implementation — Story 2.4 accepted after QA/security review and notification-isolation hardening (merge `f482601`; 168 tests, checks clean; 2026-09-12)
+- [ ] Continue implementation with Story 2.5 (cancel) after contract review
 
 ## 11. Sources
 

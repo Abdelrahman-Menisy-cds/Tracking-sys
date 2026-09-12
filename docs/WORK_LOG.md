@@ -138,7 +138,16 @@ Story 2.3 evidence (accepted 2026-09-12):
 - Commits: `af744c3`.
 - Noted for later: resubmit routing re-derives from current RequestType config (mid-flight type reconfig edge case) — belongs to the Epic 4 story owning HR type config; Story 2.4 decide/cancel idempotency may scope lookups by user FK.
 
-Planned outputs: Story 2.4 (approve/reject/return decisions), 2.5 (cancel), Epic 3 timesheets, React frontend, PostgreSQL on provisioned DB, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
+Story 2.4 evidence (accepted 2026-09-12):
+
+- `POST /api/v1/requests/{id}/decision` supports `approve`, `reject`, and `return` with required `Idempotency-Key`; same-key/same-payload replay returns the stored response without duplicate transitions/events; differing payload conflicts safely.
+- Authorization is checked under row lock: requester/self-decision is denied; only the active snapshot manager may decide `PENDING_MANAGER`; only active HR may decide `PENDING_HR`; unauthorized scope is 404-safe.
+- Legal state-machine transitions are transactional, version-checked, row-locked, append-only (`APPROVED`/`REJECTED`/`RETURNED` events), audited, and terminal states reject further decisions with `409`.
+- Reject/return require a bounded non-blank comment (`422` with no mutation). Notifications are scheduled after commit and scheduling failures are isolated/logged; later returned-and-resubmitted decisions can notify again.
+- Verification on acceptance: 168 tests passed (40 decision-focused); Django check clean; migration drift none; diff check clean; final QA/security review APPROVED.
+- Commits: `27ce924`, `fece9b0`, `1d3fd61`, `ac7c234`, merge `f482601`.
+
+Planned outputs: Story 2.5 (cancel), Epic 3 timesheets, React frontend, PostgreSQL on provisioned DB, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
 
 ## Scope boundary
 
