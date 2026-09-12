@@ -11,6 +11,8 @@ from uuid import uuid4
 from django.conf import settings
 from django.core.files.uploadedfile import UploadedFile
 from django.db import transaction
+from django.utils.translation import gettext_lazy as _
+from django.utils._os import safe_join
 from django.utils.text import get_valid_filename
 
 from accounts.models import AuditEvent
@@ -69,7 +71,9 @@ def _file_sha256(fileobj) -> str:
 
 
 def _store_bytes(storage_key: str, payload: bytes) -> None:
-    destination = Path(settings.MEDIA_ROOT) / storage_key
+    # safe_join, same as the read path: defense in depth against any future
+    # caller passing a storage key that escapes MEDIA_ROOT.
+    destination = Path(safe_join(settings.MEDIA_ROOT, *storage_key.split("/")))
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_bytes(payload)
     destination.chmod(0o600)
@@ -84,7 +88,7 @@ def upload_attachment(*, user, request_obj: EmployeeRequest, fileobj: UploadedFi
     if request_obj.status not in UPLOADABLE_STATUSES:
         raise AttachmentValidationError(
             "file",
-            "Attachments can only be uploaded to drafts or returned requests.",
+            _("Attachments can only be uploaded to drafts or returned requests."),
         )
 
     original = sanitize_filename(fileobj.name or "")
@@ -96,29 +100,29 @@ def upload_attachment(*, user, request_obj: EmployeeRequest, fileobj: UploadedFi
     fileobj.seek(0)
 
     if not payload:
-        raise AttachmentValidationError("file", "The uploaded file is empty.")
+        raise AttachmentValidationError("file", _("The uploaded file is empty."))
     if declared not in RequestAttachment.ALLOWED_CONTENT_TYPES:
-        raise AttachmentValidationError("file", "Only PDF, PNG, JPG, or DOCX files are accepted.")
+        raise AttachmentValidationError("file", _("Only PDF, PNG, JPG, or DOCX files are accepted."))
     if allowed_extension is None:
-        raise AttachmentValidationError("file", "Only PDF, PNG, JPG, or DOCX files are accepted.")
+        raise AttachmentValidationError("file", _("Only PDF, PNG, JPG, or DOCX files are accepted."))
     if declared != allowed_extension:
-        raise AttachmentValidationError("file", "The declared file type does not match its extension.")
+        raise AttachmentValidationError("file", _("The declared file type does not match its extension."))
     if len(payload) > MAX_PER_FILE:
-        raise AttachmentValidationError("file", "Each file must be 10 MB or smaller.")
+        raise AttachmentValidationError("file", _("Each file must be 10 MB or smaller."))
 
     detected = _sniff_content_type(payload[:512])
     if detected is None or detected != allowed_extension:
         raise AttachmentValidationError(
             "file",
-            "The file content does not match its declared type.",
+            _("The file content does not match its declared type."),
         )
 
     current = RequestAttachment.objects.filter(request=request_obj)
     if current.count() + 1 > MAX_COUNT:
-        raise AttachmentValidationError("file", "A request can have at most 5 attachments.")
+        raise AttachmentValidationError("file", _("A request can have at most 5 attachments."))
     total = sum(current.values_list("size_bytes", flat=True)) + len(payload)
     if total > MAX_TOTAL:
-        raise AttachmentValidationError("file", "Attachment size exceeds the 25 MB request limit.")
+        raise AttachmentValidationError("file", _("Attachment size exceeds the 25 MB request limit."))
 
     sha = sha256(payload).hexdigest()
     storage_key = f"attachments/{uuid4().hex}/{uuid4().hex}.bin"
@@ -173,7 +177,7 @@ def create_attachment_record(*, user, request_obj, storage_key, original_filenam
 def replace_attachment(*, user, request_obj, old_attachment, fileobj: UploadedFile, request_id: str = ""):
     """Replace in RETURNED under the same quotas: delete old store, add new."""
     if request_obj.status != EmployeeRequest.Status.RETURNED:
-        raise AttachmentValidationError("file", "Only returned requests allow attachment replacement.")
+        raise AttachmentValidationError("file", _("Only returned requests allow attachment replacement."))
     new_attachment = upload_attachment(
         user=user,
         request_obj=request_obj,
@@ -194,8 +198,8 @@ def replace_attachment(*, user, request_obj, old_attachment, fileobj: UploadedFi
 def delete_attachment(*, user, request_obj, attachment, request_id: str = "",
                       replacement_of=None, count_waiver: bool = False):
     if request_obj.status not in UPLOADABLE_STATUSES:
-        raise AttachmentValidationError("file", "Attachments are immutable in the request's current state.")
-    path = Path(settings.MEDIA_ROOT) / attachment.storage_key
+        raise AttachmentValidationError("file", _("Attachments are immutable in the request's current state."))
+    path = Path(safe_join(settings.MEDIA_ROOT, *attachment.storage_key.split("/")))
     if path.exists():
         path.unlink()
     attachment.delete()
