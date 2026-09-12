@@ -96,6 +96,7 @@ class RequestEvent(models.Model):
         APPROVED = "APPROVED", "Approved"
         REJECTED = "REJECTED", "Rejected"
         RETURNED = "RETURNED", "Returned"
+        CANCELLED = "CANCELLED", "Cancelled"
 
     request = models.ForeignKey(
         EmployeeRequest,
@@ -108,6 +109,7 @@ class RequestEvent(models.Model):
         related_name="request_events",
     )
     action = models.CharField(max_length=16, choices=Action.choices)
+    # Action.CANCELLED arrives with Story 2.5.
     from_status = models.CharField(max_length=32, choices=EmployeeRequest.Status.choices, null=True, blank=True)
     to_status = models.CharField(max_length=32, choices=EmployeeRequest.Status.choices, null=True, blank=True)
     comment = models.TextField(blank=True, default="")
@@ -260,3 +262,31 @@ class DecisionIdempotencyRecord(models.Model):
         ]
         verbose_name = "decision idempotency record"
         verbose_name_plural = "decision idempotency records"
+
+
+class CancelIdempotencyRecord(models.Model):
+    """Stored cancellation idempotency (Story 2.5): same pattern as decisions.
+
+    Same key + same payload (request id + expected version) replays the
+    original 200 response without a duplicate transition/event; differing
+    payload -> 409. Scoped per user: the view looks up by (key_hash, user),
+    so a key guessed by another user is simply unknown to them and never
+    leaks one requester's stored snapshot to someone else.
+    """
+
+    key_hash = models.CharField(max_length=64, db_index=True)
+    payload_hash = models.CharField(max_length=64)
+    response_snapshot = models.JSONField()
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="cancel_idempotency_records",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["key_hash", "user"], name="uniq_cancel_idem_key_user")
+        ]
+        verbose_name = "cancel idempotency record"
+        verbose_name_plural = "cancel idempotency records"

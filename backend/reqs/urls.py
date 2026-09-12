@@ -10,6 +10,7 @@ urlpatterns = [
     path("requests/<uuid:pk>", views.RequestDetailView.as_view(), name="request-detail"),
     path("requests/<uuid:pk>/submit", views.RequestSubmitView.as_view(), name="request-submit"),
     path("requests/<uuid:pk>/decision", views.RequestDecisionView.as_view(), name="request-decision"),
+    path("requests/<uuid:pk>/cancel", views.RequestCancelView.as_view(), name="request-cancel"),
     path("requests/<uuid:pk>/attachments", attachment_views.AttachmentListView.as_view(), name="attachment-list"),
     path("attachments/<uuid:pk>", attachment_views.AttachmentDetailView.as_view(), name="attachment-detail"),
     re_path(r"^attachments/(?P<pk>[0-9a-f-]{36})/replace(?:/(?P<pk2>[0-9a-f-]{36})?)$", attachment_views.AttachmentReplaceView.as_view(), name="attachment-replace"),
