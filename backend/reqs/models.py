@@ -16,6 +16,7 @@ class RequestType(models.Model):
 
     name = models.CharField(max_length=100, unique=True)
     description = models.TextField(blank=True, default="")
+    requires_manager_approval = models.BooleanField(default=False)
     requires_hr_approval = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
@@ -72,6 +73,7 @@ class EmployeeRequest(models.Model):
         related_name="requests_assigned",
     )
     version = models.IntegerField(default=1)
+    submitted_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -90,6 +92,7 @@ class RequestEvent(models.Model):
     class Action(models.TextChoices):
         CREATED = "CREATED", "Created"
         EDITED = "EDITED", "Edited"
+        SUBMITTED = "SUBMITTED", "Submitted"
 
     request = models.ForeignKey(
         EmployeeRequest,
@@ -203,3 +206,25 @@ class AttachmentIdempotencyRecord(models.Model):
     class Meta:
         verbose_name = "attachment idempotency record"
         verbose_name_plural = "attachment idempotency records"
+
+
+class SubmissionIdempotencyRecord(models.Model):
+    """Stored submission idempotency (Story 2.3): key hash + payload hash + snapshot.
+
+    Same key + same payload (request id + expected version) replays the original
+    200 response without a duplicate transition; differing payload -> 409.
+    """
+
+    key_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    payload_hash = models.CharField(max_length=64)
+    response_snapshot = models.JSONField()
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="submission_idempotency_records",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "submission idempotency record"
+        verbose_name_plural = "submission idempotency records"

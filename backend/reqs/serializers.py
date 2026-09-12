@@ -70,3 +70,21 @@ class DraftEditSerializer(serializers.Serializer):
         if not attrs:
             raise serializers.ValidationError({"non_field_errors": ["No permitted fields to update."]})
         return attrs
+
+
+class SubmitRequestSerializer(serializers.Serializer):
+    """Submit payload (Story 2.3): the client sends only its known version.
+
+    Routing, reviewer snapshot, and status are server-derived; any other
+    field (status/manager/assignee/...) is rejected as protected.
+    """
+
+    version = serializers.IntegerField()
+
+    def validate(self, attrs):
+        protected = set(self.initial_data) - {"version"}
+        if protected:
+            raise serializers.ValidationError(
+                {field: ["This field is managed by the server."] for field in sorted(protected)}
+            )
+        return attrs

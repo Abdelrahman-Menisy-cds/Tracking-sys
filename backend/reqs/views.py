@@ -5,11 +5,18 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.throttles import MutationRateThrottle
-from config.api import RequestPagination
+from config.api import RequestPagination, error_payload
 from reqs import serializers as rs
 from reqs import attachment_views  # re-exported for reqs.urls (Story 2.2)
-from reqs.models import EmployeeRequest
+from reqs.models import EmployeeRequest, SubmissionIdempotencyRecord
 from reqs.services import create_draft, edit_draft
+from reqs.submission_services import (
+    SubmissionError,
+    VersionConflict,
+    idempotency_fingerprint,
+    record_idempotency,
+    submit_request,
+)
 
 
 def _get_own_request(user, pk):
@@ -84,3 +91,99 @@ class RequestDetailView(APIView):
             details=serializer.validated_data.get("details", instance.details),
         )
         return Response({"data": rs.EmployeeRequestSerializer(new).data})
+
+
+class RequestSubmitView(APIView):
+    """POST /api/v1/requests/{id}/submit (Story 2.3).
+
+    Requester-only, DRAFT/RETURNED-only, idempotent via Idempotency-Key,
+    server-derived routing. Notifications are Epic 4 scope.
+    """
+
+    throttle_classes = [MutationRateThrottle]
+
+    def post(self, request, pk):
+        request_obj = _get_own_request(request.user, pk)
+
+        idempotency_key = request.headers.get("Idempotency-Key", "").strip()
+        if not idempotency_key:
+            return Response(
+                error_payload(
+                    code="idempotency_key_required",
+                    message="An Idempotency-Key header is required to submit a request.",
+                    fields={"idempotency_key": ["Missing Idempotency-Key header."]},
+                    request=request,
+                ),
+                status=422,
+            )
+
+        serializer = rs.SubmitRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        expected_version = serializer.validated_data["version"]
+
+        key_hash, payload_hash = idempotency_fingerprint(
+            key=idempotency_key, request_id=request_obj.pk, version=expected_version
+        )
+        existing = SubmissionIdempotencyRecord.objects.filter(key_hash=key_hash).first()
+        if existing is not None:
+            if existing.payload_hash == payload_hash:
+                return Response(existing.response_snapshot, status=status.HTTP_200_OK)
+            return Response(
+                error_payload(
+                    code="idempotency_conflict",
+                    message="This idempotency key was already used with a different payload.",
+                    fields={"idempotency_key": ["Key reused with different payload."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        try:
+            submitted = submit_request(
+                requester=request.user,
+                request_obj=request_obj,
+                version=expected_version,
+            )
+        except SubmissionError as exc:
+            field_errors = [exc.message]
+            if exc.detail:
+                # e.g. attachment ids that failed the clean-scan requirement.
+                field_errors.extend(exc.detail.split(","))
+            return Response(
+                error_payload(
+                    code=exc.code,
+                    message=exc.message,
+                    fields={exc.field: field_errors},
+                    request=request,
+                ),
+                status=422,
+            )
+        except VersionConflict:
+            return Response(
+                error_payload(
+                    code="version_conflict",
+                    message="This request changed since you last saw it. Reload and try again.",
+                    fields={"version": ["The provided version is stale."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except PermissionError:
+            return Response(
+                error_payload(
+                    code="state_conflict",
+                    message="Only drafts and returned requests can be submitted.",
+                    fields={"status": ["Submitting requires the DRAFT or RETURNED state."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        body = {"data": rs.EmployeeRequestSerializer(submitted).data}
+        record_idempotency(
+            user=request.user,
+            key_hash=key_hash,
+            payload_hash=payload_hash,
+            snapshot=body,
+        )
+        return Response(body, status=status.HTTP_200_OK)
