@@ -13,7 +13,6 @@ from config.api import RequestPagination, error_payload
 from reqs import serializers as rs
 from reqs import attachment_views  # re-exported for reqs.urls (Story 2.2)
 from reqs.models import (
-    DecisionIdempotencyRecord,
     EmployeeRequest,
     SubmissionIdempotencyRecord,
 )
@@ -27,6 +26,8 @@ from reqs.submission_services import (
 )
 from reqs.decision_services import (
     DecisionStateError,
+    IdempotencyConflict,
+    IdempotencyReplay,
     VersionConflict,
     decide_request,
 )
@@ -221,10 +222,13 @@ class RequestDecisionView(APIView):
 
     Idempotency-Key required; action approve/reject/return with a
     non-blank bounded comment for reject/return; version for optimistic
-    concurrency. Same key + payload replays the original response;
-    differing payload -> 409. Idempotency lookup is scoped by reviewer
-    (key_hash, user) so one reviewer's stored snapshot is never visible
-    to another user who guesses the key.
+    concurrency. Idempotency lookup AND record insert run inside the
+    locked decision transaction (decision_services.decide_request): the
+    UniqueConstraint(key_hash, user) arbitrates concurrent same-key
+    requests — identical payload replays the winner's 200 with exactly one
+    transition/event; differing payload -> 409 idempotency_conflict.
+    Records are scoped by reviewer so one reviewer's stored snapshot is
+    never visible to another user who guesses the key.
     """
 
     throttle_classes = [MutationRateThrottle]
@@ -255,22 +259,6 @@ class RequestDecisionView(APIView):
         )
         key_hash = _decision_key_hash(idempotency_key)
 
-        existing = DecisionIdempotencyRecord.objects.filter(
-            key_hash=key_hash, user=request.user
-        ).first()
-        if existing is not None:
-            if existing.payload_hash == payload_hash:
-                return Response(existing.response_snapshot, status=status.HTTP_200_OK)
-            return Response(
-                error_payload(
-                    code="idempotency_conflict",
-                    message="This idempotency key was already used with a different payload.",
-                    fields={"idempotency_key": ["Key reused with different payload."]},
-                    request=request,
-                ),
-                status=status.HTTP_409_CONFLICT,
-            )
-
         try:
             decided = decide_request(
                 reviewer=request.user,
@@ -278,6 +266,8 @@ class RequestDecisionView(APIView):
                 action=action,
                 comment=comment,
                 version=expected_version,
+                key_hash=key_hash,
+                payload_hash=payload_hash,
             )
         except VersionConflict:
             return Response(
@@ -299,6 +289,20 @@ class RequestDecisionView(APIView):
                 ),
                 status=status.HTTP_409_CONFLICT,
             )
+        except IdempotencyReplay as replay:
+            # Lost a concurrent same-key race with the identical payload: the
+            # winner's transition stands; replay its response (200).
+            return Response(replay.snapshot, status=status.HTTP_200_OK)
+        except IdempotencyConflict:
+            return Response(
+                error_payload(
+                    code="idempotency_conflict",
+                    message="This idempotency key was already used with a different payload.",
+                    fields={"idempotency_key": ["Key reused with different payload."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
         except PermissionError:
             return Response(
                 error_payload(
@@ -314,12 +318,6 @@ class RequestDecisionView(APIView):
             raise Http404
 
         body = {"data": rs.EmployeeRequestSerializer(decided).data}
-        DecisionIdempotencyRecord.objects.create(
-            key_hash=key_hash,
-            payload_hash=payload_hash,
-            response_snapshot=body,
-            user=request.user,
-        )
         return Response(body, status=status.HTTP_200_OK)
 
 

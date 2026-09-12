@@ -2,8 +2,20 @@
 
 The decision transaction must never roll back because a notification failed
 (AC-04 / contract): creation runs inside transaction.on_commit with its own
-try/except and logging. The on_commit callback is idempotent per (request,
-kind) pair — retries that replay after a crash cannot duplicate rows.
+try/except and logging.
+
+QA duplicate-notification claim reviewed (Story 2.4 QA fix round): there is
+no duplicate/retry path. The on_commit hook is scheduled exactly once — only
+on the transition path, after the idempotency record insert succeeded inside
+the locked transaction; the replay path (stored snapshot or concurrent
+IdempotencyReplay) returns before any scheduling, so a retried request can
+never schedule a second notification. A crash between commit and callback
+fires the hook exactly once on callback execution (Django runs each
+registered callback once per commit; it does not re-fire). Deliberately NO
+(request, kind) unique constraint: after RETURNED -> resubmit -> re-decide,
+the requester must receive a NEW notification for the later decision — such
+a constraint would suppress legitimate outcomes (documented decision; no
+schema change).
 """
 import logging
 
