@@ -88,3 +88,43 @@ class SubmitRequestSerializer(serializers.Serializer):
                 {field: ["This field is managed by the server."] for field in sorted(protected)}
             )
         return attrs
+
+
+DECISION_ACTIONS = ("approve", "reject", "return")
+COMMENT_MAX_LENGTH = 2000
+
+
+class DecisionSerializer(serializers.Serializer):
+    """Decision payload (Story 2.4): action + comment + known version.
+
+    The reviewer sends action (approve/reject/return), a comment that must be
+    non-blank and bounded for reject/return (optional for approve), and the
+    version it last saw for optimistic concurrency. Status, assignee, and
+    manager-at-submission remain server-managed: any such field in the payload
+    is rejected as protected (422).
+    """
+
+    action = serializers.ChoiceField(choices=DECISION_ACTIONS)
+    comment = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        max_length=COMMENT_MAX_LENGTH,
+        trim_whitespace=True,
+    )
+    version = serializers.IntegerField()
+
+    def validate(self, attrs):
+        protected = set(self.initial_data) - {"action", "comment", "version"}
+        if protected:
+            raise serializers.ValidationError(
+                {field: ["This field is managed by the server."] for field in sorted(protected)}
+            )
+        action = attrs["action"]
+        comment = (attrs.get("comment") or "").strip()
+        if action in ("reject", "return") and not comment:
+            raise serializers.ValidationError(
+                {"comment": ["A non-blank comment is required to reject or return a request."]}
+            )
+        attrs["comment"] = comment
+        return attrs
