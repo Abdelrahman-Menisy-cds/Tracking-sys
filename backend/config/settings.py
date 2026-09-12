@@ -123,6 +123,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "login": "10/min",
         "mutation": "60/min",
+        "attachment_upload": "20/hour",
     },
 }
 

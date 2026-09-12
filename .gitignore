@@ -29,3 +29,4 @@ db.sqlite3-*
 .vscode/
 .idea/
 _bmad-output/
+/attachments/

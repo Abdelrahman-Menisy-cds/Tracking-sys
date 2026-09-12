@@ -114,3 +114,92 @@ class RequestEvent(models.Model):
 
     def __str__(self) -> str:
         return f"{self.action} on {self.request_id} by {self.actor_id}"
+
+
+class RequestAttachment(models.Model):
+    """Request attachment (Story 2.2): private opaque-key stored file.
+
+    Policy (product-policy-decisions.md item 5, AC-03): PDF/PNG/JPG/DOCX only,
+    10MB per file, 5 files per request, 25MB total; async malware scan with
+    quarantine until CLEAN; downloads only through Django-authorized paths,
+    never public media URLs. Storage keys are uuid-based and never derived
+    from client filenames; original_filename is sanitized display-only.
+    """
+
+    class ScanStatus(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        CLEAN = "CLEAN", "Clean"
+        FAILED = "FAILED", "Failed"
+        REJECTED = "REJECTED", "Rejected"
+
+    ALLOWED_CONTENT_TYPES = (
+        "application/pdf",
+        "image/png",
+        "image/jpeg",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    ALLOWED_EXTENSIONS = {"pdf": "application/pdf", "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    request = models.ForeignKey(
+        EmployeeRequest,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="uploaded_attachments",
+    )
+    # Opaque random key: MEDIA_ROOT/attachments/<uuid>/ ... never filename-derived.
+    storage_key = models.CharField(max_length=255, unique=True)
+    original_filename = models.CharField(max_length=255)
+    declared_content_type = models.CharField(max_length=128)
+    detected_content_type = models.CharField(max_length=128)
+    size_bytes = models.PositiveBigIntegerField()
+    content_sha256 = models.CharField(max_length=64)
+    scan_status = models.CharField(
+        max_length=16,
+        choices=ScanStatus.choices,
+        default=ScanStatus.PENDING,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ("created_at", "id")
+        verbose_name = "request attachment"
+        verbose_name_plural = "request attachments"
+
+    def __str__(self) -> str:
+        return f"{self.original_filename} ({self.scan_status})"
+
+    @property
+    def allows_edit(self) -> bool:
+        """True while the parent request still accepts attachment changes."""
+        return self.request.status in (
+            EmployeeRequest.Status.DRAFT,
+            EmployeeRequest.Status.RETURNED,
+        )
+
+
+class AttachmentIdempotencyRecord(models.Model):
+    """Stored upload idempotency: key hash + payload hash + response snapshot.
+
+    Same key + same payload (file content + declared type + filename) returns
+    the original 201 response; differing payload with same key -> 409.
+    """
+
+    key_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    payload_hash = models.CharField(max_length=64)
+    response_snapshot = models.JSONField()
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="upload_idempotency_records",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "attachment idempotency record"
+        verbose_name_plural = "attachment idempotency records"

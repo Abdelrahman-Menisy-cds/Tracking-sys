@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from accounts.throttles import MutationRateThrottle
 from config.api import RequestPagination
 from reqs import serializers as rs
+from reqs import attachment_views  # re-exported for reqs.urls (Story 2.2)
 from reqs.models import EmployeeRequest
 from reqs.services import create_draft, edit_draft
 
