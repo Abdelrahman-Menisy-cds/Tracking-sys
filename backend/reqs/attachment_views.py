@@ -3,8 +3,12 @@
 Download serves bytes only for scan_status=CLEAN through a fresh
 requester-ownership check; blocked attempts are audited and never leak bytes.
 """
+from pathlib import Path
+
+from django.conf import settings
 from django.http import FileResponse, Http404
 from django.urls import reverse
+from django.utils._os import safe_join
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -258,13 +262,8 @@ class AttachmentDownloadView(APIView):
                 ),
                 status=422,
             )
-        import os
-
-        from django.conf import settings
-        from django.utils._os import safe_join
-
         file_path = safe_join(settings.MEDIA_ROOT, *attachment.storage_key.split("/"))
-        if not os.path.exists(file_path):
+        if not Path(file_path).exists():
             raise Http404
         safe_name = attachment.original_filename or "attachment"
         response = FileResponse(

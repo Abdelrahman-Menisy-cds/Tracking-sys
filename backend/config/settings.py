@@ -101,6 +101,21 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ---------------------------------------------------------------------------
+# Media storage: PRIVATE attachment store (Story 2.2).
+# MEDIA_ROOT is the on-disk base for attachment bytes, declared explicitly
+# (not environment-derived) so the private store location cannot drift.
+# NOTE: no MEDIA_URL is configured and no public media route is served —
+# attachments are only delivered through AttachmentDownloadView, which
+# re-checks ownership and scan status before serving bytes via safe_join.
+# ---------------------------------------------------------------------------
+MEDIA_ROOT = BASE_DIR / "attachments"
+
+# Keep multipart-body memory buffers consistent with the 10 MB per-file
+# attachment limit (larger bodies spill to temp files instead of RAM).
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+
+# ---------------------------------------------------------------------------
 # Authentication: custom email-based user model (must exist before the first
 # migration of any app that references it).
 # ---------------------------------------------------------------------------
