@@ -127,7 +127,18 @@ Story 2.2 evidence (accepted 2026-09-12):
 - Commits: `839d8b8`, `f1de7c9`, merge `a696f28`.
 - Deferred: real AV vendor integration; view-layer English strings beyond service messages flagged for a future i18n pass.
 
-Planned outputs: Story 2.3 (server-derived submit), 2.4 (decisions), 2.5 (cancel), Epic 3 timesheets, React frontend, PostgreSQL on provisioned DB, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
+Story 2.3 evidence (accepted 2026-09-12):
+
+- `POST /api/v1/requests/{id}/submit` with required `Idempotency-Key`: same key+payload replays the stored response without duplicate transitions; differing payload → `409 idempotency_conflict`; stale version/conflicting state → `409`.
+- Server-derived routing: manager snapshot read from `EmployeeProfile.manager` at submission (`manager_at_submission`), `current_assignee` set by routing, `RequestType.requires_manager_approval` drives `PENDING_MANAGER` vs `PENDING_HR` (HR-only types skip the manager requirement).
+- Blocked paths audited (`request_submit_blocked`) with `422` field errors and zero mutation: no manager, inactive manager, non-`CLEAN` attachments, inactive request type. No silent rerouting. HR-queue visibility for blocked submissions deferred to Epic 4.
+- Transactional 3-phase transition: resolution outside transactions so blocked-path audits persist; phase-3 `select_for_update` re-lock with status+version recheck; version bump; `SUBMITTED` RequestEvent + AuditEvent with actor/subject/UTC/request-id/before-after.
+- Security review: no manager-identity disclosure to the requester; cross-user URL → uniform `404`; serializer rejects all non-version fields as protected; `get_throttles` correct; idempotency uniquely scoped, cannot replay across users/requests.
+- Verification on acceptance: 128 tests passed (28 new submission tests; no regressions); Django checks clean; migration drift none; `git diff --check` clean; security review APPROVED.
+- Commits: `af744c3`.
+- Noted for later: resubmit routing re-derives from current RequestType config (mid-flight type reconfig edge case) — belongs to the Epic 4 story owning HR type config; Story 2.4 decide/cancel idempotency may scope lookups by user FK.
+
+Planned outputs: Story 2.4 (approve/reject/return decisions), 2.5 (cancel), Epic 3 timesheets, React frontend, PostgreSQL on provisioned DB, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
 
 ## Scope boundary
 
