@@ -17,7 +17,7 @@ from hashlib import sha256
 from unittest import mock
 
 from django.core.cache import cache
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
@@ -31,8 +31,6 @@ from timesheets.models import (
     TimesheetSubmitIdempotencyRecord,
     TimezoneConfig,
 )
-from timesheets.correction_services import _validate_submittable_entries
-from timesheets.services import TimesheetError
 
 MONDAY = date(2026, 9, 7)
 REVIEWER_REASON = "Please correct Tuesday's hours."
@@ -270,27 +268,20 @@ class TimeEntryDBIntegrityTests(TestCase):
         self.assertEqual((entry.duration_minutes, entry.unpaid_break_minutes), (1440, 1440))
 
 
-class _SheetProxy:
-    """Duck-typed sheet exposing an explicit (possibly invalid) entry set."""
-
-    def __init__(self, sheet, entries):
-        self.week_start = sheet.week_start
-        self._entries = entries
-        self.pk = sheet.pk
-
-    @property
-    def entries(self):  # object of .all(), matches sheet.entries.all() usage
-        class _Q:
-            def __init__(self, items):
-                self._items = items
-
-            def all(self):
-                return self._items
-
-        return _Q(self._entries)
-
-
 class SubmitValidationTests(Story32Base):
+    """End-to-end API validation: 422 + zero mutation on invalid weeks.
+
+    Reachability under the restored DB constraints (migration 0006):
+    - Out-of-week rows have NO DB constraint, so an invalid row can exist
+      via a non-API writer; the fixture is ORM-seeded and the submit
+      endpoint itself must reject it (422, zero mutation).
+    - Over-24h and duplicate-day rows are impossible to persist (chk_
+      timeentry_* CHECKs and uniq_timeentry_sheet_work_date — proven
+      directly by TimeEntryDBIntegrityTests), so their API coverage runs
+      through the endpoints that would create them (create + entry PATCH)
+      and asserts 422 with zero mutation there.
+    """
+
     def _entry(self, sheet, work_date, duration=60, breaker=0):
         return TimeEntry.objects.create(
             timesheet=sheet,
@@ -301,65 +292,77 @@ class SubmitValidationTests(Story32Base):
 
     def test_out_of_week_entry_blocks_submit_no_mutation(self):
         sheet = self.create_sheet(entries=self.default_entries())
-        entry_set = [
-            TimeEntry(timesheet=sheet, work_date=date(2026, 9, 14), duration_minutes=60),
-        ]
-        with self.assertRaises(TimesheetError) as ctx:
-            _validate_submittable_entries(_SheetProxy(sheet, entry_set))
-        self.assertEqual(ctx.exception.code, "validation_error")
-        self.assertEqual(ctx.exception.field, "entries")
+        self._entry(sheet, date(2026, 9, 14))  # next Monday, outside the week
+        response = self.post_submit(sheet.pk, version=1)
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("entries", response.json()["error"]["fields"])
         sheet.refresh_from_db()
-        self.assertEqual((sheet.status, sheet.version), (Timesheet.Status.DRAFT, 1))
+        self.assertEqual(sheet.status, Timesheet.Status.DRAFT)
+        self.assertEqual(sheet.version, 1)
+        self.assertEqual(TimeEntry.objects.filter(timesheet=sheet).count(), 3)
 
-    def test_duplicate_day_entry_blocks_submit(self):
-        """Service-level duplicate detection: defense in depth beyond the DB.
+    def test_duplicate_day_rejected_on_create_422_no_sheet(self):
+        response = self.client.post(
+            reverse("timesheets:timesheet-list"),
+            {
+                "week_start": MONDAY.isoformat(),
+                "entries": [
+                    {"work_date": MONDAY.isoformat(), "duration_minutes": 480},
+                    {"work_date": MONDAY.isoformat(), "duration_minutes": 120},
+                ],
+            },
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="dup-day-create",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("entries", response.json()["error"]["fields"])
+        self.assertFalse(
+            Timesheet.objects.filter(employee=self.user, week_start=MONDAY).exists()
+        )
+        self.assertEqual(TimeEntry.objects.count(), 0)
 
-        The DB unique constraint now prevents persisting a duplicate, so the
-        API path can no longer reach the service with duplicate rows.
-        Exercise _validate_submittable_entries directly with an in-memory
-        duplicate entry set to keep the service check itself covered.
-        """
-        from timesheets.correction_services import _validate_submittable_entries
-
+    def test_duplicate_day_correction_blocked_no_mutation(self):
+        # Moving Monday's entry onto Tuesday (already taken) must be a 422
+        # with zero mutation — the duplicate-day check runs BEFORE any write.
         sheet = self.create_sheet(entries=self.default_entries())
-        entry_set = [
-            TimeEntry(timesheet=sheet, work_date=MONDAY, duration_minutes=60),
-            TimeEntry(timesheet=sheet, work_date=MONDAY, duration_minutes=30),
-        ]
-        with self.assertRaises(TimesheetError) as ctx:
-            _validate_submittable_entries(_SheetProxy(sheet, entry_set))
-        self.assertEqual(ctx.exception.code, "validation_error")
-        self.assertEqual(ctx.exception.field, "entries")
-
-    def test_duplicate_day_entry_blocked_on_real_sheet_no_mutation(self):
-        """End-to-end: duplicate cannot be created and nothing mutates."""
-        sheet = self.create_sheet(entries=self.default_entries())
-        before_status = sheet.status
-        before_version = sheet.version
-        before_count = TimesheetEvent.objects.filter(timesheet=sheet).count()
-        with self.assertRaises(IntegrityError):
-            with transaction.atomic():
-                TimeEntry.objects.create(
-                    timesheet=sheet,
-                    work_date=MONDAY,
-                    duration_minutes=60,
-                    unpaid_break_minutes=0,
-                )
+        entry = TimeEntry.objects.get(timesheet=sheet, work_date=MONDAY)
+        response = self.client.patch(
+            self.entry_url(sheet.pk, self._entry_id(entry)),
+            {"work_date": "2026-09-08", "version": 1},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("entries", response.json()["error"]["fields"])
+        entry.refresh_from_db()
+        self.assertEqual(entry.work_date, MONDAY)
         sheet.refresh_from_db()
-        self.assertEqual(sheet.status, before_status)
-        self.assertEqual(sheet.version, before_version)
-        self.assertEqual(TimesheetEvent.objects.filter(timesheet=sheet).count(), before_count)
+        self.assertEqual(sheet.version, 1)
         self.assertEqual(sheet.entries.count(), 2)
+        self.assertEqual(
+            TimesheetEvent.objects.filter(
+                timesheet=sheet, action=TimesheetEvent.Action.EDITED
+            ).count(),
+            0,
+        )
 
-    def test_daily_over_24h_blocks_submit(self):
-        sheet = self.create_sheet(entries=[])
-        entry_set = [TimeEntry(timesheet=sheet, work_date=MONDAY, duration_minutes=1441)]
-        with self.assertRaises(TimesheetError) as ctx:
-            _validate_submittable_entries(_SheetProxy(sheet, entry_set))
-        self.assertEqual(ctx.exception.code, "validation_error")
-        self.assertEqual(ctx.exception.field, "entries")
-        sheet.refresh_from_db()
-        self.assertEqual((sheet.status, sheet.version), (Timesheet.Status.DRAFT, 1))
+    def test_daily_over_24h_rejected_on_create_422_no_sheet(self):
+        response = self.client.post(
+            reverse("timesheets:timesheet-list"),
+            {
+                "week_start": MONDAY.isoformat(),
+                "entries": [
+                    {"work_date": MONDAY.isoformat(), "duration_minutes": 1441},
+                ],
+            },
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="over-24h-create",
+        )
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("entries", response.json()["error"]["fields"])
+        self.assertFalse(
+            Timesheet.objects.filter(employee=self.user, week_start=MONDAY).exists()
+        )
+        self.assertEqual(TimeEntry.objects.count(), 0)
 
     def test_weekly_over_168h_blocks_submit_no_mutation(self):
         sheet = self.create_sheet(entries=[])
@@ -530,42 +533,16 @@ class ReturnedCorrectionTests(Story32Base):
         self.assertEqual(self.sheet.version, 2)
         self.assertEqual(self.sheet.status, Timesheet.Status.RETURNED)
 
-    def test_patch_making_week_over_168h_impossible_but_over_24h_day_blocked(self):
-        """Over-24h PATCH input is rejected with zero mutation.
-
-        The restored DB CHECK (chk_timeentry_duration_within_day) now blocks a
-        duration of 1441 at the storage layer, so a raw >1440 row can no longer
-        seed this scenario and the API never sees such a persisted row. Assert
-        the same policy where it is still exercised end-to-end: duration=1440
-        on Tuesday succeeds on its own (only weekday cap), but taking the same
-        entry beyond the cap via a second permitted-field edit that would push
-        the WEEK over (weekly cap has no DB constraint) is rejected. Also
-        verify the invalid fixture is impossible through the API: the DB
-        backstop turns any 1441 write into an IntegrityError inside a
-        savepoint, provably leaving the row and sheet untouched.
-        """
+    def test_patch_making_week_over_168h_rejected_422_no_mutation(self):
         other = TimeEntry.objects.get(timesheet=self.sheet, work_date=date(2026, 9, 8))
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            other.duration_minutes = 1441
-            other.save(update_fields=["duration_minutes", "updated_at"])
-        other.refresh_from_db()
-        self.assertEqual(other.duration_minutes, 510)
-
-        # Service-level weekly cap still reachable with valid per-day values:
-        # 7x1440=168h is the exact limit; any extra minutes would exceed it,
-        # but a single day cannot exceed 1440 (DB-enforced), so the weekly
-        # validation is covered by SubmitValidationTests and validate_entries.
         response = self.client.patch(
             self.entry_url(self.sheet.pk, other.pk),
-            {"duration_minutes": 1440, "version": 2},
+            {"duration_minutes": 1441, "version": 2},
             format="json",
         )
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, 422)
         other.refresh_from_db()
-        self.assertEqual(other.duration_minutes, 1440)
-        self.sheet.refresh_from_db()
-        self.assertEqual(self.sheet.version, 3)
-        self.assertEqual(self.sheet.status, Timesheet.Status.RETURNED)
+        self.assertEqual(other.duration_minutes, 510)
 
 
 class ReadOnlyEnforcementTests(Story32Base):
