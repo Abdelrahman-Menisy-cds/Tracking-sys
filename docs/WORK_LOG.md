@@ -179,6 +179,11 @@ Story 3.3 evidence (accepted 2026-09-13):
 - Timesheet review decisions: approve / reject / replace / reopen from the review side, with replacement entries after reject and HR reopen of an approved/returned sheet, under `backend/timesheets`.
 - Authorization on decisions; legal state-machine transitions with locking, version checks, and idempotency keys; reject/return reasons, confirmation, and idempotency-key enforcement; replacement entry sets accepted only in the permitted states; HR reopen restores the returned/draft flow.
 - Events and audit trail appended for every decision; read-only surfaces for decided sheets; notifications scheduled post-commit with failures isolated; auth/CSRF/throttle per platform baseline.
+- Verification on acceptance (final, in the project-local `.venv` on `main` at HEAD `8b15913`): final QA verdict APPROVED; review tests 42 passed; Django system check clean with `config.test_settings`; `git diff --check` clean.
+- Capability surface verified: manager review queues limited to current active direct reports; HR timesheet reads are read-only (`can_decide=false`); cross-user object URLs return the safe 404 envelope with no data leak; queue filtering, bounded pagination, and deterministic sorting verified.
+- QA hardening pass: `permissions.can_decide` mirrors the current direct-report read scope (HR reads always `can_decide=false`; manager follows AC 4.1 current scope, not snapshot).
+- Commits: implementation `a13a299`, merge `5ced7de`; QA fix `3c70842`, merge `8b15913` = main HEAD.
+- Next step: Story 4.2 — in-app notifications.
 
 ## Scope boundary
 
