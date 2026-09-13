@@ -13,5 +13,6 @@ urlpatterns = [
     path("api/v1/", include("notifications.urls")),
     path("api/v1/", include("reqs.urls")),
     path("api/v1/", include("timesheets.urls")),
+    path("api/v1/", include("review.urls")),
     re_path(r"^api/v1(?:/.*)?$", api_not_found),
 ]
