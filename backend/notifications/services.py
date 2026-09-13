@@ -7,8 +7,10 @@ IntegrityError-safe retry path, and never raises for suppressed duplicates.
 whose failure leaves the unread state untouched (AC: failure must not mark).
 """
 import logging
+import time
 
-from django.db import IntegrityError, transaction
+from django.core.exceptions import ObjectDoesNotExist
+from django.db import IntegrityError, OperationalError, transaction
 from django.utils import timezone
 
 from notifications.models import Notification
@@ -16,6 +18,41 @@ from notifications.models import Notification
 logger = logging.getLogger(__name__)
 
 RELATED_TYPES = frozenset({"request", "timesheet"})
+
+# SQLite (the local/test fallback; the :memory: test database runs in
+# shared-cache mode) raises OperationalError("database table is locked")
+# when two connections race a write on the same table. The busy handler
+# does NOT cover shared-cache table locks, so the caller must retry with a
+# backoff. PostgreSQL (the approved production database) blocks writers
+# instead of erroring, so this retry path never triggers there.
+SQLITE_LOCKED_MARKERS = ("locked", "database schema is locked")
+MAX_LOCK_ATTEMPTS = 8
+RETRY_BASE_DELAY_SECONDS = 0.02
+RETRY_MAX_DELAY_SECONDS = 0.25
+
+
+def _is_retryable_lock_error(exc) -> bool:
+    return isinstance(exc, OperationalError) and any(
+        marker in str(exc).lower() for marker in SQLITE_LOCKED_MARKERS
+    )
+
+
+def _lock_retry_delay_seconds(attempt: int) -> float:
+    return min(RETRY_MAX_DELAY_SECONDS, RETRY_BASE_DELAY_SECONDS * (2**attempt))
+
+
+def _fetch_dedupe_winner(recipient, dedupe_key: str):
+    """Fetch the existing deduped row, tolerating SQLite lock races."""
+    for attempt in range(MAX_LOCK_ATTEMPTS):
+        try:
+            return Notification.objects.filter(
+                recipient=recipient, dedupe_key=dedupe_key
+            ).first()
+        except OperationalError as exc:
+            if not _is_retryable_lock_error(exc) or attempt == MAX_LOCK_ATTEMPTS - 1:
+                return None
+            time.sleep(_lock_retry_delay_seconds(attempt))
+    return None
 
 
 def _normalize(object_type, object_id):
@@ -47,25 +84,28 @@ def create_notification(
     be resolved (should not happen), keeping failure-isolated callers safe.
     """
     related_object_type, related_object_id = _normalize(related_object_type, related_object_id)
-    try:
-        with transaction.atomic():
-            return Notification.objects.create(
-                recipient=recipient,
-                kind=kind,
-                title=title[:255],
-                body=body,
-                related_object_type=related_object_type,
-                related_object_id=related_object_id,
-                dedupe_key=dedupe_key[:128],
-            )
-    except IntegrityError:
-        existing = Notification.objects.filter(
-            recipient=recipient, dedupe_key=dedupe_key[:128]
-        ).first()
-        if existing is None:
-            logger.exception("notification dedupe winner missing key=%s", dedupe_key)
-            return None
-        return existing
+    dedupe_key = dedupe_key[:128]
+    for attempt in range(MAX_LOCK_ATTEMPTS):
+        try:
+            with transaction.atomic():
+                return Notification.objects.create(
+                    recipient=recipient,
+                    kind=kind,
+                    title=title[:255],
+                    body=body,
+                    related_object_type=related_object_type,
+                    related_object_id=related_object_id,
+                    dedupe_key=dedupe_key,
+                )
+        except IntegrityError:
+            # Dedupe winner exists: return the stored row (idempotent).
+            return _fetch_dedupe_winner(recipient, dedupe_key)
+        except OperationalError as exc:
+            if not _is_retryable_lock_error(exc) or attempt == MAX_LOCK_ATTEMPTS - 1:
+                raise
+            time.sleep(_lock_retry_delay_seconds(attempt))
+    # Unreachable: the loop either returns or raises on its last attempt.
+    raise OperationalError("notification create retry loop exhausted")  # pragma: no cover
 
 
 def _resolve_viewer_object(user, related_object_type, related_object_id):
@@ -132,18 +172,23 @@ def mark_notification_read(notification_id, user):
     from django.core.exceptions import ObjectDoesNotExist
 
     try:
-        with transaction.atomic():
-            notification = Notification.objects.select_for_update().filter(
-                recipient=user, pk=notification_id
-            ).first()
-            if notification is None:
-                from django.core.exceptions import ObjectDoesNotExist
-
-                raise ObjectDoesNotExist("notification not found")
-            if notification.read_at is None:
-                notification.read_at = timezone.now()
-                notification.save(update_fields=["read_at"])
-            return notification.read_at
+        for attempt in range(MAX_LOCK_ATTEMPTS):
+            try:
+                with transaction.atomic():
+                    notification = Notification.objects.select_for_update().filter(
+                        recipient=user, pk=notification_id
+                    ).first()
+                    if notification is None:
+                        raise ObjectDoesNotExist("notification not found")
+                    if notification.read_at is None:
+                        notification.read_at = timezone.now()
+                        notification.save(update_fields=["read_at"])
+                    return notification.read_at
+            except OperationalError as exc:
+                if not _is_retryable_lock_error(exc) or attempt == MAX_LOCK_ATTEMPTS - 1:
+                    raise
+                time.sleep(_lock_retry_delay_seconds(attempt))
+        raise OperationalError("mark read retry loop exhausted")  # pragma: no cover
     except ObjectDoesNotExist:
         raise
     except Exception:

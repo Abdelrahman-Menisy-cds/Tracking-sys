@@ -559,6 +559,9 @@ def test_concurrent_direct_mark_read_runs_resolve_to_one_read_state(owner):
     for thread in threads:
         thread.join()
 
+    # No worker may die on a database lock (e.g. sqlite "table is locked");
+    # the service must resolve every racing call cleanly.
+    assert errors == []
     notification.refresh_from_db()
     assert notification.read_at is not None
     # Everyone who succeeded observed the same stable read_at (idempotent).
@@ -568,14 +571,18 @@ def test_concurrent_direct_mark_read_runs_resolve_to_one_read_state(owner):
 @pytest.mark.django_db(transaction=True)
 def test_concurrent_creates_same_dedupe_key_create_one(owner):
     keys = []
+    errors = []
     barrier = threading.Barrier(3)
 
     def worker():
-        barrier.wait()
-        notification = create_notification(
-            recipient=owner, kind="request_updated", title="race", dedupe_key="race:1"
-        )
-        keys.append(notification.pk)
+        try:
+            barrier.wait()
+            notification = create_notification(
+                recipient=owner, kind="request_updated", title="race", dedupe_key="race:1"
+            )
+            keys.append(notification.pk)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
 
     threads = [threading.Thread(target=worker) for _ in range(3)]
     for thread in threads:
@@ -583,6 +590,10 @@ def test_concurrent_creates_same_dedupe_key_create_one(owner):
     for thread in threads:
         thread.join()
 
+    # Every racing worker must succeed without a database-lock exception;
+    # the lock-retry path plus dedupe resolves to exactly one notification.
+    assert errors == []
+    assert len(keys) == 3
     assert len(set(keys)) == 1
     assert Notification.objects.count() == 1
 
