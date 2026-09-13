@@ -268,6 +268,37 @@ class RequestReviewDetailTests(ReviewBase):
         res = self._client_for(self.manager).get(self.submitted_url)
         self.assertEqual(res.data["data"]["permissions"]["can_decide"], True)
 
+    def test_manager_can_decide_follows_current_reporting_line_not_snapshot(self):
+        # QA finding 2 (Story 4.1): read permissions.can_decide must match
+        # the CURRENT active direct-report scope (AC 4.1), not the
+        # manager_at_submission snapshot. After the reporting line moves to
+        # another manager, the former manager no longer sees the record in
+        # their scoped queue and cannot act on it; the new current manager
+        # sees it in their queue and shows can_decide=true.
+        EmployeeProfile.objects.filter(user=self.employee).update(manager=self.manager_other)
+        self.submitted.refresh_from_db()
+        self.assertEqual(self.submitted.manager_at_submission, self.manager)  # snapshot untouched
+
+        former = self._client_for(self.manager).get(self.queue_url)
+        self.assertEqual(former.data["data"], [])
+        res = self._client_for(self.manager).get(self.submitted_url)
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
+        current = self._client_for(self.manager_other).get(self.queue_url)
+        ids = [row["id"] for row in current.data["data"]]
+        self.assertIn(str(self.submitted.pk), ids)
+        detail = self._client_for(self.manager_other).get(self.submitted_url)
+        self.assertEqual(detail.data["data"]["permissions"]["can_decide"], True)
+
+    def test_manager_can_decide_false_for_inactive_direct_report(self):
+        # Current-scope consistency: an inactive direct report is outside the
+        # active direct-report rule, so can_decide is false even in the
+        # pending state.
+        self.employee.is_active = False
+        self.employee.save(update_fields=["is_active"])
+        res = self._client_for(self.manager).get(self.submitted_url)
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+
     def test_get_does_not_mutate(self):
         before_version = self.submitted.version
         self._client_for(self.manager).get(self.submitted_url)
@@ -348,10 +379,28 @@ class TimesheetReviewDetailTests(ReviewBase):
         url = reverse("review:timesheet-detail", kwargs={"pk": sheet_other.pk})
         res = self._client_for(self.hr).get(url)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        # The sheet is SUBMITTED so HR may act (organization scope) — but the
-        # capability gate stays with review_services; can_decide reflects the
-        # act-on rules.
-        self.assertIsInstance(res.data["data"]["permissions"]["can_decide"], bool)
+        # QA finding 1 (Story 4.1): HR organization read scope is visibility
+        # only — there is no explicit HR decision capability in the model,
+        # so HR reads must never serialize can_decide=true, including on a
+        # SUBMITTED sheet. The command endpoint's own authorization is
+        # untouched (Story 3.3 snapshot).
+        self.assertEqual(res.data["data"]["permissions"]["can_decide"], False)
+
+    def test_hr_queue_read_shows_can_decide_false_for_submitted_sheet(self):
+        # QA finding 1 (Story 4.1): same rule on the queue rows, not just the
+        # detail view.
+        res = self._client_for(self.hr).get(self.ts_queue_url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        rows = {row["id"]: row for row in res.data["data"]}
+        self.assertIn(str(self.sheet.pk), rows)
+        self.assertEqual(rows[str(self.sheet.pk)]["permissions"]["can_decide"], False)
+
+    def test_hr_read_can_decide_false_for_non_submitted_sheet(self):
+        approved = self._sheet(self.employee2, week_start=date(2026, 8, 17), status=Timesheet.Status.APPROVED)
+        url = reverse("review:timesheet-detail", kwargs={"pk": approved.pk})
+        res = self._client_for(self.hr).get(url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["data"]["permissions"]["can_decide"], False)
 
     def test_nonexistent_404(self):
         url = reverse("review:timesheet-detail", kwargs={"pk": uuid4()})

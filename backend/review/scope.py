@@ -97,29 +97,60 @@ def scope_timesheets(manager):
 
 
 def can_decide_request(user, request_obj) -> bool:
-    """Whether `user` may act on this request in its CURRENT state.
+    """Whether `user` may act on this request per Story 4.1 READ permissions.
 
-    Based on _resolve_scope (the act-on rules used to authorize a decision
-    in reqs.decision_services): snapshot manager of PENDING_MANAGER, active
-    HR of PENDING_HR. Read scope and decision capability stay separate: an
-    HR sees organization records but shows can_decide=false outside the
-    act-on states.
+    Story 4.1 QA decision: read permissions.can_decide mirrors the CURRENT
+    active direct-report scope (AC 4.1), NOT the manager_at_submission
+    snapshot used by the command endpoint (reqs.decision_services keeps its
+    snapshot policy for decisions — changing a manager affects future
+    submissions, not existing snapshots, per approved policy item 1). The
+    read flag stays consistent with the scoped queryset: a manager sees a
+    PENDING_MANAGER record of an active direct report in their queue and
+    shows can_decide=true exactly there. HR read scope is visibility
+    separate from action EXCEPT for the explicit, policy-gated HR decision
+    capability on PENDING_HR requests (permission matrix: approve/reject/
+    return in scope — HR, policy-gated); all other HR reads serialize
+    can_decide=false. The decision command endpoint independently
+    re-authorizes everything inside its locked transaction.
     """
-    from reqs.decision_services import _resolve_scope  # single source of truth
-
-    try:
-        _resolve_scope(request_obj, user)
-    except Exception:  # noqa: BLE001 - any denial is a no
+    if not getattr(user, "is_authenticated", False) or not user.is_active:
         return False
-    return True
+    if request_obj.requester_id == user.pk:
+        return False  # self-review is never permitted
+    if user.role == User.Role.MANAGER:
+        # Current active direct-report scope (AC 4.1), not the snapshot; the
+        # only state a manager can act on is PENDING_MANAGER.
+        return (
+            request_obj.requester_id in _active_direct_report_ids(user)
+            and request_obj.status == EmployeeRequest.Status.PENDING_MANAGER
+        )
+    if user.role == User.Role.HR:
+        # Explicit, policy-gated HR decision capability for requests: active
+        # HR acts on PENDING_HR (reqs.decision_services._resolve_scope).
+        # Every other state is read-only visibility -> can_decide=false.
+        return request_obj.status == EmployeeRequest.Status.PENDING_HR
+    return False
 
 
 def can_decide_timesheet(user, sheet) -> bool:
-    """Whether `user` may act on this sheet (manager-of or active HR, SUBMITTED)."""
-    from timesheets.review_services import _authorize_reviewer
+    """Whether `user` may act on this sheet per Story 4.1 READ permissions.
 
-    try:
-        _authorize_reviewer(sheet, user)
-    except (PermissionError, LookupError):
+    Story 4.1 QA decision: HR organization read scope is visibility only —
+    there is no explicit HR decision capability in the data model, so HR
+    reads ALWAYS serialize can_decide=false (finding 1), including on
+    SUBMITTED sheets. The timesheet decision/reopen command endpoints
+    (timesheets.review_services) keep their own independent authorization.
+    Managers mirror the current active direct-report scope (AC 4.1): the
+    sheet's employee must be their CURRENT active direct report and the
+    sheet must be in a relevant review state. The SUBMITTED act-on gate
+    itself stays with review_services; this flag only drives UI affordances.
+    """
+    if not getattr(user, "is_authenticated", False) or not user.is_active:
         return False
-    return True
+    if sheet.employee_id == user.pk:
+        return False  # self-review is never permitted
+    if user.role == User.Role.MANAGER:
+        if sheet.employee_id not in _active_direct_report_ids(user):
+            return False
+        return sheet.status in MANAGER_TIMESHEET_HISTORY_STATES
+    return False
