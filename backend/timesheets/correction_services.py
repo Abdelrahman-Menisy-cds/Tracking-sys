@@ -88,22 +88,13 @@ def submit_idempotency_fingerprint(*, key: str, timesheet_id, version: int) -> t
     return key_hash, payload_hash
 
 
-def _validate_submittable_entries(sheet: Timesheet) -> None:
-    """Complete-week + limit validation against the persisted entry rows.
+def _validate_entry_set(entries: list[dict], week_start) -> None:
+    """Complete-week + limit + one-entry-per-day checks on an entry dict set.
 
-    Runs BEFORE any mutation; raises TimesheetError (422-mapped) with the
-    affected field on any violation. Duration-only mode: at most one entry
-    per work_date and every work_date inside the Monday-Sunday week.
+    Shared by submit-time validation (persisted rows) and correction
+    re-validation (prospective rows): raises TimesheetError (422-mapped)
+    with the affected field on any violation, before any mutation.
     """
-    week_start = sheet.week_start
-    entries = [
-        {
-            "work_date": entry.work_date,
-            "duration_minutes": entry.duration_minutes,
-            "unpaid_break_minutes": entry.unpaid_break_minutes,
-        }
-        for entry in sheet.entries.all()
-    ]
     if not entries:
         raise TimesheetError(
             "validation_error",
@@ -120,6 +111,27 @@ def _validate_submittable_entries(sheet: Timesheet) -> None:
                 _("Only one entry per work_date is allowed in duration mode."),
             )
         seen.add(entry["work_date"])
+
+
+def _entry_dict(entry) -> dict:
+    return {
+        "work_date": entry.work_date,
+        "duration_minutes": entry.duration_minutes,
+        "unpaid_break_minutes": entry.unpaid_break_minutes,
+    }
+
+
+def _validate_submittable_entries(sheet: Timesheet) -> None:
+    """Complete-week + limit validation against the persisted entry rows.
+
+    Runs BEFORE any mutation; raises TimesheetError (422-mapped) with the
+    affected field on any violation. Duration-only mode: at most one entry
+    per work_date and every work_date inside the Monday-Sunday week.
+    """
+    _validate_entry_set(
+        [_entry_dict(entry) for entry in sheet.entries.all()],
+        sheet.week_start,
+    )
 
 
 def submit_timesheet(
@@ -260,19 +272,31 @@ def edit_entry(
 
         locked_entry = TimeEntry.objects.select_for_update().get(pk=entry.pk, timesheet=locked_sheet)
 
+        # Validate BEFORE any write: the corrected entry must not create an
+        # out-of-week date, duplicate day, over-cap day, or over-168h week.
+        # Any violation aborts everything (no mutation, 422), preserving the
+        # reviewer reason and history — and never trips the restored TimeEntry
+        # DB CHECK constraints (chk_timeentry_duration_within_day etc.), which
+        # would surface as an IntegrityError/500 instead of the contract 422.
         updates = _normalize_entry_payload(cleaned)
+        prospective = []
+        for row in locked_sheet.entries.all():
+            if row.pk == locked_entry.pk:
+                merged = _entry_dict(locked_entry)
+                merged.update(
+                    {k: v for k, v in updates.items() if v is not None}
+                )
+                prospective.append(merged)
+            else:
+                prospective.append(_entry_dict(row))
+        _validate_entry_set(prospective, locked_sheet.week_start)
+
         changed_fields = []
         for field, value in updates.items():
             if value is not None:
                 setattr(locked_entry, field, value)
                 changed_fields.append(field)
         locked_entry.save(update_fields=changed_fields + ["updated_at"])
-
-        # Re-validate the ENTIRE week against persisted rows: the corrected
-        # entry must not create an out-of-week date, duplicate day, over-cap
-        # day, or over-168h week. Any violation aborts everything (no
-        # mutation), preserving the reviewer reason and history.
-        _validate_submittable_entries(locked_sheet)
 
         locked_sheet.version += 1
         locked_sheet.save(update_fields=["version", "updated_at"])
