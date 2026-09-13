@@ -67,7 +67,7 @@ def test_notification_read_state_can_be_marked_and_unmarked(authenticated_client
     )
 
     marked_read = authenticated_client.patch(
-        f"/api/v1/notifications/{notification.pk}",
+        f"/api/v1/notifications/{notification.pk}/read-state",
         {"is_read": True},
         format="json",
         HTTP_X_CSRFTOKEN=csrf_token(authenticated_client),
@@ -79,7 +79,7 @@ def test_notification_read_state_can_be_marked_and_unmarked(authenticated_client
     assert notification.read_at is not None
 
     marked_unread = authenticated_client.patch(
-        f"/api/v1/notifications/{notification.pk}",
+        f"/api/v1/notifications/{notification.pk}/read-state",
         {"is_read": False},
         format="json",
         HTTP_X_CSRFTOKEN=csrf_token(authenticated_client),
@@ -101,7 +101,7 @@ def test_repeated_mark_read_preserves_original_read_at(authenticated_client, not
     )
 
     response = authenticated_client.patch(
-        f"/api/v1/notifications/{notification.pk}",
+        f"/api/v1/notifications/{notification.pk}/read-state",
         {"is_read": True},
         format="json",
         HTTP_X_CSRFTOKEN=csrf_token(authenticated_client),
@@ -123,7 +123,7 @@ def test_notification_read_state_is_throttled_after_sixty_mutations(authenticate
 
     responses = [
         authenticated_client.patch(
-            f"/api/v1/notifications/{notification.pk}",
+            f"/api/v1/notifications/{notification.pk}/read-state",
             {"is_read": True},
             format="json",
             HTTP_X_CSRFTOKEN=token,
@@ -143,7 +143,7 @@ def test_other_users_notification_cannot_be_updated(authenticated_client, other_
     )
 
     response = authenticated_client.patch(
-        f"/api/v1/notifications/{notification.pk}",
+        f"/api/v1/notifications/{notification.pk}/read-state",
         {"is_read": True},
         format="json",
         HTTP_X_CSRFTOKEN=csrf_token(authenticated_client),
@@ -169,7 +169,7 @@ def test_notification_read_state_rejects_other_fields(authenticated_client, noti
     )
 
     response = authenticated_client.patch(
-        f"/api/v1/notifications/{notification.pk}",
+        f"/api/v1/notifications/{notification.pk}/read-state",
         {"is_read": True, "title": "Tampered title"},
         format="json",
         HTTP_X_CSRFTOKEN=csrf_token(authenticated_client),

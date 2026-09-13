@@ -169,16 +169,16 @@ def cancel_request(
                 raise IdempotencyConflict()
             raise IdempotencyReplay(winner[1])
 
-    _schedule_cancel_notification(request_id)
+    _schedule_cancel_notification(request_id, key_hash)
     return locked
 
 
-def _schedule_cancel_notification(request_id: str) -> None:
+def _schedule_cancel_notification(request_id: str, key_hash: str = "") -> None:
     """Schedule the committed cancellation notification without risking it."""
     try:
         from reqs.cancel_notifications import notify_requester_of_cancel
 
-        notify_requester_of_cancel(request_id)
+        notify_requester_of_cancel(request_id, key_hash=key_hash)
     except Exception:  # noqa: BLE001 - scheduling must not undo a cancellation
         logger.exception(
             "cancel notification scheduling failed request_id=%s", request_id

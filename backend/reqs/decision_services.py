@@ -269,13 +269,13 @@ def decide_request(
             # transition + events roll back (zero second event).
             raise IdempotencyReplay(winner[1])
 
-    _schedule_decision_notification(request_id, action, comment)
+    _schedule_decision_notification(request_id, action, comment, key_hash)
     return locked
 
 
-def _schedule_decision_notification(request_id: str, action: str, comment: str) -> None:
+def _schedule_decision_notification(request_id: str, action: str, comment: str, key_hash: str) -> None:
     """Schedule a committed decision notification without risking its outcome."""
     try:
-        notify_requester_of_decision(request_id, action, comment)
+        notify_requester_of_decision(request_id, action, comment, key_hash=key_hash)
     except Exception:  # noqa: BLE001 - scheduling must not undo a decision
         logger.exception("decision notification scheduling failed request_id=%s", request_id)

@@ -225,24 +225,26 @@ def decide_timesheet(
                 raise IdempotencyConflict()
             raise IdempotencyReplay(winner[1])
 
-    _schedule_decision_notification(timesheet_id, action, comment)
+    _schedule_decision_notification(timesheet_id, action, comment, key_hash)
     return locked
 
 
-def _schedule_decision_notification(timesheet_id: str, action: str, comment: str) -> None:
+def _schedule_decision_notification(timesheet_id: str, action: str, comment: str, key_hash: str = "") -> None:
     """Schedule a committed decision notification without risking its outcome."""
     try:
-        _notify_employee_of_decision(timesheet_id, action, comment)
+        _notify_employee_of_decision(timesheet_id, action, comment, key_hash=key_hash)
     except Exception:  # noqa: BLE001 - scheduling must not undo a decision
         logger.exception("timesheet decision notification scheduling failed timesheet_id=%s", timesheet_id)
 
 
-def _create_decision_notification(timesheet_id: str, action: str, comment: str) -> None:
+def _create_decision_notification(timesheet_id: str, action: str, comment: str, dedupe_key: str = "") -> None:
     """Direct post-commit creator; runs outside the decision transaction.
 
     Any failure is logged and swallowed so the committed decision survives.
+    The dedupe key carries the decision idempotency key so a retried hook or
+    duplicate scheduling cannot duplicate the row (Story 4.2).
     """
-    from notifications.models import Notification
+    from notifications.services import create_notification
 
     titles = {
         "approve": "Your timesheet was approved",
@@ -253,17 +255,26 @@ def _create_decision_notification(timesheet_id: str, action: str, comment: str) 
     body = (comment or "")[:2000]
     try:
         sheet = Timesheet.objects.get(pk=timesheet_id)
-        Notification.objects.create(recipient=sheet.employee, kind="timesheet_updated", title=title, body=body)
+        create_notification(
+            recipient=sheet.employee,
+            kind="timesheet_updated",
+            title=title,
+            body=body,
+            related_object_type="timesheet",
+            related_object_id=str(sheet.pk),
+            dedupe_key=dedupe_key,
+        )
     except Exception:  # noqa: BLE001
         logger.exception("timesheet decision notification failed timesheet_id=%s", timesheet_id)
 
 
-def _notify_employee_of_decision(timesheet_id: str, action: str, comment: str) -> None:
+def _notify_employee_of_decision(timesheet_id: str, action: str, comment: str, key_hash: str = "") -> None:
     """Schedule the post-commit notification for a committed decision."""
     from django.db import transaction as db_transaction
 
+    dedupe_key = f"timesheet:{timesheet_id}:{action}:{key_hash}"
     db_transaction.on_commit(
-        lambda: _create_decision_notification(timesheet_id, action, comment)
+        lambda: _create_decision_notification(timesheet_id, action, comment, dedupe_key)
     )
 
 
@@ -367,24 +378,29 @@ def reopen_timesheet(
                 raise IdempotencyConflict()
             raise IdempotencyReplay(winner[1])
 
-    _schedule_reopen_notification(timesheet_id, comment)
+    _schedule_reopen_notification(timesheet_id, comment, key_hash)
     return locked
 
 
-def _schedule_reopen_notification(timesheet_id: str, comment: str) -> None:
+def _schedule_reopen_notification(timesheet_id: str, comment: str, key_hash: str = "") -> None:
     try:
         from django.db import transaction as db_transaction
 
+        dedupe_key = f"timesheet:{timesheet_id}:reopen:{key_hash}"
+
         def _create():
-            from notifications.models import Notification
+            from notifications.services import create_notification
 
             try:
                 sheet = Timesheet.objects.get(pk=timesheet_id)
-                Notification.objects.create(
+                create_notification(
                     recipient=sheet.employee,
                     kind="timesheet_updated",
                     title="Your timesheet was reopened",
                     body=(comment or "")[:2000],
+                    related_object_type="timesheet",
+                    related_object_id=str(sheet.pk),
+                    dedupe_key=dedupe_key,
                 )
             except Exception:  # noqa: BLE001
                 logger.exception("timesheet reopen notification failed timesheet_id=%s", timesheet_id)
