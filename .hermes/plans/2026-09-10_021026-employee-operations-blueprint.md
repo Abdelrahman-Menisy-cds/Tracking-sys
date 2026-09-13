@@ -290,7 +290,8 @@ registered tool costs context.
 - [x] Continue implementation — Story 2.4 accepted after QA/security review and notification-isolation hardening (merge `f482601`; 168 tests, checks clean; 2026-09-12)
 - [x] Continue implementation — Story 2.5 (cancel) accepted after QA review; 26 cancel tests, full suite 194 passed, checks clean (commit `d2aec09`, merge `2d6e9eb`; 2026-09-13)
 - [x] Continue implementation — Story 3.1 (unique weekly timesheet and entries) accepted after QA review and hardening merge; 30 timesheet tests, full suite 224 passed, Django check clean, migration check SQLite clean with only the known local PostgreSQL authentication warning, `git diff --check` clean (commits `0203ce6`, `e3c9cf4`, hardening `a9f14b1`, merge `f31a02f`; 2026-09-13)
-- [ ] Continue implementation with Story 3.2 — submit and correct a timesheet
+- [x] Continue implementation — Story 3.2 (submit and correct a timesheet) accepted after QA review and hardening merge; 59 focused timesheet tests + 30 Story 3.1 focused = 89 combined, full suite 287 passed, Django check clean with `config.test_settings`, migration 0006 applied/check clean, `git diff --check` clean (commits `bace208`, merge `60da82d`, hardening `2f7c3bf`, `c525d5f`, merge `9c24acf` = main HEAD; 2026-09-13)
+- [ ] Continue implementation with Story 3.3 — review / reject / replace / reopen timesheet
 
 ## 11. Sources
 

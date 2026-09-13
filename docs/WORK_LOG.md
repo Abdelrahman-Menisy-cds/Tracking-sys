@@ -166,6 +166,14 @@ Story 3.1 evidence (accepted 2026-09-13):
 - Commits: `0203ce6`, `e3c9cf4`, hardening `a9f14b1`, merge `f31a02f`.
 - Next step: Story 3.2 — submit and correct a timesheet.
 
+Story 3.2 evidence (accepted 2026-09-13):
+
+- Submit and correct a weekly timesheet: status-locked submission of the `Timesheet` from `DRAFT`/`RETURNED` plus correction of a returned sheet by submitting a prospective corrected entry set; `TimeEntry` DB-level constraints (row locks) restored and API-level contract tests kept with separate ORM constraint tests in the hardening pass.
+- Hardening pass: prospective corrected entry set validated before mutation; additional validation and re-added `TimeEntry` database constraints (`2f7c3bf`, `c525d5f`), merged via `9c24acf` as `main` HEAD.
+- Verification on acceptance (final, in the project-local `.venv` on `main` at HEAD `9c24acf`): final QA verdict APPROVED; Story 3.2 focused suite 59/59 passed; Story 3.1 focused suite 30/30 passed; combined 89/89; full SQLite suite 287 passed with no regressions; Django system check clean with `config.test_settings`; migration 0006 applied and migration check clean; `git diff --check` clean.
+- Commits: implementation `bace208`, merge `60da82d`, hardening `2f7c3bf`, `c525d5f`, merge `9c24acf`.
+- Next step: Story 3.3 — review / reject / replace / reopen timesheet.
+
 ## Scope boundary
 
 This log documents Tracking-sys only. It does not describe or govern any Odoo project.
