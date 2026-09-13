@@ -54,6 +54,71 @@ class TimesheetCreateSerializer(serializers.Serializer):
         return attrs
 
 
+class TimesheetSubmitSerializer(serializers.Serializer):
+    """POST /api/v1/timesheets/{id}/submit body: {confirm: true, version}.
+
+    A missing or falsy confirm is rejected 422 with no mutation; status,
+    entries, and any other field are server-managed and rejected.
+    """
+
+    confirm = serializers.BooleanField()
+    version = serializers.IntegerField()
+
+    def validate(self, attrs):
+        protected = set(self.initial_data) - {"confirm", "version"}
+        if protected:
+            raise serializers.ValidationError(
+                {field: ["This field is managed by the server."] for field in sorted(protected)}
+            )
+        if attrs.get("confirm") is not True:
+            raise serializers.ValidationError(
+                {"confirm": ["Explicit confirmation (confirm=true) is required to submit a timesheet."]}
+            )
+        return attrs
+
+
+class TimeEntryCorrectionSerializer(serializers.Serializer):
+    """PATCH body for one entry: partial, permitted fields only.
+
+    Permitted fields (contract): work_date, duration_minutes,
+    unpaid_break_minutes, description. Everything else (id, timesheet,
+    version, created_at, ...) is server-managed. `version` carries the
+    client's known sheet version for optimistic concurrency.
+    """
+
+    work_date = serializers.DateField(required=False)
+    duration_minutes = serializers.IntegerField(min_value=0, required=False)
+    unpaid_break_minutes = serializers.IntegerField(min_value=0, required=False, allow_null=False)
+    description = serializers.CharField(max_length=500, required=False, allow_blank=True, trim_whitespace=False)
+    version = serializers.IntegerField()
+
+    def validate(self, attrs):
+        permitted = {"work_date", "duration_minutes", "unpaid_break_minutes", "description", "version"}
+        protected = set(self.initial_data) - permitted
+        if protected:
+            raise serializers.ValidationError(
+                {field: ["This field is managed by the server."] for field in sorted(protected)}
+            )
+        if not set(attrs) - {"version"}:
+            raise serializers.ValidationError({"non_field_errors": ["No permitted fields to update."]})
+        attrs["expected_version"] = attrs.pop("version")
+        return attrs
+
+
+class EntryDeleteSerializer(serializers.Serializer):
+    """DELETE body for one entry: the client's known sheet version."""
+
+    version = serializers.IntegerField()
+
+    def validate(self, attrs):
+        protected = set(self.initial_data) - {"version"}
+        if protected:
+            raise serializers.ValidationError(
+                {field: ["This field is managed by the server."] for field in sorted(protected)}
+            )
+        return attrs
+
+
 def _totals(entries):
     worked = sum(e.duration_minutes for e in entries)
     breaks = sum(e.unpaid_break_minutes for e in entries)
