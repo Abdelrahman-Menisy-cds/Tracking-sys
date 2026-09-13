@@ -13,4 +13,6 @@ urlpatterns = [
         views.TimesheetEntryDetailView.as_view(),
         name="timesheet-entry-detail",
     ),
+    path("timesheets/<uuid:pk>/decision", views.TimesheetDecisionView.as_view(), name="timesheet-decision"),
+    path("timesheets/<uuid:pk>/reopen", views.TimesheetReopenView.as_view(), name="timesheet-reopen"),
 ]

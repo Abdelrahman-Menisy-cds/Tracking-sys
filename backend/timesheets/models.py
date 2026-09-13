@@ -127,6 +127,7 @@ class TimesheetEvent(models.Model):
         APPROVED = "APPROVED", "Approved"
         REJECTED = "REJECTED", "Rejected"
         RETURNED = "RETURNED", "Returned"
+        REOPENED = "REOPENED", "Reopened"
 
     timesheet = models.ForeignKey(
         Timesheet,
@@ -202,3 +203,33 @@ class TimesheetCreateIdempotencyRecord(models.Model):
         ]
         verbose_name = "timesheet create idempotency record"
         verbose_name_plural = "timesheet create idempotency records"
+
+
+class TimesheetDecisionIdempotencyRecord(models.Model):
+    """Stored decision/reopen idempotency: one key+reviewer, payload hash, snapshot.
+
+    Story 3.3: arbiter for POST /timesheets/{id}/decision and POST
+    /timesheets/{id}/reopen. Lookup AND insert run inside the locked
+    transition transaction (review_services); UniqueConstraint(key_hash,
+    user) is the serialization point so concurrent same-key requests yield
+    exactly one transition/event — the loser replays (same payload) or
+    conflicts (409, differing payload). Scoped per reviewer so a guessed key
+    never leaks another reviewer's stored response.
+    """
+
+    key_hash = models.CharField(max_length=64, db_index=True)
+    payload_hash = models.CharField(max_length=64)
+    response_snapshot = models.JSONField()
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="timesheet_decision_idempotency_records",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("key_hash", "user"), name="uniq_timesheet_decision_idem_key_user"),
+        ]
+        verbose_name = "timesheet decision idempotency record"
+        verbose_name_plural = "timesheet decision idempotency records"
