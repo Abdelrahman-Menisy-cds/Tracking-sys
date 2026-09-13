@@ -103,13 +103,6 @@ class TimeEntry(models.Model):
 
     class Meta:
         ordering = ("work_date", "id")
-        constraints = [
-            models.UniqueConstraint(fields=("timesheet", "work_date"), name="uniq_timeentry_sheet_work_date"),
-            models.CheckConstraint(condition=models.Q(duration_minutes__gte=0), name="chk_timeentry_duration_non_negative"),
-            models.CheckConstraint(condition=models.Q(unpaid_break_minutes__gte=0), name="chk_timeentry_break_non_negative"),
-            models.CheckConstraint(condition=models.Q(duration_minutes__lte=1440), name="chk_timeentry_duration_within_day"),
-            models.CheckConstraint(condition=models.Q(unpaid_break_minutes__lte=1440), name="chk_timeentry_break_within_day"),
-        ]
         verbose_name = "time entry"
         verbose_name_plural = "time entries"
 
@@ -148,6 +141,34 @@ class TimesheetEvent(models.Model):
         ordering = ("created_at", "id")
         verbose_name = "timesheet event"
         verbose_name_plural = "timesheet events"
+
+
+class TimesheetSubmitIdempotencyRecord(models.Model):
+    """Stored submit-timesheet idempotency: one key+user, payload hash, snapshot.
+
+    Same design as TimesheetCreateIdempotencyRecord and the reqs decision/
+    cancel records: lookup AND insert run inside the locked transition
+    transaction; UniqueConstraint(key_hash, user) is the serialization point.
+    Scoped per user so a guessed key never leaks another employee's stored
+    response.
+    """
+
+    key_hash = models.CharField(max_length=64, db_index=True)
+    payload_hash = models.CharField(max_length=64)
+    response_snapshot = models.JSONField()
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="timesheet_submit_idempotency_records",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=("key_hash", "user"), name="uniq_timesheet_submit_idem_key_user"),
+        ]
+        verbose_name = "timesheet submit idempotency record"
+        verbose_name_plural = "timesheet submit idempotency records"
 
 
 class TimesheetCreateIdempotencyRecord(models.Model):
