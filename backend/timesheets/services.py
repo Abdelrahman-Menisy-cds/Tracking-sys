@@ -200,19 +200,18 @@ def create_timesheet(
     Raises TimesheetError (422), DuplicateWeek (409-mapped), IdempotencyReplay
     (200/201 replay of a committed response), or IdempotencyConflict (409).
     """
-    # In-transaction idempotency FIRST (contract: a committed same-key+payload
-    # replays even if the week also already exists): a previously committed key
-    # replays/conflicts BEFORE any mutation; a concurrent winner is caught by
-    # the record insert's unique constraint below.
+    # Lock the employee row before checking either uniqueness key. Locking only
+    # an existing child row cannot serialize the first concurrent creates.
+    employee.__class__.objects.select_for_update().get(pk=employee.pk)
+
+    # A committed key replays/conflicts before any mutation. Rechecking after
+    # the employee lock also serializes concurrent same-key creators.
     record = TimesheetCreateIdempotencyRecord.objects.filter(key_hash=key_hash, user=employee).first()
     if record is not None:
         if record.payload_hash == payload_hash:
             raise IdempotencyReplay(record.response_snapshot)
         raise IdempotencyConflict()
 
-    # Locking the employee row serializes all of this employee's sheet creation;
-    # the duplicate check afterwards is therefore race-free.
-    Timesheet.objects.select_for_update().filter(employee=employee, week_start=week_start).first()
     existing = Timesheet.objects.filter(employee=employee, week_start=week_start).first()
     if existing is not None:
         raise DuplicateWeek(existing)
