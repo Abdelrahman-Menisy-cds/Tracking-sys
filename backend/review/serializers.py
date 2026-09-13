@@ -131,6 +131,44 @@ class ReviewTimesheetSerializer(serializers.ModelSerializer):
         return {"can_decide": can_decide_timesheet(self.context["viewer"], obj)}
 
 
+def report_rows_for(category, queryset):
+    """Story 4.3 report row dicts over an already-scoped+ordered queryset."""
+    if category == "requests":
+        from reqs.models import EmployeeRequest  # local import parity with scope
+
+        rows = []
+        for obj in queryset.iterator():
+            rows.append(
+                {
+                    "id": str(obj.pk),
+                    "requester_id": str(obj.requester_id),
+                    "requester_name": obj.requester.full_name,
+                    "request_type": obj.request_type.name,
+                    "title": obj.title,
+                    "status": obj.status,
+                    "version": obj.version,
+                    "submitted_at": obj.submitted_at.isoformat() if obj.submitted_at else None,
+                    "created_at": obj.created_at.isoformat(),
+                }
+            )
+        return rows
+    rows = []
+    for obj in queryset.iterator():
+        rows.append(
+            {
+                "id": str(obj.pk),
+                "employee_id": str(obj.employee_id),
+                "employee_name": obj.employee.full_name,
+                "week_start": obj.week_start.isoformat(),
+                "status": obj.status,
+                "version": obj.version,
+                "created_at": obj.created_at.isoformat(),
+                "updated_at": obj.updated_at.isoformat(),
+            }
+        )
+    return rows
+
+
 class ReviewTimesheetSummarySerializer(serializers.ModelSerializer):
     """Queue row: no entries/events — detail returns those."""
 

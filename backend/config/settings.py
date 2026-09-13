@@ -141,6 +141,7 @@ REST_FRAMEWORK = {
         "login": "10/min",
         "mutation": "60/min",
         "attachment_upload": "20/hour",
+        "report_export": "5/hour",
     },
 }
 
