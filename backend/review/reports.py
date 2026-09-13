@@ -81,9 +81,13 @@ def resolve_report(category: str, user, params):
     if category not in ALLOWED_CATEGORIES:
         raise ReportFilterError([f"report: unknown category {category!r}."])
     _authorize(user)
+    # Server-authoritative org timezone (policy item 4): the SAME value is
+    # used for the date-bound conversion below and for the org_timezone
+    # metadata, so advertised and applied semantics can never diverge.
+    tzone = organization_timezone()
     if category == "requests":
         scoped = review_scope.scope_requests(user)
-        filtered, cleaned, errors = apply_request_queue_filters(scoped, params)
+        filtered, cleaned, errors = apply_request_queue_filters(scoped, params, timezone_name=tzone)
     else:
         scoped = review_scope.scope_timesheets(user)
         filtered, cleaned, errors = apply_timesheet_queue_filters(scoped, params)
@@ -98,7 +102,7 @@ def resolve_report(category: str, user, params):
     return filtered, {
         "report": category,
         "scope": scope_label(user),
-        "org_timezone": organization_timezone(),
+        "org_timezone": tzone,
         "date_from": cleaned.get("date_from"),
         "date_to": cleaned.get("date_to"),
         "filters_applied": filters_applied,

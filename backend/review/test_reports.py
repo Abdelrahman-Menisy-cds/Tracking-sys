@@ -25,6 +25,8 @@ import io
 from datetime import date, timedelta
 from unittest import mock
 
+from datetime import timezone as dt_utc
+
 import django.utils.timezone as django_tz
 
 from django.core.cache import cache
@@ -353,6 +355,118 @@ class TestRateLimitAndAudit(ReportBase):
         url_rows = reverse("review:report-rows", args=["requests"])
         for _ in range(12):
             self.assertEqual(self.client.get(url_rows).status_code, status.HTTP_200_OK)
+
+
+class TestOrgTimezoneDateBoundary(ReportBase):
+    """QA blocker fix: date_from/date_to on request reports are ORGANIZATION
+
+    timezone local dates, not UTC dates. The server derives the local
+    midnight bounds in the org timezone, converts them to UTC instants, and
+    filters submitted_at with those instants — and rows / totals /
+    dashboard / CSV must all show the SAME filtered set.
+    """
+
+    ORG_TZ = "Pacific/Kiritimati"  # fixed UTC+14, no DST: unambiguous boundary math
+
+    def url(self, kind, cat="requests"):
+        return reverse(f"review:report-{kind}", args=[cat])
+
+    def setUp(self):
+        super().setUp()
+        from timesheets.models import TimezoneConfig
+
+        TimezoneConfig.objects.update_or_create(pk=1, defaults={"name": self.ORG_TZ})
+        # UTC 2026-03-10 12:00 -> Kiritimati local 2026-03-11 02:00 (org date 03-11,
+        # but UTC date 03-10: the old submitted_at__date filter missed this row).
+        self.in_local_day = EmployeeRequest.objects.create(
+            requester=self.employee,
+            request_type=self.rtype,
+            title="Local-day request",
+            status=EmployeeRequest.Status.PENDING_MANAGER,
+            manager_at_submission=self.manager,
+            version=1,
+        )
+        EmployeeRequest.objects.filter(pk=self.in_local_day.pk).update(
+            submitted_at=django_tz.make_aware(django_tz.datetime(2026, 3, 10, 12, 0), dt_utc.utc)
+        )
+        # UTC 2026-03-11 20:00 -> Kiritimati local 2026-03-12 10:00 (org date 03-12,
+        # but UTC date 03-11: the old UTC filter wrongly included this row).
+        self.next_local_day = EmployeeRequest.objects.create(
+            requester=self.employee,
+            request_type=self.rtype,
+            title="Next-local-day request",
+            status=EmployeeRequest.Status.PENDING_MANAGER,
+            manager_at_submission=self.manager,
+            version=1,
+        )
+        EmployeeRequest.objects.filter(pk=self.next_local_day.pk).update(
+            submitted_at=django_tz.make_aware(django_tz.datetime(2026, 3, 11, 20, 0), dt_utc.utc)
+        )
+        self.params = {"date_from": "2026-03-11", "date_to": "2026-03-11"}
+
+    def _csv_titles(self, resp):
+        text = resp.content.decode("utf-8-sig")
+        reader = list(csv.reader(io.StringIO(text)))
+        data_rows = [r for r in reader if r and not r[0].startswith("#")][1:]
+        return {r[9] for r in data_rows}
+
+    def test_org_tz_bounds_filter_parity_across_outputs(self):
+        self.auth_hr()
+        rows = self.client.get(self.url("rows"), self.params).json()
+        titles = {r["title"] for r in rows["data"]}
+        self.assertEqual(titles, {"Local-day request"})
+        self.assertEqual(rows["meta"]["org_timezone"], self.ORG_TZ)
+        # Metadata keeps the ORG-LOCAL dates the client asked for.
+        self.assertEqual(rows["meta"]["date_from"], "2026-03-11")
+        self.assertEqual(rows["meta"]["date_to"], "2026-03-11")
+
+        totals = self.client.get(self.url("totals"), self.params).json()
+        self.assertEqual(totals["data"]["total"], 1)
+        self.assertEqual(totals["data"]["counts_by_status"]["PENDING_MANAGER"], 1)
+
+        dash = self.client.get(self.url("dashboard"), self.params).json()
+        self.assertEqual(dash["data"]["total"], 1)
+        self.assertEqual(dash["data"]["counts_by_status"]["PENDING_MANAGER"], 1)
+
+        csv_resp = self.client.get(self.url("csv"), self.params)
+        self.assertEqual(csv_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._csv_titles(csv_resp), {"Local-day request"})
+
+    def test_org_tz_boundary_inclusive_of_full_local_day(self):
+        # A request at the LAST instant of org-local 2026-03-11 (UTC 2026-03-11
+        # 09:59 = local 2026-03-11 23:59) is inside date_to=2026-03-11.
+        self.auth_hr()
+        edge = EmployeeRequest.objects.create(
+            requester=self.employee,
+            request_type=self.rtype,
+            title="End-of-local-day request",
+            status=EmployeeRequest.Status.PENDING_MANAGER,
+            manager_at_submission=self.manager,
+            version=1,
+        )
+        EmployeeRequest.objects.filter(pk=edge.pk).update(
+            submitted_at=django_tz.make_aware(django_tz.datetime(2026, 3, 11, 9, 59), dt_utc.utc)
+        )
+        titles = {r["title"] for r in self.client.get(self.url("rows"), self.params).json()["data"]}
+        self.assertEqual(titles, {"Local-day request", "End-of-local-day request"})
+
+    def test_org_tz_date_filter_open_sides(self):
+        # date_from only: everything from org-local 2026-03-12 onward.
+        self.auth_hr()
+        titles = {r["title"] for r in self.client.get(self.url("rows"), {"date_from": "2026-03-12"}).json()["data"]}
+        self.assertEqual(titles, {"Next-local-day request"})
+        # date_to only: everything up to and including org-local 2026-03-11.
+        titles = {r["title"] for r in self.client.get(self.url("rows"), {"date_to": "2026-03-11"}).json()["data"]}
+        self.assertIn("Local-day request", titles)
+        self.assertNotIn("Next-local-day request", titles)
+
+    def test_manager_scope_parity_with_org_tz_dates(self):
+        self.auth_manager()
+        rows = self.client.get(self.url("rows"), self.params).json()["data"]
+        totals = self.client.get(self.url("totals"), self.params).json()["data"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(totals["total"], 1)
+        self.assertEqual(rows[0]["title"], "Local-day request")
 
 
 class TestTimesheetReportValues(ReportBase):
