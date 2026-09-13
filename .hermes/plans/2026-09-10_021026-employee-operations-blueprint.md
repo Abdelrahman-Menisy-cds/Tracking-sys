@@ -288,7 +288,8 @@ registered tool costs context.
 - [x] Continue implementation — Story 2.2 accepted after spec/security review + fix merge (commits `839d8b8`, `f1de7c9`, merge `a696f28`; 100 tests, checks clean; 2026-09-12)
 - [x] Continue implementation — Story 2.3 accepted after security review (commit `af744c3`; 128 tests, checks clean; 2026-09-12)
 - [x] Continue implementation — Story 2.4 accepted after QA/security review and notification-isolation hardening (merge `f482601`; 168 tests, checks clean; 2026-09-12)
-- [ ] Continue implementation with Story 2.5 (cancel) after contract review
+- [x] Continue implementation — Story 2.5 (cancel) accepted after QA review; 26 cancel tests, full suite 194 passed, checks clean (commit `d2aec09`, merge `2d6e9eb`; 2026-09-13)
+- [ ] Continue implementation with Story 3.1 — unique weekly timesheet and entries
 
 ## 11. Sources
 

@@ -147,7 +147,16 @@ Story 2.4 evidence (accepted 2026-09-12):
 - Verification on acceptance: 168 tests passed (40 decision-focused); Django check clean; migration drift none; diff check clean; final QA/security review APPROVED.
 - Commits: `27ce924`, `fece9b0`, `1d3fd61`, `ac7c234`, merge `f482601`.
 
-Planned outputs: Story 2.5 (cancel), Epic 3 timesheets, React frontend, PostgreSQL on provisioned DB, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
+Story 2.5 evidence (accepted 2026-09-13):
+
+- `POST /api/v1/requests/{id}/cancel` with required `Idempotency-Key`: same key+payload replays the stored response; differing payload → `409 idempotency_conflict`.
+- Cancel allowed only for the requester from `DRAFT`/`RETURNED` while policy permits; terminal/decided states reject with `409 state_conflict`; cross-user access is 404-safe; transitions transactional, version-checked, append-only (`CANCELLED` RequestEvent + AuditEvent).
+
+Planned outputs: Epic 3 timesheets, React frontend, PostgreSQL on provisioned DB, unit/integration/browser tests, QA approval, CI, deployment readiness, and release evidence.
+
+- Verification on acceptance: final QA verdict APPROVED; 26 focused cancel tests; full suite previously at 194 passed; Django system check clean; migration-drift check had only the known local PostgreSQL authentication warning with no drift; `git diff --check` clean.
+- Commits: implementation `d2aec09`, merge `2d6e9eb`.
+- Next step: Story 3.1 — unique weekly timesheet and entries.
 
 ## Scope boundary
 
