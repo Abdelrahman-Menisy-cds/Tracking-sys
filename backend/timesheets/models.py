@@ -31,6 +31,9 @@ class TimezoneConfig(models.Model):
     name = models.CharField(max_length=63, unique=True, default="UTC")
 
     class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(id=1), name="chk_timezone_config_singleton"),
+        ]
         verbose_name = "organization timezone config"
         verbose_name_plural = "organization timezone configs"
 
