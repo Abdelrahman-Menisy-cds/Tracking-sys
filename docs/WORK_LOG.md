@@ -185,6 +185,16 @@ Story 3.3 evidence (accepted 2026-09-13):
 - Commits: implementation `a13a299`, merge `5ced7de`; QA fix `3c70842`, merge `8b15913` = main HEAD.
 - Next step: Story 4.2 — in-app notifications.
 
+Story 4.2 evidence (accepted 2026-09-13):
+
+- In-app notifications under `backend/notifications`: notification creation triggered post-commit on request and timesheet decisions, delivered to scoped recipients per the Epic 4.1 permission surface.
+- Lock retry and dedupe verified: concurrent decision paths cannot double-create a notification for the same event; retry under contention is safe and bounded.
+- Post-commit creation verified: notification writes occur after the decision transaction commits; scheduling/creation failures are isolated and logged with zero impact on the deciding transaction (unread failure isolation verified).
+- Scoped surfaces verified: recipient-scoped list, detail, and read endpoints; cross-user object URLs return the safe 404 envelope with no data leak; unread counts and read-state updates remain per-recipient.
+- Safe links verified: notification targets resolve only to objects the recipient is authorized to see; no manager-identity or cross-scope disclosure via links or payloads.
+- Verification on acceptance (final, in the project-local `.venv` on `main` at HEAD `a4ff7b9`): final QA verdict APPROVED; notification tests 31 passed with `-W error` and no thread warnings; Django system check clean with `config.test_settings`; `git diff --check` clean.
+- Next step: Story 4.3 — scoped CSV reports.
+
 ## Scope boundary
 
 This log documents Tracking-sys only. It does not describe or govern any Odoo project.
