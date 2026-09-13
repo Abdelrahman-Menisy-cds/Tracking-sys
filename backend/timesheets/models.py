@@ -103,6 +103,13 @@ class TimeEntry(models.Model):
 
     class Meta:
         ordering = ("work_date", "id")
+        constraints = [
+            models.UniqueConstraint(fields=("timesheet", "work_date"), name="uniq_timeentry_sheet_work_date"),
+            models.CheckConstraint(condition=models.Q(duration_minutes__gte=0), name="chk_timeentry_duration_non_negative"),
+            models.CheckConstraint(condition=models.Q(unpaid_break_minutes__gte=0), name="chk_timeentry_break_non_negative"),
+            models.CheckConstraint(condition=models.Q(duration_minutes__lte=1440), name="chk_timeentry_duration_within_day"),
+            models.CheckConstraint(condition=models.Q(unpaid_break_minutes__lte=1440), name="chk_timeentry_break_within_day"),
+        ]
         verbose_name = "time entry"
         verbose_name_plural = "time entries"
 
