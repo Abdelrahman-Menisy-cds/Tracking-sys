@@ -158,6 +158,14 @@ Planned outputs: Epic 3 timesheets, React frontend, PostgreSQL on provisioned DB
 - Commits: implementation `d2aec09`, merge `2d6e9eb`.
 - Next step: Story 3.1 — unique weekly timesheet and entries.
 
+Story 3.1 evidence (accepted 2026-09-13):
+
+- Unique weekly timesheets and entries: `Timesheet` container with unique `(employee, week_start)` singleton enforcement plus `TimeEntry` rows (work date, duration in minutes, description), created/list/detail APIs under `backend/timesheets`.
+- Hardening pass: singleton-create and config races fixed under row locks (`a9f14b1`), merged via `f31a02f`.
+- Verification on acceptance (final, in the project-local `.venv` on `main` at merge `f31a02f`): final QA verdict APPROVED; focused timesheet suite 30/30 passed; full suite 224 passed with no regressions (baseline 194 + 30 new); Django system check clean (`0 silenced`); migration-drift check `No changes detected` — SQLite clean, with only the known local PostgreSQL authentication warning (`fe_sendauth: no password supplied`) due to the missing local DB password, no drift; `git diff --check` clean.
+- Commits: `0203ce6`, `e3c9cf4`, hardening `a9f14b1`, merge `f31a02f`.
+- Next step: Story 3.2 — submit and correct a timesheet.
+
 ## Scope boundary
 
 This log documents Tracking-sys only. It does not describe or govern any Odoo project.
