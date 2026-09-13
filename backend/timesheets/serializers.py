@@ -119,6 +119,70 @@ class EntryDeleteSerializer(serializers.Serializer):
         return attrs
 
 
+class TimesheetDecisionSerializer(serializers.Serializer):
+    """POST /api/v1/timesheets/{id}/decision body (Story 3.3).
+
+    action approve/reject/return; comment must be non-blank and bounded for
+    reject/return (optional for approve); version carries the client's known
+    sheet version. Status and any other field are server-managed (422).
+    """
+
+    action = serializers.ChoiceField(choices=("approve", "reject", "return"))
+    comment = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        max_length=2000,
+        trim_whitespace=True,
+    )
+    version = serializers.IntegerField()
+
+    def validate(self, attrs):
+        protected = set(self.initial_data) - {"action", "comment", "version"}
+        if protected:
+            raise serializers.ValidationError(
+                {field: ["This field is managed by the server."] for field in sorted(protected)}
+            )
+        action = attrs["action"]
+        comment = (attrs.get("comment") or "").strip()
+        if action in ("reject", "return") and not comment:
+            raise serializers.ValidationError(
+                {"comment": ["A non-blank comment is required to reject or return a timesheet."]}
+            )
+        attrs["comment"] = comment
+        return attrs
+
+
+class TimesheetReopenSerializer(serializers.Serializer):
+    """POST /api/v1/timesheets/{id}/reopen body (Story 3.3, HR-only).
+
+    Contract: {confirm: true, version: <int>, comment: <non-blank>}.
+    Missing/false confirm, missing/blank comment, or any protected extra
+    field is rejected 422 with no mutation.
+    """
+
+    confirm = serializers.BooleanField()
+    version = serializers.IntegerField()
+    comment = serializers.CharField(max_length=2000, trim_whitespace=True)
+
+    def validate(self, attrs):
+        protected = set(self.initial_data) - {"confirm", "version", "comment"}
+        if protected:
+            raise serializers.ValidationError(
+                {field: ["This field is managed by the server."] for field in sorted(protected)}
+            )
+        if attrs.get("confirm") is not True:
+            raise serializers.ValidationError(
+                {"confirm": ["Explicit confirmation (confirm=true) is required to reopen a timesheet."]}
+            )
+        if not (attrs.get("comment") or "").strip():
+            raise serializers.ValidationError(
+                {"comment": ["A non-blank comment is required to reopen a timesheet."]}
+            )
+        attrs["comment"] = attrs["comment"].strip()
+        return attrs
+
+
 def _totals(entries):
     worked = sum(e.duration_minutes for e in entries)
     breaks = sum(e.unpaid_break_minutes for e in entries)

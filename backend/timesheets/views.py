@@ -24,6 +24,7 @@ from accounts.throttles import MutationRateThrottle
 from config.api import RequestPagination, error_payload
 
 from . import serializers as ts
+from . import review_services
 from .models import TimeEntry, Timesheet
 from .services import (
     DuplicateWeek,
@@ -379,3 +380,192 @@ class TimesheetEntryDetailView(APIView):
             )
 
         return Response({"data": ts.TimesheetSerializer(sheet).data})
+
+
+def _get_timesheet_for_review(user, pk):
+    """Fetch any timesheet the user may review; 404 when it does not exist.
+
+    Scope (direct-report manager / HR role) is enforced inside the service
+    under the row lock; out-of-scope there maps back to this same 404 so an
+    unauthorized reviewer learns nothing about the sheet's existence
+    (permission-matrix.md 404 policy).
+    """
+    try:
+        return Timesheet.objects.get(pk=pk)
+    except (Timesheet.DoesNotExist, ValueError):
+        raise Http404
+
+
+class TimesheetDecisionView(APIView):
+    """POST /api/v1/timesheets/{id}/decision (Story 3.3).
+
+    Reviewer-only (active direct-report manager or active HR); the sheet
+    must be SUBMITTED. Idempotency-Key header required; payload
+    {action, comment, version} — non-blank comment required for
+    reject/return (422, no mutation). Undisclosed cross-scope access is a
+    uniform 404. The transition, event, audit, and the idempotency record
+    commit in one locked transaction; same-key races replay or conflict,
+    never duplicate. Post-commit employee notification is failure-isolated.
+    """
+
+    throttle_classes = [MutationRateThrottle]
+
+    def post(self, request, pk):
+        sheet = _get_timesheet_for_review(request.user, pk)
+
+        idempotency_key = request.headers.get("Idempotency-Key", "").strip()
+        if not idempotency_key:
+            return Response(
+                error_payload(
+                    code="idempotency_key_required",
+                    message="An Idempotency-Key header is required to decide a timesheet.",
+                    fields={"idempotency_key": ["Missing Idempotency-Key header."]},
+                    request=request,
+                ),
+                status=422,
+            )
+
+        serializer = ts.TimesheetDecisionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        action = serializer.validated_data["action"]
+        comment = serializer.validated_data["comment"]
+        expected_version = serializer.validated_data["version"]
+
+        payload_hash = sha256(
+            f"{sheet.pk}:{expected_version}:{action}:{comment}".encode()
+        ).hexdigest()
+        key_hash = sha256(idempotency_key.encode()).hexdigest()
+
+        try:
+            decided = review_services.decide_timesheet(
+                reviewer=request.user,
+                sheet=sheet,
+                action=action,
+                comment=comment,
+                version=expected_version,
+                key_hash=key_hash,
+                payload_hash=payload_hash,
+            )
+        except review_services.VersionConflict:
+            return Response(
+                _version_conflict_payload(request),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except review_services.DecisionStateError:
+            return Response(
+                _state_conflict_payload(
+                    "This action is not possible in the timesheet's current state.",
+                    "Decisions require the SUBMITTED state.",
+                    request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except review_services.IdempotencyReplay as replay:
+            # Lost a concurrent same-key race with the identical payload: the
+            # winner's transition stands; replay its response (200).
+            replayed = Timesheet.objects.get(pk=replay.snapshot["timesheet_id"])
+            return Response({"data": ts.TimesheetSerializer(replayed).data}, status=status.HTTP_200_OK)
+        except review_services.IdempotencyConflict:
+            return Response(
+                _idempotency_conflict_payload(request),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except PermissionError:
+            return Response(
+                error_payload(
+                    code="self_decision_forbidden",
+                    message="You cannot decide your own timesheet.",
+                    fields={"action": ["Self-approval is forbidden."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except LookupError:
+            # Out of scope: same envelope as a nonexistent resource (404 policy).
+            raise Http404
+
+        return Response({"data": ts.TimesheetSerializer(decided).data}, status=status.HTTP_200_OK)
+
+
+class TimesheetReopenView(APIView):
+    """POST /api/v1/timesheets/{id}/reopen (Story 3.3, HR-only).
+
+    Active HR only; only APPROVED or REJECTED sheets may be reopened to
+    RETURNED. Mandatory non-blank reason, explicit confirm=true, and an
+    Idempotency-Key; stale version -> 409. All prior history is retained
+    (append-only); the reopened sheet becomes employee-editable. Employees
+    and managers get the same 404 as a nonexistent sheet.
+    """
+
+    throttle_classes = [MutationRateThrottle]
+
+    def post(self, request, pk):
+        sheet = _get_timesheet_for_review(request.user, pk)
+
+        idempotency_key = request.headers.get("Idempotency-Key", "").strip()
+        if not idempotency_key:
+            return Response(
+                error_payload(
+                    code="idempotency_key_required",
+                    message="An Idempotency-Key header is required to reopen a timesheet.",
+                    fields={"idempotency_key": ["Missing Idempotency-Key header."]},
+                    request=request,
+                ),
+                status=422,
+            )
+
+        serializer = ts.TimesheetReopenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        comment = serializer.validated_data["comment"]
+        expected_version = serializer.validated_data["version"]
+
+        key_hash, payload_hash = review_services.reopen_idempotency_fingerprint(
+            key=idempotency_key, timesheet_id=sheet.pk, version=expected_version, comment=comment
+        )
+
+        try:
+            reopened = review_services.reopen_timesheet(
+                hr_user=request.user,
+                sheet=sheet,
+                comment=comment,
+                version=expected_version,
+                key_hash=key_hash,
+                payload_hash=payload_hash,
+            )
+        except review_services.VersionConflict:
+            return Response(
+                _version_conflict_payload(request),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except review_services.DecisionStateError:
+            return Response(
+                _state_conflict_payload(
+                    "Only approved or rejected timesheets can be reopened.",
+                    "Reopening requires the APPROVED or REJECTED state.",
+                    request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except review_services.IdempotencyReplay as replay:
+            replayed = Timesheet.objects.get(pk=replay.snapshot["timesheet_id"])
+            return Response({"data": ts.TimesheetSerializer(replayed).data}, status=status.HTTP_200_OK)
+        except review_services.IdempotencyConflict:
+            return Response(
+                _idempotency_conflict_payload(request),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except PermissionError:
+            return Response(
+                error_payload(
+                    code="self_decision_forbidden",
+                    message="You cannot reopen your own timesheet.",
+                    fields={"action": ["Self-reopen is forbidden."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+        except LookupError:
+            # Not HR: same envelope as a nonexistent resource (404 policy).
+            raise Http404
+
+        return Response({"data": ts.TimesheetSerializer(reopened).data}, status=status.HTTP_200_OK)
