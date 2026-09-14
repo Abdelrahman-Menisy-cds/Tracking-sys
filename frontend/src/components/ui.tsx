@@ -52,7 +52,7 @@ export function Banner({
   children,
   role = "status",
 }: {
-  tone: "info" | "error" | "warning" | "neutral";
+  tone: "info" | "success" | "error" | "warning" | "neutral";
   children: ReactNode;
   role?: "status" | "alert";
 }) {
@@ -125,8 +125,10 @@ export function Dialog({
   useEffect(() => {
     headingRef.current?.focus();
     const previouslyFocused = document.activeElement as HTMLElement | null;
+    document.body.classList.add("dialog-open");
     return () => {
       previouslyFocused?.focus();
+      document.body.classList.remove("dialog-open");
     };
   }, []);
 

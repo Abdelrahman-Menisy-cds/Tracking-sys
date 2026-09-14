@@ -3,10 +3,11 @@
  * language / appearance / role controls, notifications link, demo banner.
  * Navigation mirrors capability scoping: Team reviews only for manager/HR demo roles.
  */
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useApp, type Appearance } from "./AppContext";
 import type { Role } from "../i18n/dict";
+import { notifications } from "../mock/data";
 
 const brandMark = (
   <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true" focusable="false">
@@ -21,18 +22,21 @@ const brandMark = (
 );
 
 export default function AppShell() {
-  const { t, locale, setLocale, role, setRole, appearance, setAppearance } = useApp();
+  const { t, locale, setLocale, role, setRole, appearance, setAppearance, failNext, emptyNext } = useApp();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [stateTools, setStateTools] = useState(false);
   const navigate = useNavigate();
 
   const canReview = role === "manager" || role === "hr";
 
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.is_read).length, []);
+
   const navItems = [
-    { to: "/", label: t("navHome"), end: true },
-    { to: "/requests", label: t("navMyRequests") },
-    { to: "/timesheets", label: t("navMyTimesheets") },
-    ...(canReview ? [{ to: "/reviews", label: t("navTeamReviews") }] : []),
-    { to: "/notifications", label: t("navNotifications") },
+    { to: "/", label: t("navHome"), end: true, badge: 0 },
+    { to: "/requests", label: t("navMyRequests"), end: false, badge: 0 },
+    { to: "/timesheets", label: t("navMyTimesheets"), end: false, badge: 0 },
+    ...(canReview ? [{ to: "/reviews", label: t("navTeamReviews"), end: false, badge: 0 }] : []),
+    { to: "/notifications", label: t("navNotifications"), end: false, badge: unreadCount },
   ];
 
   const roleOptions: { value: Role; label: string }[] = [
@@ -47,9 +51,22 @@ export default function AppShell() {
     { value: "dark", label: t("appearanceDark") },
   ];
 
+  // Mobile drawer: Escape closes it and returns focus to the toggle button.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setDrawerOpen(false);
+        document.querySelector<HTMLElement>(".menu-toggle")?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [drawerOpen]);
+
   return (
     <>
-      <a href="#main-content" style={{ position: "absolute", insetInlineStart: -9999, top: 0 }}>
+      <a href="#main-content" className="skip-link">
         {t("skipToMain")}
       </a>
       <div className="demo-banner" role="note">
@@ -73,13 +90,59 @@ export default function AppShell() {
               end={item.end}
               className="nav-link"
               aria-current="page"
+              aria-label={item.badge > 0 ? (locale === "ar" ? `الإشعارات — ${item.badge} غير مقروءة` : `Notifications — ${item.badge} unread`) : undefined}
               onClick={() => setDrawerOpen(false)}
             >
               {item.label}
+              {item.badge > 0 && (
+                <span className="nav-badge" aria-hidden="true">
+                  {item.badge}
+                </span>
+              )}
             </NavLink>
           ))}
           <div style={{ marginTop: "auto", fontSize: 13, color: "var(--text-muted)" }}>
             {t("tagline")}
+          </div>
+
+          {/* Reviewer-only demo state controls: preview error / empty list states. */}
+          <div className="demo-state-tools">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ minHeight: 36, width: "100%" }}
+              aria-expanded={stateTools}
+              onClick={() => setStateTools((v) => !v)}
+            >
+              {t("demoStatesTitle")}
+            </button>
+            {stateTools && (
+              <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                <span>{t("demoStatesHint")}</span>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ minHeight: 36 }}
+                  onClick={() => {
+                    failNext();
+                    setDrawerOpen(false);
+                  }}
+                >
+                  ✕ {t("demoStateError")}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ minHeight: 36 }}
+                  onClick={() => {
+                    emptyNext();
+                    setDrawerOpen(false);
+                  }}
+                >
+                  🗂️ {t("demoStateEmpty")}
+                </button>
+              </div>
+            )}
           </div>
         </nav>
 

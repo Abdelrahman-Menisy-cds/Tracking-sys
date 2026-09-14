@@ -1,7 +1,7 @@
 /** S03 — My requests list + new-request editor with draft/submit and demo state controls. */
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useApp } from "../app/AppContext";
+import { useApp, usePageTitle } from "../app/AppContext";
 import { useMockList, formatDateTime } from "../app/useMockList";
 import { mockFetch, myRequests, requestTypes } from "../mock/data";
 import { Banner, EmptyState, ErrorState, RequestStatusPill, SkeletonRows } from "../components/ui";
@@ -11,6 +11,7 @@ export default function MyRequestsPage() {
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const list = useMockList(() => mockFetch(myRequests), []);
+  usePageTitle(t("myRequestsTitle"));
 
   const filtered =
     list.phase === "ready"
@@ -175,7 +176,7 @@ export function NewRequestPage() {
           </span>
         </label>
 
-        {savedMsg && <Banner tone="info">{savedMsg}</Banner>}
+        {savedMsg && <Banner tone="success">{savedMsg}</Banner>}
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <button className="btn btn-secondary" type="button" disabled={busy} onClick={() => save(false)}>

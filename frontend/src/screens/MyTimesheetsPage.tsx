@@ -1,7 +1,7 @@
 /** S05 — My timesheets: week list + weekly editor with entries, totals, submit. */
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useApp } from "../app/AppContext";
+import { useApp, usePageTitle } from "../app/AppContext";
 import { useMockList, formatMinutes } from "../app/useMockList";
 import { mockFetch, myTimesheets, type TimesheetMock } from "../mock/data";
 import { Banner, EmptyState, ErrorState, SkeletonRows, TimesheetStatusPill } from "../components/ui";
@@ -9,6 +9,7 @@ import { Banner, EmptyState, ErrorState, SkeletonRows, TimesheetStatusPill } fro
 export function MyTimesheetsPage() {
   const { t, locale } = useApp();
   const list = useMockList(() => mockFetch(myTimesheets), []);
+  usePageTitle(t("myTimesheetsTitle"));
 
   return (
     <>
@@ -208,7 +209,7 @@ function TimesheetEditor({
         </table>
       </div>
 
-      {savedMsg && <Banner tone="info">{savedMsg}</Banner>}
+      {savedMsg && <Banner tone="success">{savedMsg}</Banner>}
 
       {!readOnly && (
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 16 }}>

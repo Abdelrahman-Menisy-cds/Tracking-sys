@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36">
+  <!-- هي فوضى؟ / Heya Fawda? — original composed-clipboard mark: an orderly clipboard with one wandering violet slip -->
+  <rect x="6" y="5" width="24" height="27" rx="4" fill="none" stroke="#0f766e" stroke-width="2.4"/>
+  <rect x="12" y="2" width="12" height="6" rx="2" fill="#0f766e"/>
+  <line x1="11" y1="15" x2="25" y2="15" stroke="#0f766e" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="11" y1="20" x2="25" y2="20" stroke="#0f766e" stroke-width="2.4" stroke-linecap="round"/>
+  <line x1="11" y1="25" x2="21" y2="25" stroke="#0f766e" stroke-width="2.4" stroke-linecap="round"/>
+  <rect x="24" y="27" width="8" height="6" rx="1.5" fill="#6d28d9" transform="rotate(-8 28 30)"/>
+</svg>

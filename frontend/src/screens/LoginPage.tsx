@@ -1,11 +1,12 @@
 /** S01 — Sign-in (demo): single-column form, language/appearance controls, role picker. */
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp } from "../app/AppContext";
+import { useApp, usePageTitle } from "../app/AppContext";
 import type { Role } from "../i18n/dict";
 
 export default function LoginPage() {
   const { t, locale, setLocale, setRole, appearance, setAppearance } = useApp();
+  usePageTitle(t("signIn"));
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);

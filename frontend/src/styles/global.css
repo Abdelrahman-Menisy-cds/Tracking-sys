@@ -286,6 +286,7 @@ th {
 }
 
 .banner-info { background: var(--info-bg); color: var(--info-text); }
+.banner-success { background: var(--success-bg); color: var(--success-text); }
 .banner-error { background: var(--error-bg); color: var(--error-text); }
 .banner-warning { background: var(--warning-bg); color: var(--warning-text); }
 .banner-neutral { background: var(--surface-subtle); color: var(--text-muted); }
@@ -323,6 +324,57 @@ th {
   text-align: center;
   padding: var(--sp-2) var(--sp-4);
   font-size: 14px;
+}
+
+/* ---- skip link: visually hidden until keyboard focus ---- */
+.skip-link {
+  position: absolute;
+  inset-inline-start: -9999px;
+  top: 0;
+  z-index: 100;
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--focus);
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--radius-control);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.skip-link:focus-visible {
+  inset-inline-start: var(--sp-2);
+  top: var(--sp-2);
+}
+
+/* ---- unread badge on the notifications nav link ---- */
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--secondary);
+  color: var(--on-primary);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ---- dialog body scroll lock (class toggled on <body> while open) ---- */
+body.dialog-open {
+  overflow: hidden;
+}
+
+/* ---- demo state controls (reviewer affordance, visually quieter) ---- */
+.demo-state-tools {
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-card);
+  padding: var(--sp-3);
+  margin-top: var(--sp-6);
+  font-size: 14px;
+  color: var(--text-muted);
 }
 
 /* ---- dialog ---- */

@@ -1,6 +1,6 @@
 /** S04 — Request detail: header, details, attachments, append-only history. */
 import { Link, useParams } from "react-router-dom";
-import { useApp } from "../app/AppContext";
+import { useApp, usePageTitle } from "../app/AppContext";
 import { useMockList, formatDateTime } from "../app/useMockList";
 import { mockFetch, myRequests, teamRequests, pickName } from "../mock/data";
 import { Banner, ErrorState, RequestStatusPill, SkeletonRows } from "../components/ui";
@@ -8,6 +8,7 @@ import { Banner, ErrorState, RequestStatusPill, SkeletonRows } from "../componen
 export default function RequestDetailPage() {
   const { id } = useParams();
   const { t, locale } = useApp();
+  usePageTitle(t("details"));
 
   const all = [...myRequests, ...teamRequests];
   const state = useMockList(() => mockFetch(all.find((r) => r.id === id) ?? null, 250), [id]);

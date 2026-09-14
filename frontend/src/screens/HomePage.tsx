@@ -1,6 +1,6 @@
 /** S02 — Role-scoped home: own summaries + team review summary for manager/HR demo roles. */
 import { Link } from "react-router-dom";
-import { useApp } from "../app/AppContext";
+import { useApp, usePageTitle } from "../app/AppContext";
 import { useMockList, formatDateTime } from "../app/useMockList";
 import { demoUser, mockFetch, myRequests, myTimesheets, teamRequests, teamTimesheets, notifications } from "../mock/data";
 import { Banner, RequestStatusPill, SkeletonRows, TimesheetStatusPill } from "../components/ui";
@@ -8,6 +8,7 @@ import { Banner, RequestStatusPill, SkeletonRows, TimesheetStatusPill } from "..
 export default function HomePage() {
   const { t, locale, role } = useApp();
   const user = demoUser[role];
+  usePageTitle(t("homeTitle"));
 
   const reqState = useMockList(() => mockFetch(myRequests), []);
   const tsState = useMockList(() => mockFetch(myTimesheets), []);
