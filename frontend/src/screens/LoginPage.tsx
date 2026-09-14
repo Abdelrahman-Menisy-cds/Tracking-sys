@@ -2,6 +2,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../app/AppContext";
+import { BrandMark } from "../components/brand";
 import type { Role } from "../i18n/dict";
 
 export default function LoginPage() {
@@ -45,12 +46,19 @@ export default function LoginPage() {
         border: "1px solid var(--border-subtle)",
       }}
     >
-      <div style={{ textAlign: "center", marginBottom: 24 }}>
-        <h1 style={{ fontSize: 30 }}>
+      <div style={{ textAlign: "center", marginBottom: "var(--sp-6)" }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "var(--sp-3)" }}>
+          <BrandMark size={48} />
+        </div>
+        <h1 style={{ fontSize: "var(--fs-display)" }}>
           <bdi>{t("brand")}</bdi>
         </h1>
-        <p style={{ color: "var(--text-muted)", margin: 0 }}>{t("descriptor")}</p>
-        <p style={{ color: "var(--text-muted)", fontSize: 14 }}>{t("tagline")}</p>
+        <p style={{ color: "var(--text-muted)", margin: 0 }}>
+          <bdi>{t("descriptor")}</bdi>
+        </p>
+        <p style={{ color: "var(--text-faint)", fontSize: 14, margin: 0 }}>
+          <bdi>{t("tagline")}</bdi>
+        </p>
       </div>
 
       <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>

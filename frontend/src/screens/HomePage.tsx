@@ -1,4 +1,4 @@
-/** S02 — Role-scoped home: own summaries + team review summary for manager/HR demo roles. */
+/** S02 — Role-scoped home: stat cards, activity feed, pending queue. */
 import { Link } from "react-router-dom";
 import { useApp } from "../app/AppContext";
 import { useMockList, formatDateTime } from "../app/useMockList";
@@ -21,10 +21,20 @@ export default function HomePage() {
 
   return (
     <>
-      <h1>{t("homeTitle")}</h1>
-      <p style={{ color: "var(--text-muted)" }}>
-        {t("homeWelcome")}, <bdi>{user.name[locale]}</bdi> ({t(role === "employee" ? "roleEmployee" : role === "manager" ? "roleManager" : "roleHr")})
-      </p>
+      <header className="page-header">
+        <div>
+          <span className="page-eyebrow">{t("homeTitle")}</span>
+          <h1>
+            {t("homeWelcome")}, <bdi>{user.name[locale]}</bdi>
+          </h1>
+          <p style={{ color: "var(--text-muted)", margin: 0 }}>
+            {role === "employee" ? t("roleEmployee") : role === "manager" ? t("roleManager") : t("roleHr")}
+          </p>
+        </div>
+        <Link className="btn btn-primary" to="/requests/new">
+          + {t("newRequest")}
+        </Link>
+      </header>
 
       <div className="card-grid">
         <div className="card">
@@ -34,9 +44,11 @@ export default function HomePage() {
           ) : reqState.phase === "error" ? (
             <Banner tone="error" role="alert">{t("errorNetwork")}</Banner>
           ) : (
-            <p style={{ fontSize: 36, fontWeight: 700, margin: 0 }}>{pendingMine.length}</p>
+            <p className="stat-value num">{pendingMine.length}</p>
           )}
-          <Link to="/requests">{t("navMyRequests")} →</Link>
+          <Link className="card-link" to="/requests">
+            {t("navMyRequests")} →
+          </Link>
         </div>
 
         <div className="card">
@@ -47,15 +59,17 @@ export default function HomePage() {
             <Banner tone="error" role="alert">{t("errorNetwork")}</Banner>
           ) : currentWeek ? (
             <>
-              <TimesheetStatusPill status={currentWeek.status} />
-              <p style={{ margin: "8px 0 0", color: "var(--text-muted)", fontSize: 14 }}>
-                {t("weekStart")}: {currentWeek.week_start}
+              <div style={{ marginBottom: "var(--sp-2)" }}>
+                <TimesheetStatusPill status={currentWeek.status} />
+              </div>
+              <p style={{ margin: "0 0 var(--sp-2)", color: "var(--text-muted)", fontSize: 14 }}>
+                {t("weekStart")}: <bdi dir="ltr">{currentWeek.week_start}</bdi>
               </p>
             </>
           ) : null}
-          <div style={{ marginTop: 8 }}>
-            <Link to="/timesheets">{t("openTimesheet")} →</Link>
-          </div>
+          <Link className="card-link" to="/timesheets">
+            {t("openTimesheet")} →
+          </Link>
         </div>
 
         {(role === "manager" || role === "hr") && (
@@ -66,9 +80,11 @@ export default function HomePage() {
             ) : teamReqState.phase === "error" || teamTsState.phase === "error" ? (
               <Banner tone="error" role="alert">{t("errorNetwork")}</Banner>
             ) : (
-              <p style={{ fontSize: 36, fontWeight: 700, margin: 0 }}>{pendingTeam}</p>
+              <p className="stat-value num">{pendingTeam}</p>
             )}
-            <Link to="/reviews">{t("navTeamReviews")} →</Link>
+            <Link className="card-link" to="/reviews">
+              {t("navTeamReviews")} →
+            </Link>
           </div>
         )}
       </div>
@@ -76,7 +92,9 @@ export default function HomePage() {
       <section aria-labelledby="recent-notifs">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
           <h2 id="recent-notifs">{t("homeRecentNotifications")}</h2>
-          <Link to="/notifications">{t("viewAll")}</Link>
+          <Link className="card-link" to="/notifications">
+            {t("viewAll")}
+          </Link>
         </div>
         {notifState.phase === "loading" ? (
           <SkeletonRows rows={2} />
@@ -96,7 +114,7 @@ export default function HomePage() {
         )}
       </section>
 
-      <section aria-labelledby="pending-mine" style={{ marginTop: 24 }}>
+      <section aria-labelledby="pending-mine" style={{ marginTop: "var(--sp-6)" }}>
         <h2 id="pending-mine">{t("homePendingRequests")}</h2>
         {reqState.phase === "loading" ? (
           <SkeletonRows rows={2} />

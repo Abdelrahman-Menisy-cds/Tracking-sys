@@ -170,7 +170,7 @@ export function Dialog({
           <h2 ref={headingRef} tabIndex={-1} style={{ margin: 0 }}>
             {title}
           </h2>
-          <button className="btn btn-secondary" onClick={onClose} aria-label={t("close")}>
+          <button className="btn btn-secondary btn-compact" onClick={onClose} aria-label={t("close")}>
             ✕
           </button>
         </div>

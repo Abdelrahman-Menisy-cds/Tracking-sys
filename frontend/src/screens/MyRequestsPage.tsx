@@ -21,8 +21,11 @@ export default function MyRequestsPage() {
 
   return (
     <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
-        <h1>{t("myRequestsTitle")}</h1>
+      <div className="page-header">
+        <div>
+          <span className="page-eyebrow">{t("navMyRequests")}</span>
+          <h1 style={{ margin: 0 }}>{t("myRequestsTitle")}</h1>
+        </div>
         <button className="btn btn-primary" onClick={() => navigate("/requests/new")}>
           + {t("newRequest")}
         </button>
@@ -124,7 +127,12 @@ export function NewRequestPage() {
 
   return (
     <>
-      <h1>{t("newRequest")}</h1>
+      <header className="page-header">
+        <div>
+          <span className="page-eyebrow">{t("newRequest")}</span>
+          <h1 style={{ margin: 0 }}>{t("newRequest")}</h1>
+        </div>
+      </header>
       <form style={{ maxWidth: "var(--form-max)" }} noValidate>
         <label className="field">
           <span className="field-label">{t("requestType")}</span>

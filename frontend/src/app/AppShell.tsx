@@ -1,24 +1,13 @@
 /**
- * App shell: skip link, nav rail (capability-scoped per demo role), header with
- * language / appearance / role controls, notifications link, demo banner.
+ * App shell: skip link, brand lockup, nav rail (capability-scoped per demo role),
+ * header with language / appearance / role controls, demo banner.
  * Navigation mirrors capability scoping: Team reviews only for manager/HR demo roles.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useApp, type Appearance } from "./AppContext";
+import { Brand } from "../components/brand";
 import type { Role } from "../i18n/dict";
-
-const brandMark = (
-  <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true" focusable="false">
-    {/* Original composed-clipboard mark: rounded clipboard, three orderly marks, one wandering violet slip */}
-    <rect x="6" y="5" width="24" height="27" rx="4" fill="none" stroke="currentColor" strokeWidth="2.4" />
-    <rect x="12" y="2" width="12" height="6" rx="2" fill="currentColor" />
-    <line x1="11" y1="15" x2="25" y2="15" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-    <line x1="11" y1="20" x2="25" y2="20" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-    <line x1="11" y1="25" x2="21" y2="25" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
-    <rect x="24" y="27" width="8" height="6" rx="1.5" fill="#6d28d9" transform="rotate(-8 28 30)" />
-  </svg>
-);
 
 export default function AppShell() {
   const { t, locale, setLocale, role, setRole, appearance, setAppearance } = useApp();
@@ -47,25 +36,25 @@ export default function AppShell() {
     { value: "dark", label: t("appearanceDark") },
   ];
 
+  /* Close the mobile drawer whenever the route changes. */
+  useEffect(() => {
+    const handler = () => setDrawerOpen(false);
+    window.addEventListener("popstate", handler);
+    return () => window.removeEventListener("popstate", handler);
+  }, []);
+
   return (
     <>
-      <a href="#main-content" style={{ position: "absolute", insetInlineStart: -9999, top: 0 }}>
+      <a href="#main-content" className="skip-link">
         {t("skipToMain")}
       </a>
       <div className="demo-banner" role="note">
-        ⚠ {t("demoLabel")}
+        ⚠ <bdi>{t("demoLabel")}</bdi>
       </div>
       <div className="app-shell">
         <nav className={`app-rail ${drawerOpen ? "open" : ""}`} aria-label={t("menu")}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px 16px" }}>
-            {brandMark}
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 18 }}>
-                <bdi>{t("brand")}</bdi>
-              </div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{t("descriptor")}</div>
-            </div>
-          </div>
+          <Brand />
+          <div className="nav-label">{t("menu")}</div>
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -78,14 +67,21 @@ export default function AppShell() {
               {item.label}
             </NavLink>
           ))}
-          <div style={{ marginTop: "auto", fontSize: 13, color: "var(--text-muted)" }}>
-            {t("tagline")}
+          <div
+            style={{
+              marginTop: "auto",
+              fontSize: 13,
+              color: "var(--text-faint)",
+              padding: "var(--sp-3)",
+            }}
+          >
+            <bdi>{t("tagline")}</bdi>
           </div>
         </nav>
 
         {drawerOpen && (
           <div
-            style={{ position: "fixed", inset: 0, background: "rgb(0 0 0 / 0.4)", zIndex: 35 }}
+            style={{ position: "fixed", inset: 0, background: "var(--overlay)", zIndex: 35 }}
             onClick={() => setDrawerOpen(false)}
             aria-hidden="true"
           />
@@ -93,15 +89,13 @@ export default function AppShell() {
 
         <div className="app-main">
           <header className="app-header">
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <button
-                className="btn btn-secondary menu-toggle"
-                aria-expanded={drawerOpen}
-                onClick={() => setDrawerOpen((v) => !v)}
-              >
-                ☰ {t("menu")}
-              </button>
-            </div>
+            <button
+              className="btn btn-secondary btn-compact menu-toggle"
+              aria-expanded={drawerOpen}
+              onClick={() => setDrawerOpen((v) => !v)}
+            >
+              ☰ {t("menu")}
+            </button>
             <div className="header-actions">
               {/* Demo role switch — explicit demo affordance, labelled as such */}
               <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -149,12 +143,12 @@ export default function AppShell() {
                   ))}
                 </select>
               </label>
-              <button className="btn btn-secondary" onClick={() => navigate("/login")}>
+              <button className="btn btn-secondary btn-compact" onClick={() => navigate("/login")}>
                 {t("signOut")}
               </button>
             </div>
           </header>
-          <main id="main-content">
+          <main id="main-content" tabIndex={-1}>
             <Outlet />
           </main>
         </div>

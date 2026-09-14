@@ -66,7 +66,12 @@ export function TimesheetDetailPage() {
   if (!sheet) {
     return (
       <>
-        <h1>{t("myTimesheetsTitle")}</h1>
+        <header className="page-header">
+          <div>
+            <span className="page-eyebrow">{t("navMyTimesheets")}</span>
+            <h1 style={{ margin: 0 }}>{t("myTimesheetsTitle")}</h1>
+          </div>
+        </header>
         <Banner tone="warning" role="alert">{t("relatedUnavailable")}</Banner>
         <Link to="/timesheets">{t("back")}</Link>
       </>

@@ -1,76 +1,148 @@
 /*
- * هي فوضى؟ / Heya Fawda? — design tokens
- * Source: _bmad-output/planning-artifacts/ux/ux-brand-direction.md §8 (candidate palette).
- * Visual demo implementation. Roles are semantic; statuses always pair text with icon.
+ * هي فوضى؟ / Heya Fawda? — design tokens (Clean + Enterprise foundation)
+ * Whitespace-first, semantic names, 8pt spacing, restrained indigo/violet accent.
+ * Ref. UX brand direction §8 candidate palette; refit for TypeUI-style enterprise
+ * clarity (دليل TypeUI كمرجع تصميم عام فقط — لا رموز أو علامات منقولة).
+ * Statuses always pair text with a glyph (never color-only).
  */
 
 :root {
-  /* spacing scale (px) */
+  /* spacing scale (8pt system) */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
   --sp-4: 16px;
+  --sp-5: 20px;
   --sp-6: 24px;
   --sp-8: 32px;
   --sp-12: 48px;
+  --sp-16: 64px;
 
-  --radius-card: 12px;
+  --radius-sm: 6px;
+  --radius-card: 10px;
   --radius-control: 8px;
   --radius-pill: 999px;
 
-  --control-min-h: 44px;
+  --control-min-h: 44px; /* WCAG target size */
   --content-max: 1280px;
   --form-max: 720px;
+  --rail-w: 248px;
+
+  /* type scale (ratio-free enterprise tiers) */
+  --fs-display: 30px;
+  --fs-title: 20px;
+  --fs-section: 17px;
+  --fs-body: 15px;
+  --fs-small: 13px;
+  --fs-micro: 11px;
 
   --font-ar: "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
   --font-latin: "Inter", "Segoe UI", system-ui, sans-serif;
+
+  /* elevation + motion */
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.05), 0 1px 1px rgb(15 23 42 / 0.03);
+  --shadow-raised: 0 8px 24px rgb(15 23 42 / 0.12);
+  --dur-fast: 120ms;
+  --dur-move: 220ms;
 }
 
 /* Light theme (default) */
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
-  --canvas: #f8fafc;
+  --canvas: #f4f6fa;
   --surface: #ffffff;
-  --surface-subtle: #f1f5f9;
-  --text: #0f172a;
-  --text-muted: #475569;
-  --border-control: #64748b;
-  --border-subtle: #cbd5e1;
-  --primary: #0f766e;
+  --surface-subtle: #eef1f6;
+  --surface-raised: #ffffff;
+  --overlay: rgb(15 23 42 / 0.45);
+
+  --text: #101828;
+  --text-strong: #0b1220;
+  --text-muted: #4a5568;
+  --text-faint: #667085;
+
+  --border-subtle: #e4e7ec;
+  --border-control: #98a2b3;
+
+  /* restrained indigo primary + violet secondary (semantic role, not decoration) */
+  --primary: #3f4dca;
+  --primary-hover: #333fb8;
+  --primary-soft: #eef0fd;
   --on-primary: #ffffff;
+
   --secondary: #6d28d9;
+  --secondary-soft: #f3ecfe;
+
   --focus: #1d4ed8;
-  --success-text: #166534;
-  --success-bg: #dcfce7;
-  --warning-text: #92400e;
-  --warning-bg: #fef3c7;
-  --error-text: #b91c1c;
-  --error-bg: #fee2e2;
+
+  --success-text: #1a6336;
+  --success-bg: #e3f6ea;
+  --success-border: #b8e4c8;
+  --warning-text: #8a4b0f;
+  --warning-bg: #fdf3d8;
+  --warning-border: #f2d99b;
+  --error-text: #b3261e;
+  --error-bg: #fdeceb;
+  --error-border: #f3c1be;
   --info-text: #1e40af;
-  --info-bg: #dbeafe;
+  --info-bg: #e4edff;
+  --info-border: #c3d4f8;
+
+  --rail-bg: #ffffff;
+  --demo-banner-bg: #fdf3d8;
+  --demo-banner-text: #6b3a07;
 }
 
-/* Dark theme */
+/* Dark theme — same semantics, recalibrated */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --canvas: #0f172a;
-  --surface: #1e293b;
-  --surface-subtle: #334155;
-  --text: #f8fafc;
-  --text-muted: #cbd5e1;
-  --border-control: #94a3b8;
-  --border-subtle: #475569;
-  --primary: #5eead4;
-  --on-primary: #0f172a;
-  --secondary: #c4b5fd;
+  --canvas: #0e1320;
+  --surface: #171d2d;
+  --surface-subtle: #202840;
+  --surface-raised: #1c2338;
+  --overlay: rgb(2 6 14 / 0.6);
+
+  --text: #eef1f8;
+  --text-strong: #ffffff;
+  --text-muted: #a8b3c6;
+  --text-faint: #8b96ab;
+
+  --border-subtle: #2a3450;
+  --border-control: #7e89a3;
+
+  --primary: #9aa6f5;
+  --primary-hover: #b3bcf8;
+  --primary-soft: #262f52;
+  --on-primary: #0e1320;
+
+  --secondary: #c4a8f7;
+  --secondary-soft: #2c2350;
+
   --focus: #fde047;
-  --success-text: #86efac;
-  --success-bg: #14532d;
-  --warning-text: #fde68a;
-  --warning-bg: #78350f;
-  --error-text: #fca5a5;
-  --error-bg: #7f1d1d;
-  --info-text: #93c5fd;
-  --info-bg: #1e3a8a;
+
+  --success-text: #8fe8b0;
+  --success-bg: #143524;
+  --success-border: #2f6b46;
+  --warning-text: #fddfa0;
+  --warning-bg: #4b3510;
+  --warning-border: #8a6520;
+  --error-text: #ffaaa5;
+  --error-bg: #4a1715;
+  --error-border: #8a3b36;
+  --info-text: #b3ccff;
+  --info-bg: #1d2c55;
+  --info-border: #3a5490;
+
+  --rail-bg: #121726;
+  --demo-banner-bg: #4b3510;
+  --demo-banner-text: #fddfa0;
+}
+
+/* Respect reduced motion for any transition/animation added at the component
+   layer (skeleton shimmer is already covered in global.css). */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-move: 0ms;
+  }
 }

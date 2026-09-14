@@ -21,7 +21,12 @@ export default function NotificationsPage() {
 
   return (
     <>
-      <h1>{t("notificationsTitle")}</h1>
+      <header className="page-header">
+        <div>
+          <span className="page-eyebrow">{t("navNotifications")}</span>
+          <h1 style={{ margin: 0 }}>{t("notificationsTitle")}</h1>
+        </div>
+      </header>
       {list.phase === "loading" && <SkeletonRows rows={3} />}
       {list.phase === "error" && <ErrorState onRetry={list.retry} />}
       {list.phase === "empty" && <EmptyState message={t("noNotifications")} />}

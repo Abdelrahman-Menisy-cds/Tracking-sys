@@ -37,8 +37,13 @@ export default function TeamReviewsPage() {
 
   return (
     <>
-      <h1>{t("teamReviewsTitle")}</h1>
-      <p style={{ color: "var(--text-muted)" }}>
+      <header className="page-header">
+        <div>
+          <span className="page-eyebrow">{t("homeTitle")}</span>
+          <h1 style={{ margin: 0 }}>{t("teamReviewsTitle")}</h1>
+        </div>
+      </header>
+      <p style={{ color: "var(--text-muted)", marginTop: 0 }}>
         {locale === "ar"
           ? "النطاق: المرؤوسون المباشرون فقط (نطاق تجريبي)."
           : "Scope: active direct reports only (demo scope)."}
