@@ -77,7 +77,7 @@ Planned next: consolidate approved decisions into the PRD/spec artifacts and imp
 
 ## Level 5 — Build and verification
 
-**Status:** In progress — Stories 1.1–1.3 accepted; implementation continues
+**Status:** In progress — Stories 1.1–5.1 accepted; implementation continues
 
 Level 5 readiness was validated on 2026-09-11: requirements are covered by five epics and implementation-ready stories.
 
@@ -194,6 +194,25 @@ Story 4.2 evidence (accepted 2026-09-13):
 - Safe links verified: notification targets resolve only to objects the recipient is authorized to see; no manager-identity or cross-scope disclosure via links or payloads.
 - Verification on acceptance (final, in the project-local `.venv` on `main` at HEAD `a4ff7b9`): final QA verdict APPROVED; notification tests 31 passed with `-W error` and no thread warnings; Django system check clean with `config.test_settings`; `git diff --check` clean.
 - Next step: Story 4.3 — scoped CSV reports.
+
+Story 4.3 evidence (accepted 2026-09-14; acceptance recorded 2026-09-14):
+
+- Scoped CSV reports under `backend/review`: role-scoped report rows/totals/dashboard plus `reports/requests.csv` and `reports/hours.csv` exports (`f71b234`).
+- QA fix: timezone-correct report window handling (`afa8cb6`).
+- Verification: report tests added with the story and timezone-window fix; commits verified in git history.
+- Commits: `f71b234`, merge `ab7cfae`, QA fix `afa8cb6`, merge `8c6d5e1`.
+- Record-keeping note: this entry was reconstructed from git history on 2026-09-14 during the Story 5.1 acceptance recording; its QA evidence was not captured in this log at the time of acceptance.
+
+Story 5.1 evidence (accepted 2026-09-14):
+
+- Health probes and versioned API helpers: `/health/live` (process liveness, no dependency contact) and `/health/ready` (DB readiness check hard-bounded by a worker-thread join with `READINESS_DEPENDENCY_TIMEOUT_S`; a hanging or slow DB cannot block the endpoint); both wired outside the authenticated `/api/v1/` tree (`ef4524e`).
+- Bounded readiness degrades to `503` naming only the failed dependency kind — no secrets and no exception detail in any live/ready payload, verified by dedicated no-leak assertions.
+- Uniform `X-API-Version` header stamped on every `/api/` and `/health/` response (success, error, and unmatched-route 404) via `APIVersionMiddleware`, with request-ID correlation preserved (`ec394d3`).
+- Error-matrix QA coverage on real endpoints: 401/403/404/409/422/429 responses verified for status, stable code/message/field errors, `error.request_id == X-Request-ID` body/header correlation, and `X-API-Version` presence (`2fd2362`).
+- Truthful OpenAPI endpoint `GET /api/v1/schema` generated from the actual URLconf via `DRF SchemaGenerator` with per-view `AutoSchema`: component schemas derived from the real serializer classes, documented status codes taken from real handler response paths (including the 401/403/404/409/422/429 envelopes), health probes documented verbatim, read-only `require_GET`, unauthenticated like the health probes, with 12 focused tests asserting the documented surface equals the enumerated URLconf and no secret leakage (`dd74aac`).
+- Verification on acceptance: final QA verdict APPROVED; combined health/schema suites 40 passed; Django system check clean with `config.test_settings`; `git diff --check` clean.
+- Commits: `ef4524e`, merge `0c761c1`, QA fix `ec394d3`, merge `4befcb2`, tests `2fd2362`, schema `dd74aac`, merge `c4acf01` = main HEAD.
+- Next step: Story 5.2 — bilingual RTL/LTR responsive accessible screens.
 
 ## Scope boundary
 
