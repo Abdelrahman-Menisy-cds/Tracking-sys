@@ -1,7 +1,7 @@
 /** S03 — My requests list + new-request editor with draft/submit and demo state controls. */
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useApp } from "../app/AppContext";
+import { useApp, usePageTitle } from "../app/AppContext";
 import { useMockList, formatDateTime } from "../app/useMockList";
 import { mockFetch, myRequests, requestTypes } from "../mock/data";
 import { Banner, EmptyState, ErrorState, RequestStatusPill, SkeletonRows } from "../components/ui";
@@ -11,6 +11,7 @@ export default function MyRequestsPage() {
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const list = useMockList(() => mockFetch(myRequests), []);
+  usePageTitle(t("myRequestsTitle"));
 
   const filtered =
     list.phase === "ready"
@@ -95,12 +96,14 @@ export default function MyRequestsPage() {
 export function NewRequestPage() {
   const { t, locale } = useApp();
   const navigate = useNavigate();
+  const titleRef = useRef<HTMLInputElement>(null);
   const [typeId, setTypeId] = useState<number>(requestTypes[0].id);
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
   const [errors, setErrors] = useState<{ title?: string }>({});
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
 
   const selectedType = requestTypes.find((r) => r.id === typeId) ?? requestTypes[0];
 
@@ -108,8 +111,11 @@ export function NewRequestPage() {
     const next: { title?: string } = {};
     if (!title.trim()) next.title = locale === "ar" ? "أدخل عنوان الطلب." : "Enter a request title.";
     setErrors(next);
+    if (next.title) titleRef.current?.focus();
     return Object.keys(next).length === 0;
   };
+
+  const hasUnsaved = Boolean(title.trim() || details.trim());
 
   const save = (submit: boolean) => {
     if (!validate()) return;
@@ -146,16 +152,24 @@ export function NewRequestPage() {
           </span>
         </label>
         <label className="field">
-          <span className="field-label">{t("requestTitle")} *</span>
+          <span className="field-label">
+            {t("requestTitle")} <span style={{ color: "var(--error-text)" }} aria-hidden="true">*</span>
+            <span className="visually-hidden">({locale === "ar" ? "مطلوب" : "required"})</span>
+          </span>
           <input
+            ref={titleRef}
             className="input"
             value={title}
+            required
+            autoComplete="off"
+            spellCheck={false}
+            placeholder={locale === "ar" ? "مثال: طلب إجازة سنوية…" : "e.g. Annual leave request…"}
             aria-invalid={!!errors.title}
             aria-describedby={errors.title ? "title-error" : undefined}
             onChange={(e) => setTitle(e.target.value)}
           />
           {errors.title && (
-            <span className="field-error" id="title-error">
+            <span className="field-error" id="title-error" role="alert">
               {errors.title}
             </span>
           )}
@@ -175,19 +189,74 @@ export function NewRequestPage() {
           </span>
         </label>
 
-        {savedMsg && <Banner tone="info">{savedMsg}</Banner>}
+        {savedMsg && (
+          <Banner tone="success" role="status">
+            {savedMsg}
+          </Banner>
+        )}
 
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              if (hasUnsaved) {
+                setConfirmLeave(true);
+              } else {
+                navigate("/requests");
+              }
+            }}
+          >
+            {t("back")}
+          </button>
           <button className="btn btn-secondary" type="button" disabled={busy} onClick={() => save(false)}>
             {t("saveDraft")}
           </button>
           <button className="btn btn-primary" type="button" disabled={busy} onClick={() => save(true)}>
-            {busy ? t("loading") : t("submitRequest")}
-          </button>
-          <button className="btn btn-secondary" type="button" onClick={() => navigate("/requests")}>
-            {t("back")}
+            {busy ? (
+              <>
+                <span aria-hidden="true" className="spinner" />
+                {t("saving")}
+              </>
+            ) : (
+              t("submitRequest")
+            )}
           </button>
         </div>
+
+        {confirmLeave && (
+          <Banner tone="warning" role="alert">
+            <div>
+              <p style={{ margin: "0 0 8px" }}>
+                {locale === "ar"
+                  ? "لديك تعديلات غير محفوظة. هل تريد الخروج دون حفظ؟"
+                  : "You have unsaved changes. Leave without saving?"}
+              </p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  className="btn btn-secondary"
+                  type="button"
+                  style={{ minHeight: 36 }}
+                  onClick={() => {
+                    setConfirmLeave(false);
+                    navigate("/requests");
+                  }}
+                >
+                  {locale === "ar" ? "خروج دون حفظ" : "Leave without saving"}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  style={{ minHeight: 36 }}
+                  onClick={() => setConfirmLeave(false)}
+                >
+                  {t("cancel")}
+                </button>
+              </div>
+            </div>
+          </Banner>
+        )}
       </form>
     </>
   );

@@ -1,11 +1,14 @@
 /** S01 — Sign-in (demo): single-column form, language/appearance controls, role picker. */
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp } from "../app/AppContext";
+import { useApp, usePageTitle } from "../app/AppContext";
 import type { Role } from "../i18n/dict";
 
 export default function LoginPage() {
   const { t, locale, setLocale, setRole, appearance, setAppearance } = useApp();
+  usePageTitle(t("signIn"));
+  const identifierRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -18,10 +21,12 @@ export default function LoginPage() {
     e.preventDefault();
     if (!identifier.trim()) {
       setError(locale === "ar" ? "أدخل البريد الإلكتروني." : "Enter your email.");
+      identifierRef.current?.focus();
       return;
     }
     if (!password) {
       setError(locale === "ar" ? "أدخل كلمة المرور." : "Enter your password.");
+      passwordRef.current?.focus();
       return;
     }
     setBusy(true);
@@ -53,11 +58,13 @@ export default function LoginPage() {
         <p style={{ color: "var(--text-muted)", fontSize: 14 }}>{t("tagline")}</p>
       </div>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-        <label>
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 14 }}>{t("language")}</span>
           <select
             className="select"
+            style={{ width: "auto" }}
+            aria-label={t("language")}
             value={locale}
             onChange={(e) => setLocale(e.target.value as "ar" | "en")}
           >
@@ -65,10 +72,12 @@ export default function LoginPage() {
             <option value="en">English</option>
           </select>
         </label>
-        <label>
+        <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 14 }}>{t("appearance")}</span>
           <select
             className="select"
+            style={{ width: "auto" }}
+            aria-label={t("appearance")}
             value={appearance}
             onChange={(e) => setAppearance(e.target.value as "system" | "light" | "dark")}
           >
@@ -88,10 +97,13 @@ export default function LoginPage() {
         <label className="field">
           <span className="field-label">{t("identifier")}</span>
           <input
+            ref={identifierRef}
             className="input"
             type="email"
+            name="email"
             dir="ltr"
             autoComplete="username"
+            spellCheck={false}
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
           />
@@ -100,8 +112,10 @@ export default function LoginPage() {
           <span className="field-label">{t("password")}</span>
           <div style={{ display: "flex", gap: 8 }}>
             <input
+              ref={passwordRef}
               className="input"
               type={showPassword ? "text" : "password"}
+              name="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -111,6 +125,7 @@ export default function LoginPage() {
               className="btn btn-secondary"
               onClick={() => setShowPassword((v) => !v)}
               aria-pressed={showPassword}
+              aria-label={showPassword ? t("hidePassword") : t("showPassword")}
             >
               {showPassword ? t("hidePassword") : t("showPassword")}
             </button>
@@ -129,7 +144,14 @@ export default function LoginPage() {
           </select>
         </label>
         <button className="btn btn-primary" type="submit" disabled={busy} style={{ width: "100%" }}>
-          {busy ? t("loading") : t("signIn")}
+          {busy ? (
+            <>
+              <span aria-hidden="true" className="spinner" />
+              {t("loading")}
+            </>
+          ) : (
+            t("signIn")
+          )}
         </button>
         <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 12 }}>{t("demoDataNote")}</p>
       </form>

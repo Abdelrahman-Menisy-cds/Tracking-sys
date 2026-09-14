@@ -38,7 +38,12 @@ npm run lint
   append-only history (S04), My timesheets with weekly entry editor (S05), manager review
   queue with approve / reject / return decision modal (S06), notifications (S10).
 - Loading (skeleton), empty, error + retry, validation, disabled/read-only, and success states
-  throughout; reviewable demo state controls are wired into the mock layer.
+  throughout: submit/save/decision acknowledgements use the success tone, and reviewer tools in
+  the sidebar (`أدوات حالات العرض`) preview the error and empty list states on the next load.
+- Accessibility: keyboard-visible skip link, WAI-ARIA tabs pattern (arrow keys) on the review
+  queue, Escape-to-close mobile drawer with focus return, dialog body scroll lock, unread
+  notifications badge with an accessible label, and per-page document titles.
+- Original composed-clipboard brand mark (favicon + nav), no third-party marks.
 - Demo banner is shown at all times stating that displayed data is mock data.
 
 ## Deliberate demo limitations (not real-system behavior)
@@ -59,4 +64,5 @@ React 19 + TypeScript + Vite + React Router (project-local `frontend/`, no globa
 - `docs/screenshots/demo-requests.png` — S03 my requests
 - `docs/screenshots/demo-timesheets.png` — S05 my timesheets
 - `docs/screenshots/demo-reviews.png` — S06 team review queue
+- `docs/screenshots/demo-requests-mobile.png` — S03 my requests, 390px mobile viewport
 

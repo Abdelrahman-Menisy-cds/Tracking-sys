@@ -5,7 +5,7 @@
  */
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useApp } from "../app/AppContext";
+import { useApp, usePageTitle } from "../app/AppContext";
 import { useMockList, formatDateTime, formatMinutes } from "../app/useMockList";
 import {
   mockFetch,
@@ -28,12 +28,28 @@ import {
 type DecisionKind = "APPROVE" | "REJECT" | "RETURN";
 
 export default function TeamReviewsPage() {
-  const { t, locale } = useApp();
+  const { t, locale, role } = useApp();
   const [tab, setTab] = useState<"requests" | "timesheets">("requests");
   const [deciding, setDeciding] = useState<RequestMock | TimesheetMock | null>(null);
 
   const reqState = useMockList(() => mockFetch(teamRequests), []);
   const tsState = useMockList(() => mockFetch(teamTimesheets), []);
+  usePageTitle(t("teamReviewsTitle"));
+
+  // Demo capability gate: the review queue belongs to manager/HR roles only.
+  // Direct URL access as employee shows a not-available notice instead of data.
+  // Hooks above still run so the hook order stays stable across role switches.
+  if (role !== "manager" && role !== "hr") {
+    return (
+      <>
+        <h1>{t("teamReviewsTitle")}</h1>
+        <Banner tone="warning" role="alert">
+          {t("relatedUnavailable")}
+        </Banner>
+        <Link to="/">{t("navHome")}</Link>
+      </>
+    );
+  }
 
   return (
     <>
@@ -44,10 +60,27 @@ export default function TeamReviewsPage() {
           : "Scope: active direct reports only (demo scope)."}
       </p>
 
-      <div role="tablist" aria-label={t("teamReviewsTitle")} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+      <div
+        role="tablist"
+        aria-label={t("teamReviewsTitle")}
+        style={{ display: "flex", gap: 8, marginBottom: 16 }}
+        onKeyDown={(e) => {
+          // WAI-ARIA tabs pattern: arrow keys move between tabs; the active
+          // tab keeps DOM focus while selection follows it.
+          if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+          e.preventDefault();
+          const next = e.key === (locale === "ar" ? "ArrowLeft" : "ArrowRight") ? "timesheets" : "requests";
+          setTab(next);
+          (e.currentTarget.querySelector(`[data-tab="${next}"]`) as HTMLElement | null)?.focus();
+        }}
+      >
         <button
           role="tab"
+          data-tab="requests"
+          id="tab-requests"
           aria-selected={tab === "requests"}
+          aria-controls="panel-reviews"
+          tabIndex={tab === "requests" ? 0 : -1}
           className={`btn ${tab === "requests" ? "btn-primary" : "btn-secondary"}`}
           onClick={() => setTab("requests")}
         >
@@ -55,13 +88,23 @@ export default function TeamReviewsPage() {
         </button>
         <button
           role="tab"
+          data-tab="timesheets"
+          id="tab-timesheets"
           aria-selected={tab === "timesheets"}
+          aria-controls="panel-reviews"
+          tabIndex={tab === "timesheets" ? 0 : -1}
           className={`btn ${tab === "timesheets" ? "btn-primary" : "btn-secondary"}`}
           onClick={() => setTab("timesheets")}
         >
           {t("reviewTimesheets")}
         </button>
       </div>
+
+      <div
+        role="tabpanel"
+        id="panel-reviews"
+        aria-labelledby={tab === "requests" ? "tab-requests" : "tab-timesheets"}
+      >
 
       {tab === "requests" ? (
         reqState.phase === "loading" ? (
@@ -135,6 +178,7 @@ export default function TeamReviewsPage() {
           ))}
         </ul>
       )}
+      </div>
 
       {deciding && <DecisionDialog record={deciding} onClose={() => setDeciding(null)} />}
     </>
@@ -177,7 +221,7 @@ function DecisionDialog({ record, onClose }: { record: RequestMock | TimesheetMo
     <Dialog title={t("decision")} onClose={onClose}>
       {done ? (
         <>
-          <Banner tone="info">{t("decisionSent")}</Banner>
+          <Banner tone="success">{t("decisionSent")}</Banner>
           <p>
             {t("decisionOn")}: <bdi>{subject}</bdi> — <strong>{kindLabel(kind!)}</strong>
           </p>

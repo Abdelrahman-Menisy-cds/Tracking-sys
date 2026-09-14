@@ -1,6 +1,6 @@
 /** S10 — Notifications: read/unread with text label (not color-only), mark-read, safe unavailable links. */
 import { useState } from "react";
-import { useApp } from "../app/AppContext";
+import { useApp, usePageTitle } from "../app/AppContext";
 import { useMockList, formatDateTime } from "../app/useMockList";
 import { mockFetch, notifications as seedNotifications, type NotificationMock } from "../mock/data";
 import { Banner, EmptyState, ErrorState, SkeletonRows } from "../components/ui";
@@ -8,6 +8,7 @@ import { Banner, EmptyState, ErrorState, SkeletonRows } from "../components/ui";
 export default function NotificationsPage() {
   const { t, locale } = useApp();
   const list = useMockList(() => mockFetch(seedNotifications), []);
+  usePageTitle(t("notificationsTitle"));
   const [items, setItems] = useState<NotificationMock[] | null>(null);
   const [readError, setReadError] = useState<string | null>(null);
 

@@ -98,3 +98,14 @@ export function useApp(): AppState {
   if (!ctx) throw new Error("useApp must be used inside AppProvider");
   return ctx;
 }
+
+/** Per-page document title — brand first, then the page name, demo label kept. */
+export function usePageTitle(page: string): void {
+  const { locale } = useApp();
+  useEffect(() => {
+    document.title =
+      locale === "ar"
+        ? `${page} — هي فوضى؟ (عرض تجريبي)`
+        : `${page} — Heya Fawda? (visual demo)`;
+  }, [locale, page]);
+}

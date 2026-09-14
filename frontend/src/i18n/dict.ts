@@ -16,6 +16,7 @@ export const dict = {
     menu: "القائمة",
     close: "إغلاق",
     loading: "جارٍ التحميل…",
+    saving: "جارٍ الحفظ…",
     retry: "إعادة المحاولة",
     save: "حفظ",
     cancel: "إلغاء",
@@ -143,6 +144,10 @@ export const dict = {
     // demo
     demoRoleSwitch: "تبديل الدور (تجريبي)",
     demoDataNote: "جميع البيانات في هذه النسخة وهمية لأغراض العرض فقط. لا يوجد اتصال بخادم حقيقي.",
+    demoStatesTitle: "أدوات حالات العرض (للمراجعين)",
+    demoStateError: "حالة خطأ عند التحميل القادم",
+    demoStateEmpty: "حالة فراغ عند التحميل القادم",
+    demoStatesHint: "تُطبَّق على أول قائمة تُحمَّل بعد التفعيل، لعرض حالات الخطأ/الفراغ في الواجهة.",
   },
   en: {
     brand: "Heya Fawda?",
@@ -154,6 +159,7 @@ export const dict = {
     menu: "Menu",
     close: "Close",
     loading: "Loading…",
+    saving: "Saving…",
     retry: "Retry",
     save: "Save",
     cancel: "Cancel",
@@ -269,6 +275,10 @@ export const dict = {
     stateNote: "State view",
     demoRoleSwitch: "Switch role (demo)",
     demoDataNote: "All data in this build is mock data for demonstration only. No real server connection.",
+    demoStatesTitle: "View-state tools (for reviewers)",
+    demoStateError: "Error state on next load",
+    demoStateEmpty: "Empty state on next load",
+    demoStatesHint: "Applies to the first list loaded after toggling, to preview the UI error/empty states.",
   },
 } as const;
 

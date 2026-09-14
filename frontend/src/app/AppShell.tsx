@@ -3,10 +3,11 @@
  * language / appearance / role controls, notifications link, demo banner.
  * Navigation mirrors capability scoping: Team reviews only for manager/HR demo roles.
  */
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useApp, type Appearance } from "./AppContext";
 import type { Role } from "../i18n/dict";
+import { notifications } from "../mock/data";
 
 const brandMark = (
   <svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true" focusable="false">
@@ -21,18 +22,33 @@ const brandMark = (
 );
 
 export default function AppShell() {
-  const { t, locale, setLocale, role, setRole, appearance, setAppearance } = useApp();
+  const { t, locale, setLocale, role, setRole, appearance, setAppearance, failNext, emptyNext } = useApp();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [stateTools, setStateTools] = useState(false);
   const navigate = useNavigate();
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches,
+  );
+
+  // Track the mobile breakpoint so the closed drawer is removed from the
+  // a11y tree (inert) instead of being focusable off-screen.
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   const canReview = role === "manager" || role === "hr";
 
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.is_read).length, []);
+
   const navItems = [
-    { to: "/", label: t("navHome"), end: true },
-    { to: "/requests", label: t("navMyRequests") },
-    { to: "/timesheets", label: t("navMyTimesheets") },
-    ...(canReview ? [{ to: "/reviews", label: t("navTeamReviews") }] : []),
-    { to: "/notifications", label: t("navNotifications") },
+    { to: "/", label: t("navHome"), end: true, badge: 0 },
+    { to: "/requests", label: t("navMyRequests"), end: false, badge: 0 },
+    { to: "/timesheets", label: t("navMyTimesheets"), end: false, badge: 0 },
+    ...(canReview ? [{ to: "/reviews", label: t("navTeamReviews"), end: false, badge: 0 }] : []),
+    { to: "/notifications", label: t("navNotifications"), end: false, badge: unreadCount },
   ];
 
   const roleOptions: { value: Role; label: string }[] = [
@@ -47,16 +63,34 @@ export default function AppShell() {
     { value: "dark", label: t("appearanceDark") },
   ];
 
+  // Mobile drawer: Escape closes it and returns focus to the toggle button.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setDrawerOpen(false);
+        document.querySelector<HTMLElement>(".menu-toggle")?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [drawerOpen]);
+
   return (
     <>
-      <a href="#main-content" style={{ position: "absolute", insetInlineStart: -9999, top: 0 }}>
+      <a href="#main-content" className="skip-link">
         {t("skipToMain")}
       </a>
       <div className="demo-banner" role="note">
         ⚠ {t("demoLabel")}
       </div>
       <div className="app-shell">
-        <nav className={`app-rail ${drawerOpen ? "open" : ""}`} aria-label={t("menu")}>
+        <nav
+          id="app-rail-nav"
+          className={`app-rail ${drawerOpen ? "open" : ""}`}
+          aria-label={t("menu")}
+          inert={isMobile && !drawerOpen ? true : undefined}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px 16px" }}>
             {brandMark}
             <div>
@@ -73,13 +107,65 @@ export default function AppShell() {
               end={item.end}
               className="nav-link"
               aria-current="page"
+              aria-label={
+                item.badge > 0
+                  ? locale === "ar"
+                    ? `الإشعارات — ${item.badge} غير مقروءة`
+                    : `Notifications — ${item.badge} unread`
+                  : undefined
+              }
               onClick={() => setDrawerOpen(false)}
             >
               {item.label}
+              {item.badge > 0 && (
+                <span className="nav-badge" aria-hidden="true">
+                  {item.badge}
+                </span>
+              )}
             </NavLink>
           ))}
           <div style={{ marginTop: "auto", fontSize: 13, color: "var(--text-muted)" }}>
             {t("tagline")}
+          </div>
+
+          {/* Reviewer-only demo state controls: preview error / empty list states. */}
+          <div className="demo-state-tools">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ minHeight: 36, width: "100%" }}
+              aria-expanded={stateTools}
+              onClick={() => setStateTools((v) => !v)}
+            >
+              {t("demoStatesTitle")}
+            </button>
+            {stateTools && (
+              <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                <span>{t("demoStatesHint")}</span>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ minHeight: 36 }}
+                  onClick={() => {
+                    failNext();
+                    setDrawerOpen(false);
+                  }}
+                >
+                  ✕ {t("demoStateError")}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ minHeight: 36 }}
+                  onClick={() => {
+                    emptyNext();
+                    setDrawerOpen(false);
+                  }}
+                >
+                  🗂️ {t("demoStateEmpty")}
+                </button>
+              </div>
+            )}
           </div>
         </nav>
 
@@ -90,6 +176,10 @@ export default function AppShell() {
             aria-hidden="true"
           />
         )}
+        {/* Mobile drawer state announced politely without moving focus */}
+        <span role="status" aria-live="polite" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clipPath: "inset(50%)" }}>
+          {drawerOpen ? (locale === "ar" ? "تم فتح القائمة" : "Menu opened") : null}
+        </span>
 
         <div className="app-main">
           <header className="app-header">
@@ -97,9 +187,11 @@ export default function AppShell() {
               <button
                 className="btn btn-secondary menu-toggle"
                 aria-expanded={drawerOpen}
+                aria-controls="app-rail-nav"
                 onClick={() => setDrawerOpen((v) => !v)}
               >
-                ☰ {t("menu")}
+                ☰ <span aria-hidden="true"></span>
+                {t("menu")}
               </button>
             </div>
             <div className="header-actions">
@@ -109,6 +201,7 @@ export default function AppShell() {
                 <select
                   className="select"
                   style={{ width: "auto", minHeight: 36 }}
+                  aria-label={t("demoRoleSwitch")}
                   value={role}
                   onChange={(e) => {
                     setRole(e.target.value as Role);
@@ -127,6 +220,7 @@ export default function AppShell() {
                 <select
                   className="select"
                   style={{ width: "auto", minHeight: 36 }}
+                  aria-label={t("language")}
                   value={locale}
                   onChange={(e) => setLocale(e.target.value as "ar" | "en")}
                 >
@@ -139,6 +233,7 @@ export default function AppShell() {
                 <select
                   className="select"
                   style={{ width: "auto", minHeight: 36 }}
+                  aria-label={t("appearance")}
                   value={appearance}
                   onChange={(e) => setAppearance(e.target.value as Appearance)}
                 >
