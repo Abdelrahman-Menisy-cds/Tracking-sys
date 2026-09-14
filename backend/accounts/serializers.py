@@ -30,6 +30,16 @@ class CurrentUserUpdateSerializer(serializers.Serializer):
     preferred_locale = serializers.ChoiceField(choices=("ar", "en"), required=False)
     appearance = serializers.ChoiceField(choices=("system", "light", "dark"), required=False)
     timezone_display = serializers.CharField(max_length=63, required=False, allow_blank=False)
+    # Story 5.3 stale-write guard: the appearance value the client last saw.
+    # When provided and different from the saved value the update is a stale
+    # write (409 version_conflict) instead of silently overwriting a newer
+    # selection; omitted means last-write-wins (backwards compatible).
+    expected_appearance = serializers.ChoiceField(
+        choices=("system", "light", "dark"), required=False, write_only=True
+    )
+
+    class AppearanceStaleWrite(Exception):
+        """The client's expected appearance does not match the saved value."""
 
     def validate(self, attrs):
         protected_fields = set(self.initial_data) - set(self.fields)
@@ -40,6 +50,9 @@ class CurrentUserUpdateSerializer(serializers.Serializer):
         return attrs
 
     def update(self, user, validated_data):
+        expected = validated_data.pop("expected_appearance", None)
+        if expected is not None and "appearance" in validated_data and user.appearance != expected:
+            raise self.AppearanceStaleWrite()
         for field_name, field_value in validated_data.items():
             setattr(user, field_name, field_value)
         user.save(update_fields=list(validated_data))

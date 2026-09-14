@@ -282,6 +282,14 @@ class MeSchema(AccountsSchema):
         "get": {
             **_json_response("200", "Current user.", _data_envelope(_object_ref("CurrentUser"))),
         },
+        # MeView.patch: 200 CurrentUser envelope, or 409 version_conflict when
+        # a stale expected_appearance would overwrite a newer saved value
+        # (Story 5.3 stale-write guard; handled in MeView.patch, not the
+        # shared exception handler).
+        "patch": {
+            **_json_response("200", "Profile updated.", _data_envelope(_object_ref("CurrentUser"))),
+            **_error_response("409", "version_conflict: the saved appearance changed since the client last saw it."),
+        },
     }
 
 
