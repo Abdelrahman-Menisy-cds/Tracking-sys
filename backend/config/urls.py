@@ -8,10 +8,12 @@ from django.urls import include, path, re_path
 
 from config.api import api_not_found
 from config.health import health_live, health_ready
+from config.schema import schema_endpoint
 
 urlpatterns = [
     path("health/live", health_live),
     path("health/ready", health_ready),
+    path("api/v1/schema", schema_endpoint),
     path("api/v1/", include("accounts.urls")),
     path("api/v1/", include("notifications.urls")),
     path("api/v1/", include("reqs.urls")),

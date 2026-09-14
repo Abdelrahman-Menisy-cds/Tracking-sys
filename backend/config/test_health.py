@@ -15,9 +15,13 @@ from unittest import mock
 import pytest
 from django.db import connections
 from django.db.backends.base.base import BaseDatabaseWrapper
+from django.urls import reverse
+from rest_framework.test import APIClient
 
 from config.api_version import API_VERSION
 from config.health import READINESS_DEPENDENCY_TIMEOUT_S, _probe_database_bounded
+from timesheets.models import Timesheet
+from timesheets.test_story_3_2 import Story32Base
 
 
 @pytest.mark.django_db
@@ -194,3 +198,105 @@ class TestVersionHeaderOnRealEndpoints:
         assert response_json["error"]["code"] == "not_found"
         assert response["X-API-Version"] == "v1"
         assert response["X-Request-ID"] == response_json["error"]["request_id"]
+
+
+class TestErrorMatrixOnRealEndpoints(Story32Base):
+    """QA 5.1 (2): the approved 403/409/422/429 codes exercised against real
+    /api/v1 endpoints, asserting the stable error envelope (code, message,
+    field errors where applicable) plus request-id correlation (body
+    ``error.request_id`` == ``X-Request-ID`` header) and the ``X-API-Version``
+    header on every error response.
+
+    Endpoint mapping (no mocks on the error paths — real view/service code):
+    - 403: CSRF failure on a real mutation endpoint
+      (POST /api/v1/timesheets/{id}/submit, CsrfEnforcedSessionAuthentication
+      -> PermissionDenied -> handler code ``permission_denied``);
+    - 409: stale optimistic-concurrency version on the real submit path
+      (code ``version_conflict`` with a ``version`` field error);
+    - 422: falsy ``confirm`` on the real submit serializer
+      (code ``validation_error`` with a ``confirm`` field error);
+    - 429: mutation budget exhausted on the real submit endpoint
+      (code ``throttled``).
+    """
+
+    def _assert_error_envelope(self, response, expected_status, expected_code, expected_fields=None):
+        assert response.status_code == expected_status
+        body = response.json()
+        error = body["error"]
+        assert error["code"] == expected_code
+        assert isinstance(error["message"], str) and error["message"]
+        assert response["X-Request-ID"] == error["request_id"]
+        assert error["request_id"]
+        assert response["X-API-Version"] == API_VERSION
+        if expected_fields is None:
+            assert error["fields"] == {}
+        else:
+            assert error["fields"] == expected_fields
+
+    def test_csrf_failure_403_permission_denied_envelope(self):
+        # Real mutation endpoint, CSRF enforced: SessionAuthentication raises
+        # PermissionDenied -> shared handler envelope (code permission_denied).
+        sheet = self.create_sheet(entries=self.default_entries())
+        csrf_client = APIClient(enforce_csrf_checks=True)
+        csrf_client.force_login(self.user)
+
+        response = csrf_client.post(
+            self.submit_url(sheet.pk),
+            {"confirm": True, "version": 1},
+            format="json",
+            HTTP_IDEMPOTENCY_KEY="error-matrix-csrf",
+        )
+
+        self._assert_error_envelope(response, 403, "permission_denied")
+        # No mutation happened.
+        sheet.refresh_from_db()
+        assert sheet.status == Timesheet.Status.DRAFT
+
+    def test_stale_version_submit_409_version_conflict_envelope(self):
+        # Real submit path: a version older than the sheet's current version
+        # is a 409 version_conflict with a version field error, no mutation.
+        sheet = self.create_sheet(entries=self.default_entries())
+        stale_version = sheet.version - 1
+
+        response = self.post_submit(sheet.pk, version=stale_version, key="error-matrix-stale")
+
+        self._assert_error_envelope(
+            response,
+            409,
+            "version_conflict",
+            expected_fields={"version": ["The provided version is stale."]},
+        )
+        sheet.refresh_from_db()
+        assert sheet.status == Timesheet.Status.DRAFT
+
+    def test_missing_confirm_submit_422_validation_error_envelope(self):
+        # Real submit serializer: confirm=false is rejected 422 with a
+        # confirm field error and no mutation.
+        sheet = self.create_sheet(entries=self.default_entries())
+
+        response = self.post_submit(sheet.pk, version=1, confirm=False, key="error-matrix-confirm")
+
+        self._assert_error_envelope(
+            response,
+            422,
+            "validation_error",
+            expected_fields={
+                "confirm": ["Explicit confirmation (confirm=true) is required to submit a timesheet."]
+            },
+        )
+        sheet.refresh_from_db()
+        assert sheet.status == Timesheet.Status.DRAFT
+
+    def test_mutation_budget_429_throttled_envelope(self):
+        # Real submit endpoint shares the 60/min mutation budget; drive it
+        # down with cheap invalid creates (missing key -> 422) that still
+        # count as throttled mutations, then the submit returns 429 throttled.
+        sheet = self.create_sheet(entries=self.default_entries())
+        for _ in range(60):
+            self.client.post(reverse("timesheets:timesheet-list"), {}, format="json")
+
+        response = self.post_submit(sheet.pk, version=1, key="error-matrix-throttle")
+
+        self._assert_error_envelope(response, 429, "throttled")
+        sheet.refresh_from_db()
+        assert sheet.status == Timesheet.Status.DRAFT
