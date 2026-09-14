@@ -1,0 +1,76 @@
+/*
+ * هي فوضى؟ / Heya Fawda? — design tokens
+ * Source: _bmad-output/planning-artifacts/ux/ux-brand-direction.md §8 (candidate palette).
+ * Visual demo implementation. Roles are semantic; statuses always pair text with icon.
+ */
+
+:root {
+  /* spacing scale (px) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+
+  --radius-card: 12px;
+  --radius-control: 8px;
+  --radius-pill: 999px;
+
+  --control-min-h: 44px;
+  --content-max: 1280px;
+  --form-max: 720px;
+
+  --font-ar: "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  --font-latin: "Inter", "Segoe UI", system-ui, sans-serif;
+}
+
+/* Light theme (default) */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --canvas: #f8fafc;
+  --surface: #ffffff;
+  --surface-subtle: #f1f5f9;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --border-control: #64748b;
+  --border-subtle: #cbd5e1;
+  --primary: #0f766e;
+  --on-primary: #ffffff;
+  --secondary: #6d28d9;
+  --focus: #1d4ed8;
+  --success-text: #166534;
+  --success-bg: #dcfce7;
+  --warning-text: #92400e;
+  --warning-bg: #fef3c7;
+  --error-text: #b91c1c;
+  --error-bg: #fee2e2;
+  --info-text: #1e40af;
+  --info-bg: #dbeafe;
+}
+
+/* Dark theme */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #0f172a;
+  --surface: #1e293b;
+  --surface-subtle: #334155;
+  --text: #f8fafc;
+  --text-muted: #cbd5e1;
+  --border-control: #94a3b8;
+  --border-subtle: #475569;
+  --primary: #5eead4;
+  --on-primary: #0f172a;
+  --secondary: #c4b5fd;
+  --focus: #fde047;
+  --success-text: #86efac;
+  --success-bg: #14532d;
+  --warning-text: #fde68a;
+  --warning-bg: #78350f;
+  --error-text: #fca5a5;
+  --error-bg: #7f1d1d;
+  --info-text: #93c5fd;
+  --info-bg: #1e3a8a;
+}
