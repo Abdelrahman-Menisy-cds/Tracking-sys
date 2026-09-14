@@ -7,8 +7,11 @@ with explicit approval.
 from django.urls import include, path, re_path
 
 from config.api import api_not_found
+from config.health import health_live, health_ready
 
 urlpatterns = [
+    path("health/live", health_live),
+    path("health/ready", health_ready),
     path("api/v1/", include("accounts.urls")),
     path("api/v1/", include("notifications.urls")),
     path("api/v1/", include("reqs.urls")),
