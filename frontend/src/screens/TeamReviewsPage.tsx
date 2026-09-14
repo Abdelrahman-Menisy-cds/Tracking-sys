@@ -28,13 +28,28 @@ import {
 type DecisionKind = "APPROVE" | "REJECT" | "RETURN";
 
 export default function TeamReviewsPage() {
-  const { t, locale } = useApp();
+  const { t, locale, role } = useApp();
   const [tab, setTab] = useState<"requests" | "timesheets">("requests");
   const [deciding, setDeciding] = useState<RequestMock | TimesheetMock | null>(null);
 
   const reqState = useMockList(() => mockFetch(teamRequests), []);
   const tsState = useMockList(() => mockFetch(teamTimesheets), []);
   usePageTitle(t("teamReviewsTitle"));
+
+  // Demo capability gate: the review queue belongs to manager/HR roles only.
+  // Direct URL access as employee shows a not-available notice instead of data.
+  // Hooks above still run so the hook order stays stable across role switches.
+  if (role !== "manager" && role !== "hr") {
+    return (
+      <>
+        <h1>{t("teamReviewsTitle")}</h1>
+        <Banner tone="warning" role="alert">
+          {t("relatedUnavailable")}
+        </Banner>
+        <Link to="/">{t("navHome")}</Link>
+      </>
+    );
+  }
 
   return (
     <>
