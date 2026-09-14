@@ -214,6 +214,18 @@ Story 5.1 evidence (accepted 2026-09-14):
 - Commits: `ef4524e`, merge `0c761c1`, QA fix `ec394d3`, merge `4befcb2`, tests `2fd2362`, schema `dd74aac`, merge `c4acf01` = main HEAD.
 - Next step: Story 5.2 — bilingual RTL/LTR responsive accessible screens.
 
+Story 5.3 evidence (accepted 2026-09-14):
+
+- Preference persistence with stale-write guard: `PATCH /api/v1/auth/me` persists the signed-in user's appearance and locale preferences, with an optional `expected_appearance` guard — a stale selection returns `409 version_conflict` instead of overwriting a newer saved appearance (`65e6b1d`, merge `528284f`).
+- Server acknowledgement remains the only saved signal: a preference is considered saved only after the server's success response; no client-side optimistic finality.
+- Locale surface verified: `ar` / `en` accepted; appearance surface verified: `system` / `light` / `dark`; defaults on bootstrap read are locale `ar` and appearance `system` (Arabic-first, System-default theme policy).
+- Omitting the guard keeps the existing last-write-wins allowlist contract; the guard is strictly additive.
+- OpenAPI schema truthfulness: the real `/auth/me` PATCH `409` path and the `expected_appearance` enum are documented, component shapes stay serializer-derived.
+- Account isolation verified: preferences are per-account and cannot leak across sign-out sessions.
+- Verification on acceptance: final QA verdict APPROVED; `accounts/test_preferences.py` 10 passed; accounts+config 87 passed; Django system check clean; `makemigrations --check` clean; `git diff --check` clean.
+- Commits: implementation `65e6b1d`, merge `528284f` = main HEAD.
+- Next step: Story 5.4 — release verification and operational gates.
+
 ## Scope boundary
 
 This log documents Tracking-sys only. It does not describe or govern any Odoo project.
