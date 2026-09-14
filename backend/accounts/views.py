@@ -100,5 +100,18 @@ class MeView(APIView):
     def patch(self, request):
         serializer = CurrentUserUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.update(request.user, serializer.validated_data)
+        try:
+            user = serializer.update(request.user, serializer.validated_data)
+        except CurrentUserUpdateSerializer.AppearanceStaleWrite:
+            # Story 5.3: a stale selection must not overwrite a newer saved
+            # value; the client keeps its retryable preview and re-fetches.
+            return Response(
+                error_payload(
+                    code="version_conflict",
+                    message="The saved appearance changed. Reload and try again.",
+                    fields={"appearance": ["The saved appearance changed. Reload and retry."]},
+                    request=request,
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
         return Response({"data": CurrentUserSerializer(user).data})
