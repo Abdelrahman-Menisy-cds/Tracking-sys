@@ -51,3 +51,12 @@ npm run lint
 ## Stack
 
 React 19 + TypeScript + Vite + React Router (project-local `frontend/`, no global installs).
+
+## Verified screenshots (headless Chrome, Arabic RTL dark theme)
+
+- `docs/screenshots/demo-login.png` — S01 sign-in
+- `docs/screenshots/demo-home.png` — S02 role-scoped home
+- `docs/screenshots/demo-requests.png` — S03 my requests
+- `docs/screenshots/demo-timesheets.png` — S05 my timesheets
+- `docs/screenshots/demo-reviews.png` — S06 team review queue
+
