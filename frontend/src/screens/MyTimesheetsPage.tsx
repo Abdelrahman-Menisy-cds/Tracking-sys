@@ -1,226 +1,29 @@
-/** S05 — My timesheets: week list + weekly editor with entries, totals, submit. */
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
-import { useMockList, formatMinutes } from "../app/useMockList";
+import { useMockList, formatDateTime, formatMinutes } from "../app/useMockList";
 import { mockFetch, myTimesheets, type TimesheetMock } from "../mock/data";
 import { Banner, EmptyState, ErrorState, SkeletonRows, TimesheetStatusPill } from "../components/ui";
+import OperationalTable, { type OperationalColumn } from "../components/data/OperationalTable";
+import PageHeader from "../components/layout/PageHeader";
+
+function weekDates(weekStart: string): string[] { const dates: string[] = []; const date = new Date(`${weekStart}T00:00:00`); for (let index = 0; index < 7; index += 1) { dates.push(date.toISOString().slice(0, 10)); date.setDate(date.getDate() + 1); } return dates; }
+function totalMinutes(sheet: TimesheetMock, field: "duration_minutes" | "unpaid_break_minutes") { return sheet.entries.reduce((sum, entry) => sum + entry[field], 0); }
 
 export function MyTimesheetsPage() {
-  const { t, locale } = useApp();
-  const list = useMockList(() => mockFetch(myTimesheets), []);
-  usePageTitle(t("myTimesheetsTitle"));
-
-  return (
-    <>
-      <h1>{t("myTimesheetsTitle")}</h1>
-      {list.phase === "loading" && <SkeletonRows rows={3} />}
-      {list.phase === "error" && <ErrorState onRetry={list.retry} />}
-      {list.phase === "empty" && <EmptyState message={t("noTimesheets")} />}
-      {list.phase === "ready" &&
-        (myTimesheets.length === 0 ? (
-          <EmptyState message={t("noTimesheets")} />
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {myTimesheets.map((ts) => (
-              <li key={ts.id} className="card">
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                  <Link to={`/timesheets/${ts.id}`}>
-                    <strong>
-                      {t("week")}: {ts.week_start}
-                    </strong>
-                  </Link>
-                  <TimesheetStatusPill status={ts.status} />
-                </div>
-                <div style={{ color: "var(--text-muted)", fontSize: 14 }}>
-                  {t("totalHours")}:{" "}
-                  {formatMinutes(ts.entries.reduce((s, e) => s + e.duration_minutes, 0), locale)}
-                </div>
-              </li>
-            ))}
-          </ul>
-        ))}
-    </>
-  );
-}
-
-function weekDates(weekStart: string): string[] {
-  const out: string[] = [];
-  const d = new Date(weekStart + "T00:00:00");
-  for (let i = 0; i < 7; i++) {
-    out.push(d.toISOString().slice(0, 10));
-    d.setDate(d.getDate() + 1);
-  }
-  return out;
+  const { t, locale } = useApp(); const list = useMockList(() => mockFetch(myTimesheets), []); usePageTitle(t("myTimesheetsTitle"));
+  const columns: OperationalColumn<TimesheetMock>[] = [{ key: "week", label: t("week"), render: (sheet) => <Link to={`/timesheets/${sheet.id}`}><bdi dir="ltr">{sheet.week_start}</bdi></Link> }, { key: "timezone", label: locale === "ar" ? "المنطقة الزمنية" : "Timezone", render: () => locale === "ar" ? "القاهرة" : "Cairo" }, { key: "status", label: t("status"), render: (sheet) => <TimesheetStatusPill status={sheet.status} /> }, { key: "total", label: t("totalHours"), render: (sheet) => formatMinutes(totalMinutes(sheet, "duration_minutes"), locale) }, { key: "updated", label: t("lastUpdate"), render: (sheet) => sheet.events.length ? formatDateTime(sheet.events[sheet.events.length - 1].created_at, locale) : "—" }, { key: "action", label: locale === "ar" ? "الإجراء" : "Action", render: (sheet) => <Link to={`/timesheets/${sheet.id}`}>{sheet.status === "DRAFT" || sheet.status === "RETURNED" ? (locale === "ar" ? "فتح" : "Open") : (locale === "ar" ? "عرض" : "View")}</Link> }];
+  return <div className="page"><PageHeader title={t("myTimesheetsTitle")} subtitle={locale === "ar" ? "الاثنين إلى الأحد · المنطقة الزمنية للمؤسسة: القاهرة" : "Monday to Sunday · organization timezone: Cairo"} />{list.phase === "loading" && <SkeletonRows rows={3} />}{list.phase === "error" && <ErrorState onRetry={list.retry} />}{list.phase === "empty" && <EmptyState message={t("noTimesheets")} />}{list.phase === "ready" && (myTimesheets.length ? <OperationalTable caption={locale === "ar" ? `${myTimesheets.length} أسابيع في نطاقك الشخصي` : `${myTimesheets.length} weeks in your personal scope`} columns={columns} records={myTimesheets} /> : <EmptyState message={t("noTimesheets")} />)}</div>;
 }
 
 export function TimesheetDetailPage() {
-  const { id } = useParams();
-  const { t } = useApp();
-  const state = useMockList(() => mockFetch(myTimesheets.find((ts) => ts.id === id) ?? null, 250), [id]);
-  const [savedMsg, setSavedMsg] = useState<string | null>(null);
-
-  if (state.phase === "loading") return <SkeletonRows rows={3} />;
-  if (state.phase === "error") return <ErrorState onRetry={state.retry} />;
-  const sheet = state.phase === "ready" ? state.data : null;
-
-  if (!sheet) {
-    return (
-      <>
-        <h1>{t("myTimesheetsTitle")}</h1>
-        <Banner tone="warning" role="alert">{t("relatedUnavailable")}</Banner>
-        <Link to="/timesheets">{t("back")}</Link>
-      </>
-    );
-  }
-
-  return <TimesheetEditor sheet={sheet} savedMsg={savedMsg} setSavedMsg={setSavedMsg} />;
+  const { id } = useParams(); const { t } = useApp(); const state = useMockList(() => mockFetch(myTimesheets.find((sheet) => sheet.id === id) ?? null, 250), [id]); const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  if (state.phase === "loading") return <SkeletonRows rows={3} />; if (state.phase === "error") return <ErrorState onRetry={state.retry} />; const sheet = state.phase === "ready" ? state.data : null; if (!sheet) return <div className="page"><PageHeader title={t("myTimesheetsTitle")} /><Banner tone="warning" role="alert">{t("relatedUnavailable")}</Banner><Link to="/timesheets">{t("back")}</Link></div>;
+  return <TimesheetEditor sheet={sheet} savedMessage={savedMessage} setSavedMessage={setSavedMessage} />;
 }
 
-function TimesheetEditor({
-  sheet,
-  savedMsg,
-  setSavedMsg,
-}: {
-  sheet: TimesheetMock;
-  savedMsg: string | null;
-  setSavedMsg: (v: string | null) => void;
-}) {
-  const { t, locale } = useApp();
-  const readOnly = sheet.status !== "DRAFT" && sheet.status !== "RETURNED";
-  const days = useMemo(() => weekDates(sheet.week_start), [sheet.week_start]);
-
-  const [entries, setEntries] = useState(() =>
-    days.map((d) => {
-      const found = sheet.entries.find((e) => e.work_date === d);
-      return {
-        work_date: d,
-        duration_minutes: found?.duration_minutes ?? 0,
-        unpaid_break_minutes: found?.unpaid_break_minutes ?? 0,
-        description: found?.description ?? "",
-      };
-    }),
-  );
-
-  const totalWorked = entries.reduce((s, e) => s + Number(e.duration_minutes || 0), 0);
-  const totalBreak = entries.reduce((s, e) => s + Number(e.unpaid_break_minutes || 0), 0);
-
-  const update = (date: string, patch: Partial<(typeof entries)[number]>) => {
-    setEntries((prev) => prev.map((e) => (e.work_date === date ? { ...e, ...patch } : e)));
-    setSavedMsg(null);
-  };
-
-  const submitWeek = () => {
-    // Demo only: simulates submit acknowledgement; server validation governs in the real system.
-    setSavedMsg(t("weekSubmitted"));
-  };
-
-  return (
-    <>
-      <nav aria-label={t("back")}>
-        <Link to="/timesheets">← {t("myTimesheetsTitle")}</Link>
-      </nav>
-      <header style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", margin: "12px 0" }}>
-        <h1 style={{ margin: 0 }}>
-          {t("week")}: {sheet.week_start}
-        </h1>
-        <TimesheetStatusPill status={sheet.status} />
-      </header>
-
-      {readOnly && (
-        <Banner tone="info">
-          {t("readonlyTimesheet")} ({locale === "ar" ? "عرض للقراءة فقط" : "read-only view"})
-        </Banner>
-      )}
-
-      <div className="table-wrap">
-        <table>
-          <caption style={{ textAlign: "start", padding: "8px 0" }}>
-            {locale === "ar"
-              ? "المدة بالدقائق؛ الإجماليات تُحدَّث للعرض فقط والتحقق النهائي من الخادم."
-              : "Durations in minutes; totals recalculate for feedback only — server validation governs."}
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">{t("workDate")}</th>
-              <th scope="col">{t("duration")} ({locale === "ar" ? "دقيقة" : "minutes"})</th>
-              <th scope="col">{t("breakTime")} ({locale === "ar" ? "دقيقة" : "minutes"})</th>
-              <th scope="col">{t("description")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((e) => (
-              <tr key={e.work_date}>
-                <th scope="row" style={{ fontWeight: 400 }}>
-                  <bdi dir="ltr">{e.work_date}</bdi>
-                </th>
-                <td>
-                  <input
-                    className="input"
-                    type="number"
-                    min={0}
-                    max={1440}
-                    dir="ltr"
-                    value={e.duration_minutes}
-                    disabled={readOnly}
-                    aria-label={`${t("duration")} ${e.work_date}`}
-                    onChange={(ev) => update(e.work_date, { duration_minutes: Number(ev.target.value) })}
-                    style={{ width: 110 }}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="input"
-                    type="number"
-                    min={0}
-                    max={1440}
-                    dir="ltr"
-                    value={e.unpaid_break_minutes}
-                    disabled={readOnly}
-                    aria-label={`${t("breakTime")} ${e.work_date}`}
-                    onChange={(ev) => update(e.work_date, { unpaid_break_minutes: Number(ev.target.value) })}
-                    style={{ width: 110 }}
-                  />
-                </td>
-                <td>
-                  <input
-                    className="input"
-                    value={e.description}
-                    disabled={readOnly}
-                    aria-label={`${t("description")} ${e.work_date}`}
-                    onChange={(ev) => update(e.work_date, { description: ev.target.value })}
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <th scope="row">{t("totalHours")}</th>
-              <td colSpan={3}>
-                <strong>{formatMinutes(totalWorked, locale)}</strong>
-                <span style={{ color: "var(--text-muted)" }}>
-                  {" "}
-                  · {t("breakTime")}: {formatMinutes(totalBreak, locale)}
-                </span>
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      {savedMsg && <Banner tone="success">{savedMsg}</Banner>}
-
-      {!readOnly && (
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 16 }}>
-          <button className="btn btn-secondary" onClick={() => setSavedMsg(t("draftSaved"))}>
-            {t("save")}
-          </button>
-          <button className="btn btn-primary" onClick={submitWeek}>
-            {t("submitWeek")}
-          </button>
-        </div>
-      )}
-    </>
-  );
+function TimesheetEditor({ sheet, savedMessage, setSavedMessage }: { sheet: TimesheetMock; savedMessage: string | null; setSavedMessage: (message: string | null) => void }) {
+  const { t, locale } = useApp(); const readOnly = sheet.status !== "DRAFT" && sheet.status !== "RETURNED"; const days = useMemo(() => weekDates(sheet.week_start), [sheet.week_start]); const [entries, setEntries] = useState(() => days.map((date) => { const existing = sheet.entries.find((entry) => entry.work_date === date); return { work_date: date, duration_minutes: existing?.duration_minutes ?? 0, unpaid_break_minutes: existing?.unpaid_break_minutes ?? 0, description: existing?.description ?? "" }; }));
+  const updateEntry = (date: string, field: "duration_minutes" | "unpaid_break_minutes" | "description", value: string) => { setEntries((current) => current.map((entry) => entry.work_date === date ? { ...entry, [field]: field === "description" ? value : Number(value) } : entry)); setSavedMessage(null); }; const worked = entries.reduce((sum, entry) => sum + entry.duration_minutes, 0); const breaks = entries.reduce((sum, entry) => sum + entry.unpaid_break_minutes, 0);
+  return <div className="page reading-page"><PageHeader title={<>{t("week")}: <bdi dir="ltr">{sheet.week_start}</bdi></>} subtitle={locale === "ar" ? "الاثنين إلى الأحد · المنطقة الزمنية للمؤسسة: القاهرة" : "Monday to Sunday · organization timezone: Cairo"} breadcrumb={<Link to="/timesheets">{t("myTimesheetsTitle")}</Link>} /><div className="status-action-block"><div className="status-action-row"><TimesheetStatusPill status={sheet.status} /><span>{readOnly ? t("readonlyTimesheet") : (locale === "ar" ? "يمكنك تعديل هذا السجل قبل الإرسال." : "This record can be edited before submission.")}</span></div></div><div className="table-wrap section"><table><caption className="table-caption">{locale === "ar" ? "المدة والراحة بالدقائق؛ التحقق النهائي من الخادم." : "Duration and breaks in minutes; final validation is server-authoritative."}</caption><thead><tr><th scope="col">{t("workDate")}</th><th scope="col">{t("duration")}</th><th scope="col">{t("breakTime")}</th><th scope="col">{t("description")}</th></tr></thead><tbody>{entries.map((entry) => <tr key={entry.work_date}><th scope="row"><bdi dir="ltr">{entry.work_date}</bdi></th><td><input className="input" type="number" min="0" max="1440" inputMode="numeric" dir="ltr" value={entry.duration_minutes} disabled={readOnly} aria-label={`${t("duration")} ${entry.work_date}`} onChange={(event) => updateEntry(entry.work_date, "duration_minutes", event.target.value)} /></td><td><input className="input" type="number" min="0" max="1440" inputMode="numeric" dir="ltr" value={entry.unpaid_break_minutes} disabled={readOnly} aria-label={`${t("breakTime")} ${entry.work_date}`} onChange={(event) => updateEntry(entry.work_date, "unpaid_break_minutes", event.target.value)} /></td><td><input className="input" name={`description-${entry.work_date}`} value={entry.description} disabled={readOnly} aria-label={`${t("description")} ${entry.work_date}`} onChange={(event) => updateEntry(entry.work_date, "description", event.target.value)} /></td></tr>)}</tbody><tfoot><tr><th scope="row">{t("totalHours")}</th><td>{formatMinutes(worked, locale)}</td><td>{formatMinutes(breaks, locale)}</td><td>{t("breakTime")}</td></tr></tfoot></table></div><div className="mobile-record-list section">{entries.map((entry) => <article className="record-block" key={entry.work_date}><h3><bdi dir="ltr">{entry.work_date}</bdi></h3><label className="field"><span className="field-label">{t("duration")}</span><input className="input" type="number" min="0" max="1440" value={entry.duration_minutes} disabled={readOnly} onChange={(event) => updateEntry(entry.work_date, "duration_minutes", event.target.value)} /></label><label className="field"><span className="field-label">{t("breakTime")}</span><input className="input" type="number" min="0" max="1440" value={entry.unpaid_break_minutes} disabled={readOnly} onChange={(event) => updateEntry(entry.work_date, "unpaid_break_minutes", event.target.value)} /></label><label className="field"><span className="field-label">{t("description")}</span><input className="input" value={entry.description} disabled={readOnly} onChange={(event) => updateEntry(entry.work_date, "description", event.target.value)} /></label></article>)}</div><div className="summary-strip section"><div className="summary-item"><span className="summary-label">{t("totalHours")}</span><strong>{formatMinutes(worked, locale)}</strong></div><div className="summary-item"><span className="summary-label">{t("breakTime")}</span><strong>{formatMinutes(breaks, locale)}</strong></div></div>{savedMessage && <Banner tone="success">{savedMessage}</Banner>}{!readOnly && <div className="form-actions section"><button className="btn btn-secondary" onClick={() => setSavedMessage(t("draftSaved"))}>{t("save")}</button><button className="btn btn-primary" onClick={() => setSavedMessage(t("weekSubmitted"))}>{t("submitWeek")}</button></div>}</div>;
 }

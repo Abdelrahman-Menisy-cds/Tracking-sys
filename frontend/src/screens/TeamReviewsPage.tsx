@@ -24,6 +24,7 @@ import {
   SkeletonRows,
   TimesheetStatusPill,
 } from "../components/ui";
+import PageHeader from "../components/layout/PageHeader";
 
 type DecisionKind = "APPROVE" | "REJECT" | "RETURN";
 
@@ -52,13 +53,8 @@ export default function TeamReviewsPage() {
   }
 
   return (
-    <>
-      <h1>{t("teamReviewsTitle")}</h1>
-      <p style={{ color: "var(--text-muted)" }}>
-        {locale === "ar"
-          ? "النطاق: المرؤوسون المباشرون فقط (نطاق تجريبي)."
-          : "Scope: active direct reports only (demo scope)."}
-      </p>
+    <div className="page">
+      <PageHeader title={t("teamReviewsTitle")} subtitle={locale === "ar" ? "النطاق: المرؤوسون المباشرون النشطون فقط · ترتيب محدد" : "Scope: active direct reports only · deterministic order"} />
 
       <div
         role="tablist"
@@ -118,7 +114,7 @@ export default function TeamReviewsPage() {
         ) : (
           <ul style={{ listStyle: "none", padding: 0 }}>
             {teamRequests.map((r) => (
-              <li key={r.id} className="card">
+              <li key={r.id} className="work-surface">
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                   <div>
                     <Link to={`/reviews/requests/${r.id}`}>
@@ -154,7 +150,7 @@ export default function TeamReviewsPage() {
       ) : (
         <ul style={{ listStyle: "none", padding: 0 }}>
           {teamTimesheets.map((ts) => (
-            <li key={ts.id} className="card">
+            <li key={ts.id} className="work-surface">
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                 <div>
                   <strong>
@@ -181,7 +177,7 @@ export default function TeamReviewsPage() {
       </div>
 
       {deciding && <DecisionDialog record={deciding} onClose={() => setDeciding(null)} />}
-    </>
+    </div>
   );
 }
 
@@ -332,13 +328,13 @@ export function ReviewRequestDetailPage() {
       <p style={{ color: "var(--text-muted)" }}>
         {t("requester")}: <bdi>{pickName(request.requester_name, locale)}</bdi>
       </p>
-      <section className="card">
+      <section className="work-surface">
         <h2>{t("requestDetails")}</h2>
         <p style={{ whiteSpace: "pre-wrap" }}>
           <bdi>{request.details}</bdi>
         </p>
       </section>
-      <section className="card">
+      <section className="work-surface">
         <h2>{t("history")}</h2>
         <ol style={{ paddingInlineStart: 20 }}>
           {request.events.map((ev) => (

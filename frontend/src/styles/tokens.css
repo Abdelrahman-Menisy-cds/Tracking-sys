@@ -1,11 +1,4 @@
-/*
- * هي فوضى؟ / Heya Fawda? — design tokens
- * Source: _bmad-output/planning-artifacts/ux/ux-brand-direction.md §8 (candidate palette).
- * Visual demo implementation. Roles are semantic; statuses always pair text with icon.
- */
-
 :root {
-  /* spacing scale (px) */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -13,64 +6,55 @@
   --sp-6: 24px;
   --sp-8: 32px;
   --sp-12: 48px;
-
-  --radius-card: 12px;
-  --radius-control: 8px;
+  --sp-16: 64px;
+  --radius-surface: 8px;
+  --radius-dialog: 12px;
   --radius-pill: 999px;
-
   --control-min-h: 44px;
+  --rail-width: 248px;
   --content-max: 1280px;
-  --form-max: 720px;
-
+  --reading-max: 760px;
   --font-ar: "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
-  --font-latin: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-latin: Inter, "Segoe UI", system-ui, sans-serif;
 }
 
-/* Light theme (default) */
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
-  --canvas: #f8fafc;
-  --surface: #ffffff;
-  --surface-subtle: #f1f5f9;
-  --text: #0f172a;
-  --text-muted: #475569;
-  --border-control: #64748b;
-  --border-subtle: #cbd5e1;
-  --primary: #0f766e;
-  --on-primary: #ffffff;
-  --secondary: #6d28d9;
-  --focus: #1d4ed8;
-  --success-text: #166534;
-  --success-bg: #dcfce7;
-  --warning-text: #92400e;
-  --warning-bg: #fef3c7;
-  --error-text: #b91c1c;
-  --error-bg: #fee2e2;
-  --info-text: #1e40af;
-  --info-bg: #dbeafe;
+  --color-ink: #172033;
+  --color-canvas: #f5f7f9;
+  --color-surface: #ffffff;
+  --color-action: #0f766e;
+  --color-signal: #6d28d9;
+  --color-critical: #b91c1c;
 }
 
-/* Dark theme */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --canvas: #0f172a;
-  --surface: #1e293b;
-  --surface-subtle: #334155;
-  --text: #f8fafc;
-  --text-muted: #cbd5e1;
-  --border-control: #94a3b8;
-  --border-subtle: #475569;
-  --primary: #5eead4;
-  --on-primary: #0f172a;
-  --secondary: #c4b5fd;
-  --focus: #fde047;
-  --success-text: #86efac;
-  --success-bg: #14532d;
-  --warning-text: #fde68a;
-  --warning-bg: #78350f;
-  --error-text: #fca5a5;
-  --error-bg: #7f1d1d;
-  --info-text: #93c5fd;
-  --info-bg: #1e3a8a;
+  --color-ink: #f8fafc;
+  --color-canvas: #0f172a;
+  --color-surface: #1e293b;
+  --color-action: #5eead4;
+  --color-signal: #c4b5fd;
+  --color-critical: #fca5a5;
+}
+
+:root {
+  --text: var(--color-ink);
+  --canvas: var(--color-canvas);
+  --surface: var(--color-surface);
+  --text-muted: color-mix(in srgb, var(--color-ink) 68%, var(--color-canvas));
+  --border-subtle: color-mix(in srgb, var(--color-ink) 20%, var(--color-surface));
+  --border-control: color-mix(in srgb, var(--color-ink) 52%, var(--color-surface));
+  --surface-subtle: color-mix(in srgb, var(--color-canvas) 74%, var(--color-surface));
+  --action-wash: color-mix(in srgb, var(--color-action) 13%, var(--color-surface));
+  --signal-wash: color-mix(in srgb, var(--color-signal) 12%, var(--color-surface));
+  --critical-wash: color-mix(in srgb, var(--color-critical) 12%, var(--color-surface));
+  --on-action: var(--color-surface);
+  --on-critical: var(--color-surface);
+}
+
+:root[data-theme="dark"] {
+  --on-action: var(--color-canvas);
+  --on-critical: var(--color-canvas);
 }

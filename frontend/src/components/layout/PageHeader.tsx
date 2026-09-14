@@ -1,0 +1,2 @@
+import type { ReactNode } from "react";
+export default function PageHeader({ title, subtitle, primaryAction, breadcrumb }: { title: ReactNode; subtitle?: ReactNode; primaryAction?: ReactNode; breadcrumb?: ReactNode }) { return <>{breadcrumb && <nav className="muted" aria-label="Breadcrumb">{breadcrumb}</nav>}<header className="page-header"><div className="page-header-copy"><h1>{title}</h1>{subtitle && <p className="page-meta">{subtitle}</p>}</div>{primaryAction && <div className="page-actions">{primaryAction}</div>}</header></>; }

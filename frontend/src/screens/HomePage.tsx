@@ -1,7 +1,6 @@
-/** S02 — Role-scoped home: own summaries + team review summary for manager/HR demo roles. */
 import { Link } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
-import { useMockList, formatDateTime } from "../app/useMockList";
+import { useMockList, formatDateTime, formatMinutes } from "../app/useMockList";
 import { demoUser, mockFetch, myRequests, myTimesheets, teamRequests, teamTimesheets, notifications } from "../mock/data";
 import { Banner, RequestStatusPill, SkeletonRows, TimesheetStatusPill } from "../components/ui";
 
@@ -9,120 +8,30 @@ export default function HomePage() {
   const { t, locale, role } = useApp();
   const user = demoUser[role];
   usePageTitle(t("homeTitle"));
-
-  const reqState = useMockList(() => mockFetch(myRequests), []);
-  const tsState = useMockList(() => mockFetch(myTimesheets), []);
-  const teamReqState = useMockList(() => mockFetch(teamRequests), []);
-  const teamTsState = useMockList(() => mockFetch(teamTimesheets), []);
-  const notifState = useMockList(() => mockFetch(notifications), []);
-
-  const pendingMine = myRequests.filter((r) => r.status === "PENDING_MANAGER" || r.status === "PENDING_HR" || r.status === "RETURNED");
-  const pendingTeam = [...teamRequests, ...teamTimesheets].length;
+  const requestState = useMockList(() => mockFetch(myRequests), []);
+  const timesheetState = useMockList(() => mockFetch(myTimesheets), []);
+  const teamRequestState = useMockList(() => mockFetch(teamRequests), []);
+  const teamTimesheetState = useMockList(() => mockFetch(teamTimesheets), []);
+  const notificationState = useMockList(() => mockFetch(notifications), []);
+  const attentionRequests = myRequests.filter((request) => ["RETURNED", "DRAFT"].includes(request.status));
+  const reviewRequestCount = teamRequests.filter((request) => request.status === "PENDING_MANAGER").length;
+  const reviewTimesheetCount = teamTimesheets.filter((sheet) => sheet.status === "SUBMITTED").length;
   const currentWeek = myTimesheets[0];
+  const loading = requestState.phase === "loading" || timesheetState.phase === "loading";
+  const reviewLoading = teamRequestState.phase === "loading" || teamTimesheetState.phase === "loading";
+  const reviewError = teamRequestState.phase === "error" || teamTimesheetState.phase === "error";
 
   return (
-    <>
-      <h1>{t("homeTitle")}</h1>
-      <p style={{ color: "var(--text-muted)" }}>
-        {t("homeWelcome")}, <bdi>{user.name[locale]}</bdi> ({t(role === "employee" ? "roleEmployee" : role === "manager" ? "roleManager" : "roleHr")})
-      </p>
-
-      <div className="card-grid">
-        <div className="card">
-          <h2>{t("homeMyRequests")}</h2>
-          {reqState.phase === "loading" ? (
-            <SkeletonRows rows={1} />
-          ) : reqState.phase === "error" ? (
-            <Banner tone="error" role="alert">{t("errorNetwork")}</Banner>
-          ) : (
-            <p style={{ fontSize: 36, fontWeight: 700, margin: 0 }}>{pendingMine.length}</p>
-          )}
-          <Link to="/requests">{t("navMyRequests")} →</Link>
-        </div>
-
-        <div className="card">
-          <h2>{t("homeTimesheetStatus")}</h2>
-          {tsState.phase === "loading" ? (
-            <SkeletonRows rows={1} />
-          ) : tsState.phase === "error" ? (
-            <Banner tone="error" role="alert">{t("errorNetwork")}</Banner>
-          ) : currentWeek ? (
-            <>
-              <TimesheetStatusPill status={currentWeek.status} />
-              <p style={{ margin: "8px 0 0", color: "var(--text-muted)", fontSize: 14 }}>
-                {t("weekStart")}: {currentWeek.week_start}
-              </p>
-            </>
-          ) : null}
-          <div style={{ marginTop: 8 }}>
-            <Link to="/timesheets">{t("openTimesheet")} →</Link>
-          </div>
-        </div>
-
-        {(role === "manager" || role === "hr") && (
-          <div className="card">
-            <h2>{t("homeTeamQueue")}</h2>
-            {teamReqState.phase === "loading" || teamTsState.phase === "loading" ? (
-              <SkeletonRows rows={1} />
-            ) : teamReqState.phase === "error" || teamTsState.phase === "error" ? (
-              <Banner tone="error" role="alert">{t("errorNetwork")}</Banner>
-            ) : (
-              <p style={{ fontSize: 36, fontWeight: 700, margin: 0 }}>{pendingTeam}</p>
-            )}
-            <Link to="/reviews">{t("navTeamReviews")} →</Link>
-          </div>
-        )}
-      </div>
-
-      <section aria-labelledby="recent-notifs">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <h2 id="recent-notifs">{t("homeRecentNotifications")}</h2>
-          <Link to="/notifications">{t("viewAll")}</Link>
-        </div>
-        {notifState.phase === "loading" ? (
-          <SkeletonRows rows={2} />
-        ) : notifState.phase === "error" ? (
-          <Banner tone="error" role="alert">{t("errorNetwork")}</Banner>
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {notifications.slice(0, 3).map((n) => (
-              <li key={n.id} className="card" style={{ padding: "var(--sp-3) var(--sp-4)" }}>
-                <strong>{n.title[locale]}</strong>
-                <div style={{ color: "var(--text-muted)", fontSize: 14 }}>
-                  {formatDateTime(n.created_at, locale)}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section aria-labelledby="pending-mine" style={{ marginTop: 24 }}>
-        <h2 id="pending-mine">{t("homePendingRequests")}</h2>
-        {reqState.phase === "loading" ? (
-          <SkeletonRows rows={2} />
-        ) : reqState.phase === "error" ? (
-          <Banner tone="error" role="alert">{t("errorNetwork")}</Banner>
-        ) : pendingMine.length === 0 ? (
-          <Banner tone="neutral">{t("noRequestsYet")}</Banner>
-        ) : (
-          <ul style={{ listStyle: "none", padding: 0 }}>
-            {pendingMine.map((r) => (
-              <li key={r.id} className="card" style={{ padding: "var(--sp-3) var(--sp-4)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                  <Link to={`/requests/${r.id}`}>
-                    <bdi>{r.title}</bdi>
-                  </Link>
-                  <RequestStatusPill status={r.status} />
-                </div>
-                <div style={{ color: "var(--text-muted)", fontSize: 14 }}>
-                  {t("submittedAt")}: {r.submitted_at ? formatDateTime(r.submitted_at, locale) : "—"}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </>
+    <div className="page">
+      <header className="page-header">
+        <div className="page-header-copy"><h1>{t("homeTitle")}</h1><p className="page-meta">{t("homeWelcome")}, <bdi>{user.name[locale]}</bdi> · {locale === "ar" ? "عملك الشخصي" : "Personal work"}</p></div>
+        <div className="page-actions"><Link className="btn btn-primary" to="/requests/new">{t("newRequest")}</Link><Link className="btn btn-secondary" to="/timesheets">{t("openTimesheet")}</Link></div>
+      </header>
+      {attentionRequests.length > 0 && <section className="attention-strip" aria-label={locale === "ar" ? "يحتاج إلى انتباه" : "Needs attention"}><div><strong>{locale === "ar" ? "يحتاج إلى انتباه" : "Needs your attention"}</strong><span>{locale === "ar" ? "لديك عمل مُعاد أو مسودة يمكنك متابعتها." : "You have returned work or a draft to continue."}</span></div></section>}
+      <section className="section" aria-labelledby="my-work-heading"><div className="section-heading"><h2 id="my-work-heading">{locale === "ar" ? "العمل الشخصي" : "My work"}</h2><Link to="/requests">{t("viewAll")}</Link></div>{loading ? <SkeletonRows rows={2} /> : requestState.phase === "error" || timesheetState.phase === "error" ? <Banner tone="error" role="alert">{t("errorNetwork")}</Banner> : <div className="work-surface"><ul className="compact-list">{attentionRequests.map((request) => <li key={request.id} className="compact-row"><div><Link to={`/requests/${request.id}`}><strong><bdi>{request.title}</bdi></strong></Link><div className="muted">{request.status === "RETURNED" ? (locale === "ar" ? "مطلوب تصحيح" : "Correction required") : t("draft")}</div></div><RequestStatusPill status={request.status} /></li>)}{attentionRequests.length === 0 && <li>{t("noRequestsYet")}</li>}</ul></div>}</section>
+      {currentWeek && <section className="section" aria-labelledby="week-heading"><div className="section-heading"><h2 id="week-heading">{locale === "ar" ? "الأسبوع الحالي" : "Current week"}</h2><Link to="/timesheets">{t("openTimesheet")}</Link></div><div className="work-surface"><div className="status-action-row"><div><strong>{t("week")}: <bdi dir="ltr">{currentWeek.week_start}</bdi></strong><div className="muted">{locale === "ar" ? "المنطقة الزمنية للمؤسسة: القاهرة" : "Organization timezone: Cairo"}</div></div><TimesheetStatusPill status={currentWeek.status} /></div><div className="summary-strip"><div className="summary-item"><span className="summary-label">{t("totalHours")}</span><span className="summary-value">{formatMinutes(currentWeek.entries.reduce((sum, entry) => sum + entry.duration_minutes, 0), locale)}</span></div><div className="summary-item"><span className="summary-label">{t("breakTime")}</span><span className="summary-value">{formatMinutes(currentWeek.entries.reduce((sum, entry) => sum + entry.unpaid_break_minutes, 0), locale)}</span></div></div></div></section>}
+      {role !== "employee" && <section className="section" aria-labelledby="review-heading"><div className="section-heading"><h2 id="review-heading">{t("homeTeamQueue")}</h2><Link to="/reviews">{t("viewAll")}</Link></div><div className="work-surface">{reviewLoading ? <SkeletonRows rows={1} /> : reviewError ? <Banner tone="error" role="alert">{t("errorNetwork")}</Banner> : <><p className="muted">{locale === "ar" ? "المرؤوسون المباشرون النشطون فقط · ترتيب المراجعة محدد." : "Active direct reports only · queue order is deterministic."}</p><div className="summary-strip"><div className="summary-item"><span className="summary-value">{reviewRequestCount}</span><span className="summary-label">{t("reviewRequests")}</span></div><div className="summary-item"><span className="summary-value">{reviewTimesheetCount}</span><span className="summary-label">{t("reviewTimesheets")}</span></div></div></>}</div></section>}
+      <section className="section" aria-labelledby="recent-notifications"><div className="section-heading"><h2 id="recent-notifications">{t("homeRecentNotifications")}</h2><Link to="/notifications">{t("viewAll")}</Link></div>{notificationState.phase === "loading" ? <SkeletonRows rows={2} /> : <div className="work-surface"><ul className="compact-list">{notifications.slice(0, 3).map((notification) => <li className="compact-row" key={notification.id}><div><strong>{notification.title[locale]}</strong><div className="muted">{formatDateTime(notification.created_at, locale)}</div></div><span className={`pill ${notification.is_read ? "pill-neutral" : "pill-info"}`}>{notification.is_read ? t("read") : t("unread")}</span></li>)}</ul></div>}</section>
+    </div>
   );
 }
