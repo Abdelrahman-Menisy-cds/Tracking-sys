@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
 import { useMockList, formatDateTime } from "../app/useMockList";
-import { mockFetch, myRequests, requestTypes, type RequestMock, type RequestStatus } from "../mock/data";
+import { mockFetch, requestTypes, type RequestMock, type RequestStatus } from "../mock/data";
 import { Banner, EmptyState, ErrorState, RequestStatusPill, SkeletonRows } from "../components/ui";
 import OperationalTable, { type OperationalColumn } from "../components/data/OperationalTable";
 import PageHeader from "../components/layout/PageHeader";
@@ -17,9 +17,9 @@ function nextStage(request: RequestMock, locale: "ar" | "en") {
 function correctionReason(request: RequestMock) { return [...request.events].reverse().find((event) => event.action === "RETURN")?.comment; }
 
 export default function MyRequestsPage() {
-  const { t, locale } = useApp(); const navigate = useNavigate(); const [params, setParams] = useSearchParams();
-  const statusFilter = params.get("status") ?? "all"; const list = useMockList(() => mockFetch(myRequests), []); usePageTitle(t("myRequestsTitle"));
-  const filtered = list.phase === "ready" ? statusFilter === "all" ? myRequests : myRequests.filter((request) => request.status === statusFilter) : [];
+  const { t, locale, myRequestItems } = useApp(); const navigate = useNavigate(); const [params, setParams] = useSearchParams();
+  const statusFilter = params.get("status") ?? "all"; const list = useMockList(() => mockFetch(myRequestItems), [myRequestItems]); usePageTitle(t("myRequestsTitle"));
+  const filtered = list.phase === "ready" ? statusFilter === "all" ? myRequestItems : myRequestItems.filter((request) => request.status === statusFilter) : [];
   const setFilter = (value: string) => { const next = new URLSearchParams(params); if (value === "all") next.delete("status"); else next.set("status", value); setParams(next); };
   const labels = { next: locale === "ar" ? "الخطوة التالية" : "Next stage", submitted: locale === "ar" ? "الإرسال" : "Submitted", action: locale === "ar" ? "الإجراء" : "Action" };
   const columns: OperationalColumn<RequestMock>[] = [
@@ -37,18 +37,36 @@ export default function MyRequestsPage() {
 }
 
 export function NewRequestPage() {
-  const { t, locale } = useApp(); const navigate = useNavigate(); const titleRef = useRef<HTMLInputElement>(null); const summaryRef = useRef<HTMLDivElement>(null);
+  const { t, locale, saveDemoRequest } = useApp(); const navigate = useNavigate(); const titleRef = useRef<HTMLInputElement>(null); const summaryRef = useRef<HTMLDivElement>(null);
   const [typeId, setTypeId] = useState(requestTypes[0].id); const [title, setTitle] = useState(""); const [details, setDetails] = useState(""); const [titleError, setTitleError] = useState<string | null>(null); const [savedMessage, setSavedMessage] = useState<string | null>(null); const [busy, setBusy] = useState(false); const [confirmLeave, setConfirmLeave] = useState(false); const [confirmSubmit, setConfirmSubmit] = useState(false);
   const selectedType = requestTypes.find((requestType) => requestType.id === typeId) ?? requestTypes[0]; const hasUnsaved = Boolean(title.trim() || details.trim()); usePageTitle(t("newRequest"));
   const validate = () => { if (title.trim()) { setTitleError(null); return true; } setTitleError(locale === "ar" ? "أدخل عنوان الطلب." : "Enter a request title."); window.setTimeout(() => summaryRef.current?.focus(), 0); return false; };
-  const save = (submit: boolean) => { if (!validate()) return; if (submit && !confirmSubmit) { setConfirmSubmit(true); return; } setBusy(true); window.setTimeout(() => { setBusy(false); setSavedMessage(submit ? t("requestSubmitted") : t("draftSaved")); window.setTimeout(() => navigate("/requests"), 900); }, 500); };
+  const save = async (submit: boolean) => {
+    if (!validate()) return;
+    if (submit && !confirmSubmit) {
+      setConfirmSubmit(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      const returned = await saveDemoRequest({ typeId, title: title.trim(), details, submit });
+      setSavedMessage(locale === "ar"
+        ? `${submit ? "أرسلت" : "حفظت"} طبقة العرض التجريبية الطلب بالحالة «${returned.status === "DRAFT" ? t("stDraft") : t("stPendingManager")}». هذا التغيير غير دائم وسيختفي بعد إعادة تحميل الصفحة.`
+        : `The demo data layer ${submit ? "submitted" : "saved"} the request as “${returned.status === "DRAFT" ? t("stDraft") : t("stPendingManager")}”. This change is non-persistent and will disappear after reload.`);
+      setConfirmSubmit(false);
+    } catch {
+      setSavedMessage(locale === "ar" ? "لم تؤكد طبقة العرض التغيير. احتفظنا بالقيم؛ أعد المحاولة." : "The demo data layer did not confirm the change. Your values are preserved; retry.");
+    } finally {
+      setBusy(false);
+    }
+  };
   return <div className="page reading-page"><PageHeader title={t("newRequest")} subtitle={locale === "ar" ? "مسودة جديدة · اختر النوع ثم أدخل التفاصيل" : "New draft · choose a type, then enter details"} breadcrumb={<Link to="/requests">{t("myRequestsTitle")}</Link>} />
     {titleError && <div className="banner banner-error" role="alert" tabIndex={-1} ref={summaryRef}><a href="#request-title" onClick={() => titleRef.current?.focus()}>{titleError}</a></div>}
     <form className="work-surface" noValidate onSubmit={(event) => event.preventDefault()}><label className="field"><span className="field-label">{t("requestType")}</span><select className="select" name="request-type" value={typeId} onChange={(event) => setTypeId(Number(event.target.value))}>{requestTypes.map((requestType) => <option key={requestType.id} value={requestType.id}>{requestType.name[locale]}</option>)}</select><span className="field-hint">{selectedType.requires_hr_approval ? (locale === "ar" ? "المسار: المدير ثم الموارد البشرية." : "Review path: manager, then HR.") : (locale === "ar" ? "المسار: مراجعة المدير." : "Review path: manager review.")}</span></label>
       <label className="field"><span className="field-label">{t("requestTitle")} ({locale === "ar" ? "مطلوب" : "required"})</span><input id="request-title" ref={titleRef} className="input" name="title" value={title} required autoComplete="off" spellCheck={false} aria-invalid={Boolean(titleError)} aria-describedby={titleError ? "title-error" : undefined} onChange={(event) => setTitle(event.target.value)} />{titleError && <span className="field-error" id="title-error">{titleError}</span>}</label>
       <label className="field"><span className="field-label">{t("requestDetails")}</span><textarea className="textarea" name="details" value={details} onChange={(event) => setDetails(event.target.value)} /></label>
       <fieldset className="quiet-inset field"><legend className="field-label">{t("attachments")}</legend><input className="input" type="file" disabled aria-describedby="attachment-demo" /><span id="attachment-demo" className="field-hint">{locale === "ar" ? "رفع المرفقات غير متاح في النسخة التجريبية. سيعرض النظام سياسة الخادم عند الربط." : "Uploads are unavailable in this demo. Server policy will be shown when integrated."}</span></fieldset>
-      {confirmSubmit && <div className="attention-strip"><div><strong>{locale === "ar" ? "ملخص الإرسال" : "Submission summary"}</strong><p>{locale === "ar" ? `سيُرسل «${title}» إلى مرحلة ${selectedType.requires_hr_approval ? "مراجعة المدير ثم الموارد البشرية" : "مراجعة المدير"}. يصبح الطلب للقراءة فقط بعد الإرسال.` : `“${title}” will enter ${selectedType.requires_hr_approval ? "manager then HR review" : "manager review"}. It becomes read-only after submission.`}</p></div></div>}
+      {confirmSubmit && <div className="attention-strip"><div><strong>{locale === "ar" ? "ملخص الإرسال" : "Submission summary"}</strong><p>{locale === "ar" ? `ستحدّث طبقة العرض التجريبية «${title}» إلى حالة بانتظار مراجعة المدير. سيصبح للقراءة فقط داخل الجلسة الحالية، والتغيير غير دائم.` : `The demo data layer will update “${title}” to Awaiting manager review. It will become read-only for this session, and the transition is non-persistent.`}</p></div></div>}
       {savedMessage && <Banner tone="success">{savedMessage}</Banner>}<div className="form-actions"><button className="btn btn-secondary" type="button" disabled={busy} onClick={() => hasUnsaved ? setConfirmLeave(true) : navigate("/requests")}>{t("back")}</button><button className="btn btn-secondary" type="button" disabled={busy} onClick={() => save(false)}>{t("saveDraft")}</button><button className="btn btn-primary" type="button" disabled={busy} onClick={() => save(true)}>{busy ? <><span className="spinner" aria-hidden="true" />{t("saving")}</> : confirmSubmit ? t("confirmDecision") : t("submitRequest")}</button></div>
       {confirmLeave && <Banner tone="warning" role="alert"><div><p>{locale === "ar" ? "لديك تعديلات غير محفوظة. هل تريد الخروج دون حفظ؟" : "You have unsaved changes. Leave without saving?"}</p><div className="form-actions"><button className="btn btn-secondary" type="button" onClick={() => navigate("/requests")}>{locale === "ar" ? "خروج دون حفظ" : "Leave without saving"}</button><button className="btn btn-primary" type="button" onClick={() => setConfirmLeave(false)}>{t("cancel")}</button></div></div></Banner>}
     </form>

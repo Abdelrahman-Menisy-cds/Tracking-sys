@@ -1,27 +1,230 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useApp, type Appearance } from "./AppContext";
+import { useApp, type Appearance, type DemoFixture } from "./AppContext";
 import type { Role } from "../i18n/dict";
-import { notifications } from "../mock/data";
 import BrandLockup from "../components/brand/BrandLockup";
 
+const FOCUSABLE = 'a[href], button:not([disabled]), select:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export default function AppShell() {
-  const { t, locale, setLocale, role, setRole, appearance, setAppearance, failNext, emptyNext } = useApp();
-  const [drawerOpen, setDrawerOpen] = useState(false); const [stateTools, setStateTools] = useState(false);
-  const navigate = useNavigate(); const location = useLocation();
-  const [isCompact, setIsCompact] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches);
-  useEffect(() => { const query = window.matchMedia("(max-width: 1023px)"); const update = () => setIsCompact(query.matches); update(); query.addEventListener("change", update); return () => query.removeEventListener("change", update); }, []);
-  useEffect(() => { if (!drawerOpen) return; const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") { setDrawerOpen(false); document.querySelector<HTMLElement>(".menu-toggle")?.focus(); } }; document.addEventListener("keydown", onKey); document.body.style.overflow = "hidden"; return () => { document.removeEventListener("keydown", onKey); document.body.style.overflow = ""; }; }, [drawerOpen]);
-  const canReview = role === "manager" || role === "hr";
-  const unreadCount = useMemo(() => notifications.filter((notification) => !notification.is_read).length, []);
+  const {
+    t,
+    locale,
+    setLocale,
+    role,
+    setRole,
+    capabilities,
+    appearance,
+    setAppearance,
+    notificationItems,
+    setDemoFixture,
+  } = useApp();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [demoToolsOpen, setDemoToolsOpen] = useState(false);
+  const [isCompact, setIsCompact] = useState(() => window.matchMedia("(max-width: 1023px)").matches);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const railRef = useRef<HTMLElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1023px)");
+    const updateCompactMode = () => setIsCompact(mediaQuery.matches);
+    updateCompactMode();
+    mediaQuery.addEventListener("change", updateCompactMode);
+    return () => mediaQuery.removeEventListener("change", updateCompactMode);
+  }, []);
+
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(false);
+    window.setTimeout(() => menuButtonRef.current?.focus(), 0);
+  }, []);
+
+  useEffect(() => {
+    if (!drawerOpen || !isCompact) return;
+    const previousOverflow = document.body.style.overflow;
+    const main = mainRef.current;
+    const previousInert = main?.inert ?? false;
+
+    const focusFirst = () => railRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeDrawer();
+        return;
+      }
+      if (event.key !== "Tab" || !railRef.current) return;
+      const items = [...railRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      if (!items.length) return;
+      const firstItem = items[0];
+      const lastItem = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === firstItem) {
+        event.preventDefault();
+        lastItem.focus();
+      } else if (!event.shiftKey && document.activeElement === lastItem) {
+        event.preventDefault();
+        firstItem.focus();
+      }
+    };
+
+    document.body.style.overflow = "hidden";
+    if (main) main.inert = true;
+    window.setTimeout(focusFirst, 0);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      if (main) main.inert = previousInert;
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeDrawer, drawerOpen, isCompact]);
+
+  const unreadCount = useMemo(
+    () => notificationItems.filter((notification) => !notification.is_read).length,
+    [notificationItems],
+  );
   const navGroups: { label: string; items: { to: string; label: string; end?: boolean; badge?: number }[] }[] = [
-    { label: locale === "ar" ? "عملي" : "My work", items: [{ to: "/", label: t("navHome"), end: true }, { to: "/requests", label: t("navMyRequests") }, { to: "/timesheets", label: t("navMyTimesheets") }] },
-    ...(canReview ? [{ label: locale === "ar" ? "عمل المراجعة" : "Review work", items: [{ to: "/reviews", label: t("navTeamReviews") }] }] : []),
-    { label: locale === "ar" ? "التحديثات" : "Updates", items: [{ to: "/notifications", label: t("navNotifications"), badge: unreadCount }] },
+    {
+      label: locale === "ar" ? "عملي" : "My work",
+      items: [
+        { to: "/", label: t("navHome"), end: true },
+        { to: "/requests", label: t("navMyRequests") },
+        { to: "/timesheets", label: t("navMyTimesheets") },
+      ],
+    },
+    ...(capabilities.canReview
+      ? [{ label: locale === "ar" ? "عمل المراجعة" : "Review work", items: [{ to: "/reviews", label: t("navTeamReviews") }] }]
+      : []),
+    {
+      label: locale === "ar" ? "التحديثات" : "Updates",
+      items: [{ to: "/notifications", label: t("navNotifications"), badge: unreadCount }],
+    },
   ];
-  const roleOptions: { value: Role; label: string }[] = [{ value: "employee", label: t("roleEmployee") }, { value: "manager", label: t("roleManager") }, { value: "hr", label: t("roleHr") }];
-  const appearanceOptions: { value: Appearance; label: string }[] = [{ value: "system", label: t("appearanceSystem") }, { value: "light", label: t("appearanceLight") }, { value: "dark", label: t("appearanceDark") }];
-  const currentLabel = navGroups.flatMap((group) => group.items).find((item) => item.to === location.pathname || (item.to !== "/" && location.pathname.startsWith(item.to)))?.label ?? t("navHome");
-  const navigation = <nav id="app-rail-nav" className={`app-rail ${drawerOpen ? "open" : ""}`} aria-label={t("menu")} inert={isCompact && !drawerOpen ? true : undefined}><BrandLockup />{navGroups.map((group) => <div className="nav-group" key={group.label}><div className="nav-group-title">{group.label}</div>{group.items.map((item) => <NavLink key={item.to} to={item.to} end={item.end} className="nav-link" onClick={() => setDrawerOpen(false)} aria-label={item.badge ? `${item.label} — ${item.badge}` : undefined}>{item.label}{item.badge ? <span className="nav-badge" aria-label={`${item.badge}`}>{item.badge}</span> : null}</NavLink>)}</div>)}<div className="demo-tools"><div className="demo-tools-label">{locale === "ar" ? "أدوات العرض" : "Demo tools"}</div><button type="button" className="btn btn-secondary" aria-expanded={stateTools} onClick={() => setStateTools((open) => !open)}>{t("demoStatesTitle")}</button>{stateTools && <div className="demo-state-tools"><span>{t("demoStatesHint")}</span><button type="button" className="btn btn-secondary" onClick={() => { failNext(); setDrawerOpen(false); }}>{t("demoStateError")}</button><button type="button" className="btn btn-secondary" onClick={() => { emptyNext(); setDrawerOpen(false); }}>{t("demoStateEmpty")}</button></div>}</div></nav>;
-  return <><a href="#main-content" className="skip-link">{t("skipToMain")}</a><div className="demo-banner" role="note">{t("demoLabel")}</div><div className="app-shell">{navigation}{drawerOpen && <button className="drawer-backdrop" aria-label={t("close")} onClick={() => setDrawerOpen(false)} /> }<div className="app-main"><header className="app-header"><button type="button" className="btn btn-secondary menu-toggle" aria-expanded={drawerOpen} aria-controls="app-rail-nav" onClick={() => setDrawerOpen((open) => !open)}>{t("menu")}</button><strong>{currentLabel}</strong><div className="header-actions"><label><span className="visually-hidden">{t("demoRoleSwitch")}</span><select className="select" aria-label={t("demoRoleSwitch")} value={role} onChange={(event) => { setRole(event.target.value as Role); navigate("/"); }}>{roleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><label><span className="visually-hidden">{t("language")}</span><select className="select" aria-label={t("language")} value={locale} onChange={(event) => setLocale(event.target.value as "ar" | "en")}><option value="ar">العربية</option><option value="en">English</option></select></label><label><span className="visually-hidden">{t("appearance")}</span><select className="select" aria-label={t("appearance")} value={appearance} onChange={(event) => setAppearance(event.target.value as Appearance)}>{appearanceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><button type="button" className="btn btn-secondary" onClick={() => navigate("/login")}>{t("signOut")}</button></div></header><main id="main-content"><Outlet /></main></div></div></>;
+  const currentLabel = navGroups
+    .flatMap((group) => group.items)
+    .find((item) => item.to === location.pathname || (item.to !== "/" && location.pathname.startsWith(item.to)))?.label ?? t("navHome");
+  const roleOptions: { value: Role; label: string }[] = [
+    { value: "employee", label: t("roleEmployee") },
+    { value: "manager", label: t("roleManager") },
+    { value: "hr", label: t("roleHr") },
+  ];
+  const fixtureOptions: { value: DemoFixture; label: string }[] = [
+    { value: "ready", label: locale === "ar" ? "بيانات جاهزة" : "Ready data" },
+    { value: "loading", label: t("loading") },
+    { value: "empty", label: t("demoStateEmpty") },
+    { value: "error", label: t("demoStateError") },
+  ];
+  const appearanceOptions: { value: Appearance; label: string }[] = [
+    { value: "system", label: t("appearanceSystem") },
+    { value: "light", label: t("appearanceLight") },
+    { value: "dark", label: t("appearanceDark") },
+  ];
+
+  return (
+    <>
+      <a href="#main-content" className="skip-link">{t("skipToMain")}</a>
+      <div className="demo-banner" role="note">{t("demoLabel")}</div>
+      <div className="app-shell">
+        <nav
+          ref={railRef}
+          id="app-rail-nav"
+          className={`app-rail ${drawerOpen ? "open" : ""}`}
+          aria-label={t("menu")}
+          aria-modal={isCompact && drawerOpen ? true : undefined}
+          role={isCompact && drawerOpen ? "dialog" : undefined}
+          inert={isCompact && !drawerOpen ? true : undefined}
+        >
+          <BrandLockup />
+          {navGroups.map((group) => (
+            <div className="nav-group" key={group.label}>
+              <div className="nav-group-title">{group.label}</div>
+              {group.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  className="nav-link"
+                  onClick={() => {
+                    if (isCompact) closeDrawer();
+                  }}
+                >
+                  {item.label}
+                  {item.badge ? <span className="nav-badge" aria-label={`${item.badge}`}>{item.badge}</span> : null}
+                </NavLink>
+              ))}
+            </div>
+          ))}
+          <div className="demo-tools">
+            <div className="demo-tools-label">{locale === "ar" ? "ضوابط العرض فقط" : "Demo controls only"}</div>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              aria-expanded={demoToolsOpen}
+              aria-controls="demo-tools-panel"
+              onClick={() => setDemoToolsOpen((open) => !open)}
+            >
+              {t("demoStatesTitle")}
+            </button>
+            {demoToolsOpen ? (
+              <div className="demo-state-tools" id="demo-tools-panel">
+                <span>{locale === "ar" ? "هذه الضوابط لا تمنح صلاحيات حقيقية ولا تحفظ أي تغيير." : "These controls grant no real permissions and persist no changes."}</span>
+                <label>
+                  <span>{t("demoRoleSwitch")}</span>
+                  <select
+                    className="select"
+                    value={role}
+                    onChange={(event) => {
+                      setRole(event.target.value as Role);
+                      navigate("/");
+                    }}
+                  >
+                    {roleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>{locale === "ar" ? "حالة الصفحة" : "Page fixture"}</span>
+                  <select className="select" defaultValue="ready" onChange={(event) => setDemoFixture(event.target.value as DemoFixture)}>
+                    {fixtureOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+              </div>
+            ) : null}
+          </div>
+        </nav>
+        {drawerOpen && isCompact ? <button className="drawer-backdrop" aria-label={t("close")} onClick={closeDrawer} /> : null}
+        <div className="app-main" ref={mainRef}>
+          <header className="app-header">
+            <button
+              ref={menuButtonRef}
+              type="button"
+              className="btn btn-secondary menu-toggle"
+              aria-expanded={drawerOpen}
+              aria-controls="app-rail-nav"
+              onClick={() => setDrawerOpen((open) => !open)}
+            >
+              {t("menu")}
+            </button>
+            <strong>{currentLabel}</strong>
+            <div className="header-actions">
+              <label>
+                <span className="visually-hidden">{t("language")}</span>
+                <select className="select" aria-label={t("language")} value={locale} onChange={(event) => setLocale(event.target.value as "ar" | "en")}>
+                  <option value="ar">العربية</option>
+                  <option value="en">English</option>
+                </select>
+              </label>
+              <label>
+                <span className="visually-hidden">{t("appearance")}</span>
+                <select className="select" aria-label={t("appearance")} value={appearance} onChange={(event) => setAppearance(event.target.value as Appearance)}>
+                  {appearanceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+              <button type="button" className="btn btn-secondary" onClick={() => navigate("/login")}>{t("signOut")}</button>
+            </div>
+          </header>
+          <main id="main-content"><Outlet /></main>
+        </div>
+      </div>
+    </>
+  );
 }

@@ -406,27 +406,15 @@ export const notifications: NotificationMock[] = [
   },
 ];
 
-export const stateDemoControl = {
-  /** Forces a network-error state for the next list render — demo state control. */
-  failNext: false,
-  /** Forces a loading (skeleton) state for the next list render. */
-  loadingNext: false,
-  /** Forces the empty (first-use) state for the next list render. */
-  emptyNext: false,
+export const stateDemoControl: { fixture: "ready" | "loading" | "empty" | "error" } = {
+  /** Persistent reviewer fixture. Reset to ready explicitly. */
+  fixture: "ready",
 };
 
-/** Simulated latency + state overrides so reviewers can see every UI state. */
+/** Simulated demo latency. Display-state fixtures are handled by useMockList. */
 export function mockFetch<T>(data: T, delayMs = 350): Promise<T> {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (stateDemoControl.failNext) {
-        stateDemoControl.failNext = false;
-        reject(new Error("network"));
-        return;
-      }
-      stateDemoControl.loadingNext = false;
-      resolve(data);
-    }, delayMs);
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(data), delayMs);
   });
 }
 
