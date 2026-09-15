@@ -76,6 +76,9 @@ export interface TimesheetMock {
   entries: TimeEntryMock[];
   events: RequestEventMock[];
   permissions: { can_decide: boolean };
+  /** Present on the review API; optional keeps personal fixtures contract-compatible. */
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface NotificationMock {
@@ -341,6 +344,8 @@ export const teamTimesheets: TimesheetMock[] = [
     ],
     events: [ev("ev-16", "أحمد سعيد", "SUBMIT", "DRAFT", "SUBMITTED", "", 1)],
     permissions: { can_decide: true },
+    created_at: iso(1),
+    updated_at: iso(1),
   },
   {
     id: "t-4002",
@@ -351,6 +356,8 @@ export const teamTimesheets: TimesheetMock[] = [
     entries: [day("te-7", monday(0), 465, 45, "تحليل بيانات")],
     events: [ev("ev-17", "سلمى فؤاد", "SUBMIT", "DRAFT", "SUBMITTED", "", 1)],
     permissions: { can_decide: true },
+    created_at: iso(1),
+    updated_at: iso(1),
   },
 ];
 
@@ -406,7 +413,7 @@ export const notifications: NotificationMock[] = [
   },
 ];
 
-export const stateDemoControl: { fixture: "ready" | "loading" | "empty" | "error" } = {
+export const stateDemoControl: { fixture: "ready" | "loading" | "empty" | "error" | "conflict" | "unknown" } = {
   /** Persistent reviewer fixture. Reset to ready explicitly. */
   fixture: "ready",
 };

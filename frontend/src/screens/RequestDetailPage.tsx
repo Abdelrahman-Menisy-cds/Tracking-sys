@@ -1,7 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
 import { useMockList, formatDateTime } from "../app/useMockList";
-import { mockFetch, myRequests, teamRequests, pickName } from "../mock/data";
+import { mockFetch, pickName, type RequestMock } from "../mock/data";
 import { Banner, ErrorState, RequestStatusPill, SkeletonRows } from "../components/ui";
 import Timeline from "../components/record/Timeline";
 import PageHeader from "../components/layout/PageHeader";
@@ -10,7 +10,11 @@ function nextStage(status: string, locale: "ar" | "en") { if (status === "RETURN
 function correctionReason(events: { action: string; comment: string }[]) { return [...events].reverse().find((event) => event.action === "RETURN")?.comment; }
 
 export default function RequestDetailPage() {
-  const { id } = useParams(); const { t, locale } = useApp(); usePageTitle(t("details")); const all = [...myRequests, ...teamRequests]; const state = useMockList(() => mockFetch(all.find((request) => request.id === id) ?? null, 250), [id]);
+  const { id } = useParams(); const { t, locale, myRequestItems } = useApp(); usePageTitle(t("details"));
+  // Personal detail resolves only from the personal, already-scoped query.
+  // Never merge review data into this route: an unknown/out-of-scope ID gets
+  // the same neutral response as a missing record.
+  const state = useMockList<RequestMock | null>(() => mockFetch(myRequestItems.find((request) => request.id === id) ?? null, 250), [id, myRequestItems]);
   if (state.phase === "loading") return <SkeletonRows rows={3} />; if (state.phase === "error") return <ErrorState onRetry={state.retry} />; const request = state.phase === "ready" ? state.data : null;
   if (!request) return <div className="page"><PageHeader title={t("details")} /><Banner tone="warning" role="alert">{t("relatedUnavailable")}</Banner><Link to="/requests">{t("back")}</Link></div>;
   const reason = correctionReason(request.events);

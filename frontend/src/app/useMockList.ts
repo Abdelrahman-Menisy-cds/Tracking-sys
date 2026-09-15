@@ -29,6 +29,8 @@ export function useMockList<T>(load: () => Promise<T>, deps: unknown[] = []): Li
         setState({ phase: "empty", forced: true });
         return;
       }
+      // Mutation-only fixtures are deliberately ignored by read queries. They
+      // are consumed exactly once by the decision boundary and never replayed.
       try {
         const loadedData = await load();
         if (!cancelled) setState({ phase: "ready", data: loadedData });
@@ -68,6 +70,19 @@ export function formatDateTime(isoDate: string, locale: "ar" | "en"): string {
     timeZone: "Africa/Cairo",
     timeZoneName: "short",
   });
+}
+
+export function weekInterval(weekStart: string, locale: "ar" | "en"): string {
+  const start = new Date(`${weekStart}T12:00:00Z`);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 6);
+  const formatter = new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  return `${formatter.format(start)} – ${formatter.format(end)}`;
 }
 
 export function formatMinutes(minutes: number, locale: "ar" | "en"): string {

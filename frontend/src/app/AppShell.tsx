@@ -13,6 +13,7 @@ export default function AppShell() {
     setLocale,
     role,
     setRole,
+    isDemoMode,
     capabilities,
     appearance,
     setAppearance,
@@ -113,6 +114,8 @@ export default function AppShell() {
     { value: "loading", label: t("loading") },
     { value: "empty", label: t("demoStateEmpty") },
     { value: "error", label: t("demoStateError") },
+    { value: "conflict", label: locale === "ar" ? "قرار قديم عند التأكيد" : "Stale decision on confirm" },
+    { value: "unknown", label: locale === "ar" ? "نتيجة قرار غير معروفة" : "Unknown decision outcome" },
   ];
   const appearanceOptions: { value: Appearance; label: string }[] = [
     { value: "system", label: t("appearanceSystem") },
@@ -154,42 +157,46 @@ export default function AppShell() {
               ))}
             </div>
           ))}
-          <div className="demo-tools">
-            <div className="demo-tools-label">{locale === "ar" ? "ضوابط العرض فقط" : "Demo controls only"}</div>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              aria-expanded={demoToolsOpen}
-              aria-controls="demo-tools-panel"
-              onClick={() => setDemoToolsOpen((open) => !open)}
-            >
-              {t("demoStatesTitle")}
-            </button>
-            {demoToolsOpen ? (
-              <div className="demo-state-tools" id="demo-tools-panel">
-                <span>{locale === "ar" ? "هذه الضوابط لا تمنح صلاحيات حقيقية ولا تحفظ أي تغيير." : "These controls grant no real permissions and persist no changes."}</span>
-                <label>
-                  <span>{t("demoRoleSwitch")}</span>
-                  <select
-                    className="select"
-                    value={role}
-                    onChange={(event) => {
-                      setRole(event.target.value as Role);
-                      navigate("/");
-                    }}
-                  >
-                    {roleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                  </select>
-                </label>
-                <label>
-                  <span>{locale === "ar" ? "حالة الصفحة" : "Page fixture"}</span>
-                  <select className="select" defaultValue="ready" onChange={(event) => setDemoFixture(event.target.value as DemoFixture)}>
-                    {fixtureOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                  </select>
-                </label>
-              </div>
-            ) : null}
-          </div>
+          {isDemoMode ? (
+            <div className="demo-tools">
+              <div className="demo-tools-label">{locale === "ar" ? "حدود العرض التجريبي" : "Demo fixture boundary"}</div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                aria-expanded={demoToolsOpen}
+                aria-controls="demo-tools-panel"
+                onClick={() => setDemoToolsOpen((open) => !open)}
+              >
+                {t("demoStatesTitle")}
+              </button>
+              {demoToolsOpen ? (
+                <div className="demo-state-tools" id="demo-tools-panel">
+                  <strong>{locale === "ar" ? "هوية وهمية غير موثوقة" : "Non-authoritative fixture identity"}</strong>
+                  <span>{locale === "ar" ? "هذه الضوابط تختار بيانات وهمية معزولة لاختبار الواجهة فقط. لا تسجل الدخول ولا تمنح إذنًا ولا تحاكي حماية الخادم، وكل تغيير يختفي بعد إعادة التحميل." : "These controls select isolated mock fixtures for UI review only. They do not sign in, grant permission, or simulate server authorization; every change disappears on reload."}</span>
+                  <label>
+                    <span>{locale === "ar" ? "هوية الاختبار" : "Fixture identity"}</span>
+                    <select
+                      className="select"
+                      value={role}
+                      onChange={(event) => {
+                        setRole(event.target.value as Role);
+                        navigate("/");
+                      }}
+                    >
+                      {roleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                  <label>
+                    <span>{locale === "ar" ? "حالة الصفحة/القرار التالية" : "Next page/decision fixture"}</span>
+                    <select className="select" defaultValue="ready" onChange={(event) => setDemoFixture(event.target.value as DemoFixture)}>
+                      {fixtureOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </label>
+                  <span>{locale === "ar" ? "التعارض والنتيجة غير المعروفة يُستهلكان مرة واحدة عند تأكيد القرار، ولا يعيدان إرسال القرار تلقائيًا." : "Conflict and unknown outcome are consumed once on decision confirmation and never replay the decision automatically."}</span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </nav>
         {drawerOpen && isCompact ? <button className="drawer-backdrop" aria-label={t("close")} onClick={closeDrawer} /> : null}
         <div className="app-main" ref={mainRef}>
