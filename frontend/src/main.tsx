@@ -10,7 +10,7 @@ import HomePage from "./screens/HomePage";
 import MyRequestsPage, { NewRequestPage } from "./screens/MyRequestsPage";
 import RequestDetailPage from "./screens/RequestDetailPage";
 import { MyTimesheetsPage, TimesheetDetailPage } from "./screens/MyTimesheetsPage";
-import TeamReviewsPage, { ReviewRequestDetailPage } from "./screens/TeamReviewsPage";
+import TeamReviewsPage, { ReviewRequestDetailPage, ReviewTimesheetDetailPage } from "./screens/TeamReviewsPage";
 import NotificationsPage from "./screens/NotificationsPage";
 
 createRoot(document.getElementById("root")!).render(
@@ -28,6 +28,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/timesheets/:id" element={<TimesheetDetailPage />} />
             <Route path="/reviews" element={<TeamReviewsPage />} />
             <Route path="/reviews/requests/:id" element={<ReviewRequestDetailPage />} />
+            <Route path="/reviews/timesheets/:id" element={<ReviewTimesheetDetailPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
           </Route>
         </Routes>

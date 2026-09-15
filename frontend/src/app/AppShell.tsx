@@ -29,18 +29,22 @@ export default function AppShell() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(max-width: 1023px)");
-    const updateCompactMode = () => setIsCompact(mediaQuery.matches);
-    updateCompactMode();
-    mediaQuery.addEventListener("change", updateCompactMode);
-    return () => mediaQuery.removeEventListener("change", updateCompactMode);
-  }, []);
-
   const closeDrawer = useCallback(() => {
     setDrawerOpen(false);
     window.setTimeout(() => menuButtonRef.current?.focus(), 0);
   }, []);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1023px)");
+    const updateCompactMode = () => {
+      const nextCompact = mediaQuery.matches;
+      setIsCompact(nextCompact);
+      if (!nextCompact && drawerOpen) closeDrawer();
+    };
+    updateCompactMode();
+    mediaQuery.addEventListener("change", updateCompactMode);
+    return () => mediaQuery.removeEventListener("change", updateCompactMode);
+  }, [closeDrawer, drawerOpen]);
 
   useEffect(() => {
     if (!drawerOpen || !isCompact) return;
@@ -198,7 +202,7 @@ export default function AppShell() {
             </div>
           ) : null}
         </nav>
-        {drawerOpen && isCompact ? <button className="drawer-backdrop" aria-label={t("close")} onClick={closeDrawer} /> : null}
+        {drawerOpen && isCompact ? <button className="drawer-backdrop" tabIndex={-1} aria-label={t("close")} onClick={closeDrawer} /> : null}
         <div className="app-main" ref={mainRef}>
           <header className="app-header">
             <button

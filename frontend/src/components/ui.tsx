@@ -81,6 +81,7 @@ export function Dialog({
   children,
   dirty = false,
   busy = false,
+  restoreFocus = true,
 }: {
   title: string;
   description?: string;
@@ -88,6 +89,8 @@ export function Dialog({
   children: ReactNode;
   dirty?: boolean;
   busy?: boolean;
+  /** Disable only when the caller restores focus to a stable post-mutation target. */
+  restoreFocus?: boolean;
 }) {
   const { t, locale } = useApp();
   const dialogId = useId();
@@ -115,9 +118,9 @@ export function Dialog({
     return () => {
       document.body.style.overflow = previousOverflow;
       if (applicationRootRef.current) applicationRootRef.current.inert = previousInert;
-      previouslyFocused?.focus();
+      if (restoreFocus && previouslyFocused?.isConnected) previouslyFocused.focus();
     };
-  }, []);
+  }, [restoreFocus]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {

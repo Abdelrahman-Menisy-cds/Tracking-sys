@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -155,6 +156,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [appearance, setAppearanceState] = useState<Appearance>("system");
   const [osTheme, setOsTheme] = useState<"light" | "dark">(systemTheme);
   const [identityStates, setIdentityStates] = useState<Record<DemoIdentity, IdentityState>>(initialIdentityStates);
+  const activeIdentityRef = useRef<DemoIdentity>(role);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -176,6 +178,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setAppearance = useCallback((nextAppearance: Appearance) => setAppearanceState(nextAppearance), []);
   const setRole = useCallback((nextRole: DemoIdentity) => {
     if (!DEMO_MODE) return;
+    activeIdentityRef.current = nextRole;
     setRoleState(nextRole);
     stateDemoControl.fixture = "ready";
   }, []);
@@ -185,30 +188,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
   const activeState = identityStates[role];
 
-  const updateActiveIdentity = useCallback((update: (current: IdentityState) => IdentityState) => {
-    setIdentityStates((current) => ({ ...current, [role]: update(current[role]) }));
+  const markNotificationRead = useCallback((notificationId: string) => {
+    const commandIdentity = role;
+    window.setTimeout(() => {
+      if (activeIdentityRef.current !== commandIdentity) return;
+      setIdentityStates((current) => ({
+        ...current,
+        [commandIdentity]: {
+          ...current[commandIdentity],
+          notificationItems: current[commandIdentity].notificationItems.map((notification) =>
+            notification.id === notificationId
+              ? { ...notification, is_read: true, read_at: new Date().toISOString() }
+              : notification,
+          ),
+        },
+      }));
+    }, 150);
   }, [role]);
 
-  const markNotificationRead = useCallback((notificationId: string) => {
-    updateActiveIdentity((current) => ({
-      ...current,
-      notificationItems: current.notificationItems.map((notification) =>
-        notification.id === notificationId
-          ? { ...notification, is_read: true, read_at: new Date().toISOString() }
-          : notification,
-      ),
-    }));
-  }, [updateActiveIdentity]);
-
   const saveDemoRequest = useCallback(async ({ typeId, title, details, submit }: { typeId: number; title: string; details: string; submit: boolean }) => {
+    const commandIdentity = role;
     await demoDelay();
+    if (activeIdentityRef.current !== commandIdentity) throw mutationIssue("missing");
     const requestType = myRequests.concat(teamRequests).flatMap((request) => request.request_type).find((type) => type.id === typeId) ?? myRequests[0].request_type;
     const now = new Date().toISOString();
     const status: RequestStatus = submit ? "PENDING_MANAGER" : "DRAFT";
     const created: RequestMock = {
       id: `demo-request-${Date.now()}`,
-      requester_id: `demo-${role}`,
-      requester_name: demoUser[role].name,
+      requester_id: `demo-${commandIdentity}`,
+      requester_name: demoUser[commandIdentity].name,
       request_type: requestType,
       title,
       details,
@@ -218,94 +226,134 @@ export function AppProvider({ children }: { children: ReactNode }) {
       created_at: now,
       updated_at: now,
       attachments: [],
-      events: [eventFor(submit ? "SUBMIT" : "CREATE", submit ? "DRAFT" : null, status, "", demoUser[role].name[locale])],
+      events: [eventFor(submit ? "SUBMIT" : "CREATE", submit ? "DRAFT" : null, status, "", demoUser[commandIdentity].name[locale])],
       permissions: { can_decide: false },
     };
-    updateActiveIdentity((current) => ({ ...current, myRequestItems: [created, ...current.myRequestItems] }));
+    setIdentityStates((current) => ({
+      ...current,
+      [commandIdentity]: {
+        ...current[commandIdentity],
+        myRequestItems: [created, ...current[commandIdentity].myRequestItems],
+      },
+    }));
     return created;
-  }, [locale, role, updateActiveIdentity]);
+  }, [locale, role]);
 
   const submitDemoTimesheet = useCallback(async (timesheetId: string, entries: TimeEntryMock[]) => {
+    const commandIdentity = role;
     await demoDelay();
+    if (activeIdentityRef.current !== commandIdentity) throw mutationIssue("missing");
     let returned: TimesheetMock | undefined;
-    updateActiveIdentity((current) => ({
-      ...current,
-      myTimesheetItems: current.myTimesheetItems.map((sheet) => {
+    setIdentityStates((current) => {
+      const identityState = current[commandIdentity];
+      const nextSheets = identityState.myTimesheetItems.map((sheet) => {
         if (sheet.id !== timesheetId) return sheet;
         returned = {
           ...sheet,
           status: "SUBMITTED",
           version: sheet.version + 1,
           entries,
-          events: [...sheet.events, eventFor("SUBMIT", sheet.status, "SUBMITTED", "", demoUser[role].name[locale])],
+          events: [...sheet.events, eventFor("SUBMIT", sheet.status, "SUBMITTED", "", demoUser[commandIdentity].name[locale])],
         };
         return returned;
-      }),
-    }));
+      });
+      return {
+        ...current,
+        [commandIdentity]: { ...identityState, myTimesheetItems: nextSheets },
+      };
+    });
     if (!returned) throw mutationIssue("missing");
     return returned;
-  }, [locale, role, updateActiveIdentity]);
+  }, [locale, role]);
 
   const decideDemoRequest = useCallback(async (requestId: string, decision: ReviewDecision, comment: string, expectedVersion: number) => {
+    const commandIdentity = role;
     await demoDelay();
-    const latest = identityStates[role].teamRequestItems.find((request) => request.id === requestId);
-    if (!latest) throw mutationIssue("missing");
-    if (stateDemoControl.fixture === "unknown") {
+    if (activeIdentityRef.current !== commandIdentity) throw mutationIssue("missing");
+    const issue = stateDemoControl.fixture;
+    if (issue === "unknown") {
       stateDemoControl.fixture = "ready";
       throw mutationIssue("unknown");
     }
-    if (stateDemoControl.fixture === "conflict" || latest.version !== expectedVersion) {
-      stateDemoControl.fixture = "ready";
-      throw mutationIssue("conflict", latest);
-    }
 
-    const status: RequestStatus = decision === "APPROVE"
-      ? latest.request_type.requires_hr_approval ? "PENDING_HR" : "APPROVED"
-      : decision === "REJECT" ? "REJECTED" : "RETURNED";
-    const returned: RequestMock = {
-      ...latest,
-      status,
-      version: latest.version + 1,
-      updated_at: new Date().toISOString(),
-      permissions: { can_decide: false },
-      events: [...latest.events, eventFor(decision, latest.status, status, comment, demoUser[role].name[locale])],
-    };
-    updateActiveIdentity((current) => ({
-      ...current,
-      teamRequestItems: current.teamRequestItems.map((request) => request.id === requestId ? returned : request),
-    }));
+    let returned: RequestMock | undefined;
+    let conflictRecord: RequestMock | undefined;
+    setIdentityStates((current) => {
+      const identityState = current[commandIdentity];
+      const latest = identityState.teamRequestItems.find((request) => request.id === requestId);
+      if (!latest) return current;
+      if (issue === "conflict" || latest.version !== expectedVersion) {
+        conflictRecord = latest;
+        return current;
+      }
+      const status: RequestStatus = decision === "APPROVE"
+        ? latest.request_type.requires_hr_approval ? "PENDING_HR" : "APPROVED"
+        : decision === "REJECT" ? "REJECTED" : "RETURNED";
+      returned = {
+        ...latest,
+        status,
+        version: latest.version + 1,
+        updated_at: new Date().toISOString(),
+        permissions: { can_decide: false },
+        events: [...latest.events, eventFor(decision, latest.status, status, comment, demoUser[commandIdentity].name[locale])],
+      };
+      return {
+        ...current,
+        [commandIdentity]: {
+          ...identityState,
+          teamRequestItems: identityState.teamRequestItems.map((request) => request.id === requestId ? returned! : request),
+        },
+      };
+    });
+    if (issue === "conflict") stateDemoControl.fixture = "ready";
+    if (conflictRecord) throw mutationIssue("conflict", conflictRecord);
+    if (!returned) throw mutationIssue("missing");
     return returned;
-  }, [identityStates, locale, role, updateActiveIdentity]);
+  }, [locale, role]);
 
   const decideDemoTimesheet = useCallback(async (timesheetId: string, decision: ReviewDecision, comment: string, expectedVersion: number) => {
+    const commandIdentity = role;
     await demoDelay();
-    const latest = identityStates[role].teamTimesheetItems.find((sheet) => sheet.id === timesheetId);
-    if (!latest) throw mutationIssue("missing");
-    if (stateDemoControl.fixture === "unknown") {
+    if (activeIdentityRef.current !== commandIdentity) throw mutationIssue("missing");
+    const issue = stateDemoControl.fixture;
+    if (issue === "unknown") {
       stateDemoControl.fixture = "ready";
       throw mutationIssue("unknown");
     }
-    if (stateDemoControl.fixture === "conflict" || latest.version !== expectedVersion) {
-      stateDemoControl.fixture = "ready";
-      throw mutationIssue("conflict", latest);
-    }
 
-    const status: TimesheetStatus = decision === "APPROVE" ? "APPROVED" : decision === "REJECT" ? "REJECTED" : "RETURNED";
-    const now = new Date().toISOString();
-    const returned: TimesheetMock = {
-      ...latest,
-      status,
-      version: latest.version + 1,
-      updated_at: now,
-      permissions: { can_decide: false },
-      events: [...latest.events, eventFor(decision, latest.status, status, comment, demoUser[role].name[locale])],
-    };
-    updateActiveIdentity((current) => ({
-      ...current,
-      teamTimesheetItems: current.teamTimesheetItems.map((sheet) => sheet.id === timesheetId ? returned : sheet),
-    }));
+    let returned: TimesheetMock | undefined;
+    let conflictRecord: TimesheetMock | undefined;
+    setIdentityStates((current) => {
+      const identityState = current[commandIdentity];
+      const latest = identityState.teamTimesheetItems.find((sheet) => sheet.id === timesheetId);
+      if (!latest) return current;
+      if (issue === "conflict" || latest.version !== expectedVersion) {
+        conflictRecord = latest;
+        return current;
+      }
+      const status: TimesheetStatus = decision === "APPROVE" ? "APPROVED" : decision === "REJECT" ? "REJECTED" : "RETURNED";
+      const now = new Date().toISOString();
+      returned = {
+        ...latest,
+        status,
+        version: latest.version + 1,
+        updated_at: now,
+        permissions: { can_decide: false },
+        events: [...latest.events, eventFor(decision, latest.status, status, comment, demoUser[commandIdentity].name[locale])],
+      };
+      return {
+        ...current,
+        [commandIdentity]: {
+          ...identityState,
+          teamTimesheetItems: identityState.teamTimesheetItems.map((sheet) => sheet.id === timesheetId ? returned! : sheet),
+        },
+      };
+    });
+    if (issue === "conflict") stateDemoControl.fixture = "ready";
+    if (conflictRecord) throw mutationIssue("conflict", conflictRecord);
+    if (!returned) throw mutationIssue("missing");
     return returned;
-  }, [identityStates, locale, role, updateActiveIdentity]);
+  }, [locale, role]);
 
   const setDemoFixture = useCallback((fixture: DemoFixture) => {
     if (!DEMO_MODE) return;
