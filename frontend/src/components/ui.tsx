@@ -56,9 +56,9 @@ export function SkeletonRows({ rows = 4 }: { rows?: number }) {
       <span className="visually-hidden">{t("loading")}</span>
       {Array.from({ length: rows }, (_, index) => (
         <div key={index} className="skeleton-row" aria-hidden="true">
-          <div className="skeleton" style={{ width: "42%", height: 18 }} />
-          <div className="skeleton" style={{ width: "78%", height: 16 }} />
-          <div className="skeleton" style={{ width: "26%", height: 16 }} />
+          <div className="skeleton skeleton-title" />
+          <div className="skeleton skeleton-body" />
+          <div className="skeleton skeleton-meta" />
         </div>
       ))}
     </div>
