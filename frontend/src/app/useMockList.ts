@@ -52,8 +52,12 @@ export function useMockList<T>(load: () => Promise<T>, deps: unknown[] = []): Li
   return state;
 }
 
+function localeTag(locale: "ar" | "en") {
+  return locale === "ar" ? "ar-EG-u-nu-latn" : "en-GB";
+}
+
 export function formatDate(isoDate: string, locale: "ar" | "en"): string {
-  return new Date(isoDate).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB", {
+  return new Date(isoDate).toLocaleDateString(localeTag(locale), {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -61,9 +65,9 @@ export function formatDate(isoDate: string, locale: "ar" | "en"): string {
 }
 
 export function formatDateTime(isoDate: string, locale: "ar" | "en"): string {
-  return new Date(isoDate).toLocaleString(locale === "ar" ? "ar-EG" : "en-GB", {
+  return new Date(isoDate).toLocaleString(localeTag(locale), {
     year: "numeric",
-    month: "short",
+    month: "long",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
@@ -76,7 +80,7 @@ export function weekInterval(weekStart: string, locale: "ar" | "en"): string {
   const start = new Date(`${weekStart}T12:00:00Z`);
   const end = new Date(start);
   end.setUTCDate(end.getUTCDate() + 6);
-  const formatter = new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en-GB", {
+  const formatter = new Intl.DateTimeFormat(localeTag(locale), {
     day: "numeric",
     month: "short",
     year: "numeric",

@@ -2,23 +2,24 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useApp } from "../app/AppContext";
 import type { RequestStatus, TimesheetStatus } from "../mock/data";
-import { AlertTriangleIcon, CheckIcon, ClockIcon, CloseIcon, DocumentIcon, InfoIcon, RtlArrowBackIcon } from "./icons";
+import { AlertTriangleIcon, BellIcon, CheckIcon, ClockIcon, CloseIcon, DocumentIcon, InfoIcon, RtlArrowBackIcon } from "./icons";
 
-type StatusKey = "stDraft" | "stPendingManager" | "stPendingHr" | "stApproved" | "stRejected" | "stReturned" | "stCancelled" | "stSubmitted";
-type StatusMeta = { tone: string; key: StatusKey; icon: "draft" | "pending" | "approved" | "rejected" | "returned" | "cancelled" };
+type StatusKey = "stDraft" | "stPendingManager" | "stPendingHr" | "stApproved" | "stRejected" | "stReturned" | "stCancelled" | "stSubmitted" | "unread" | "read";
+export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger" | "unread";
+type StatusMeta = { tone: StatusTone; key: StatusKey; icon: "draft" | "pending" | "approved" | "rejected" | "returned" | "cancelled" | "unread" };
 
 const requestStatusMeta: Record<RequestStatus, StatusMeta> = {
-  DRAFT: { tone: "pill-neutral", key: "stDraft", icon: "draft" },
-  PENDING_MANAGER: { tone: "pill-info", key: "stPendingManager", icon: "pending" },
-  PENDING_HR: { tone: "pill-info", key: "stPendingHr", icon: "pending" },
-  APPROVED: { tone: "pill-success", key: "stApproved", icon: "approved" },
-  REJECTED: { tone: "pill-error", key: "stRejected", icon: "rejected" },
-  RETURNED: { tone: "pill-warning", key: "stReturned", icon: "returned" },
-  CANCELLED: { tone: "pill-neutral", key: "stCancelled", icon: "cancelled" },
+  DRAFT: { tone: "neutral", key: "stDraft", icon: "draft" },
+  PENDING_MANAGER: { tone: "info", key: "stPendingManager", icon: "pending" },
+  PENDING_HR: { tone: "info", key: "stPendingHr", icon: "pending" },
+  APPROVED: { tone: "success", key: "stApproved", icon: "approved" },
+  REJECTED: { tone: "danger", key: "stRejected", icon: "rejected" },
+  RETURNED: { tone: "warning", key: "stReturned", icon: "returned" },
+  CANCELLED: { tone: "neutral", key: "stCancelled", icon: "cancelled" },
 };
 const timesheetStatusMeta: Record<TimesheetStatus, StatusMeta> = {
   DRAFT: requestStatusMeta.DRAFT,
-  SUBMITTED: { tone: "pill-info", key: "stSubmitted", icon: "pending" },
+  SUBMITTED: { tone: "info", key: "stSubmitted", icon: "pending" },
   RETURNED: requestStatusMeta.RETURNED,
   APPROVED: requestStatusMeta.APPROVED,
   REJECTED: requestStatusMeta.REJECTED,
@@ -29,21 +30,26 @@ function StatusIcon({ icon }: { icon: StatusMeta["icon"] }) {
   if (icon === "rejected") return <CloseIcon size={16} />;
   if (icon === "returned") return <RtlArrowBackIcon locale="ar" size={16} />;
   if (icon === "pending") return <ClockIcon size={16} />;
+  if (icon === "unread") return <BellIcon size={16} />;
   if (icon === "cancelled") return <CloseIcon size={16} />;
   return <DocumentIcon size={16} />;
 }
 
-function StatusPill({ meta }: { meta: StatusMeta }) {
+export function StatusPill({ tone, label, icon = "draft" }: { tone: StatusTone; label: string; icon?: StatusMeta["icon"] }) {
+  return <span className={`pill pill-${tone}`}><StatusIcon icon={icon} />{label}</span>;
+}
+
+function StatusPillFromMeta({ meta }: { meta: StatusMeta }) {
   const { t } = useApp();
-  return <span className={`pill ${meta.tone}`}><StatusIcon icon={meta.icon} />{t(meta.key)}</span>;
+  return <StatusPill tone={meta.tone} label={t(meta.key)} icon={meta.icon} />;
 }
 
 export function RequestStatusPill({ status }: { status: RequestStatus }) {
-  return <StatusPill meta={requestStatusMeta[status]} />;
+  return <StatusPillFromMeta meta={requestStatusMeta[status]} />;
 }
 
 export function TimesheetStatusPill({ status }: { status: TimesheetStatus }) {
-  return <StatusPill meta={timesheetStatusMeta[status]} />;
+  return <StatusPillFromMeta meta={timesheetStatusMeta[status]} />;
 }
 
 export function Banner({ tone, children, role = "status" }: { tone: "info" | "success" | "error" | "warning" | "neutral"; children: ReactNode; role?: "status" | "alert" }) {
@@ -68,7 +74,7 @@ export function SkeletonRows({ rows = 4 }: { rows?: number }) {
 }
 
 export function EmptyState({ message, action }: { message: string; action?: ReactNode }) {
-  return <div className="empty-region"><InfoIcon className="state-icon" /><p>{message}</p>{action}</div>;
+  return <div className="empty-region"><InfoIcon className="state-icon" /><p>{message}</p><div className="state-actions">{action}</div></div>;
 }
 
 export function ErrorState({ onRetry }: { onRetry: () => void }) {

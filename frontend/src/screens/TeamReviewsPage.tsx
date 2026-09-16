@@ -6,7 +6,7 @@ import {
   usePageTitle,
   type ReviewDecision,
 } from "../app/AppContext";
-import { formatDateTime, formatMinutes, useMockList, weekInterval } from "../app/useMockList";
+import { formatDate, formatDateTime, formatMinutes, useMockList, weekInterval } from "../app/useMockList";
 import {
   mockFetch,
   pickName,
@@ -198,7 +198,7 @@ export default function TeamReviewsPage() {
         {activeState.phase === "loading" ? <SkeletonRows rows={3} /> : null}
         {activeState.phase === "error" ? <ErrorState onRetry={activeState.retry} /> : null}
         {(activeState.phase === "empty" || (activeState.phase === "ready" && records.length === 0))
-          ? <EmptyState message={locale === "ar" ? "لا توجد عناصر بانتظار مراجعتك حاليًا." : "Nothing is currently awaiting your review."} />
+          ? <EmptyState message={locale === "ar" ? "لا توجد عناصر بانتظار مراجعتك حاليًا." : "Nothing is currently awaiting your review."} action={<Link className="btn btn-secondary" to="/">{t("navHome")}</Link>} />
           : null}
         {activeState.phase === "ready" && records.length > 0 && tab === "requests" ? (
           <OperationalTable
@@ -428,7 +428,7 @@ export function ReviewTimesheetDetailPage() {
           <dl className="decision-facts">
             {sheet.entries.map((entry) => (
               <div key={entry.id}>
-                <dt><bdi dir="ltr">{entry.work_date}</bdi></dt>
+                <dt><bdi>{formatDate(entry.work_date, locale)}</bdi></dt>
                 <dd>{formatMinutes(entry.duration_minutes, locale)} · {t("breakTime")}: {formatMinutes(entry.unpaid_break_minutes, locale)}{entry.description ? <> · <bdi>{entry.description}</bdi></> : null}</dd>
               </div>
             ))}
