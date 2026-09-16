@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useApp, type Appearance, type DemoFixture } from "./AppContext";
-import type { Role } from "../i18n/dict";
+import type { Locale, Role } from "../i18n/dict";
 import BrandLockup from "../components/brand/BrandLockup";
 import {
   ActivityIcon,
@@ -9,10 +9,13 @@ import {
   ChevronDownIcon,
   ClockIcon,
   DocumentIcon,
+  GlobeIcon,
   HomeIcon,
   LogoutIcon,
+  PaletteIcon,
   UserIcon,
 } from "../components/icons";
+import { demoUser } from "../mock/data";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), select:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -32,8 +35,12 @@ export default function AppShell() {
   } = useApp();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [demoToolsOpen, setDemoToolsOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(() => window.matchMedia("(max-width: 1023px)").matches);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const profileButtonRef = useRef<HTMLButtonElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+  const profileMenuItemsRef = useRef<Array<HTMLButtonElement | null>>([]);
   const railRef = useRef<HTMLElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -43,6 +50,41 @@ export default function AppShell() {
     setDrawerOpen(false);
     window.setTimeout(() => menuButtonRef.current?.focus(), 0);
   }, []);
+
+  const closeProfileMenu = useCallback((restoreFocus = true) => {
+    setProfileMenuOpen(false);
+    if (restoreFocus) window.setTimeout(() => profileButtonRef.current?.focus(), 0);
+  }, []);
+
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (profileMenuRef.current?.contains(target) || profileButtonRef.current?.contains(target)) return;
+      closeProfileMenu(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeProfileMenu();
+        return;
+      }
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      if (!profileMenuRef.current?.contains(document.activeElement)) return;
+      const items = profileMenuItemsRef.current.filter((item): item is HTMLButtonElement => item !== null);
+      if (!items.length) return;
+      event.preventDefault();
+      const currentIndex = items.indexOf(document.activeElement as HTMLButtonElement);
+      const offset = event.key === "ArrowDown" ? 1 : -1;
+      items[(currentIndex + offset + items.length) % items.length].focus();
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closeProfileMenu, profileMenuOpen]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 1023px)");
@@ -94,6 +136,10 @@ export default function AppShell() {
     };
   }, [closeDrawer, drawerOpen, isCompact]);
 
+  useEffect(() => {
+    setProfileMenuOpen(false);
+  }, [location.pathname]);
+
   const unreadCount = useMemo(
     () => notificationItems.filter((notification) => !notification.is_read).length,
     [notificationItems],
@@ -136,6 +182,9 @@ export default function AppShell() {
     { value: "light", label: t("appearanceLight") },
     { value: "dark", label: t("appearanceDark") },
   ];
+  const activeUser = demoUser[role];
+  const localizedName = activeUser.name[locale as Locale];
+  const localizedRole = roleOptions.find((option) => option.value === role)?.label ?? t("roleEmployee");
 
   return (
     <>
@@ -234,7 +283,7 @@ export default function AppShell() {
             <strong>{currentLabel}</strong>
             <div className="header-actions">
               <label className="select-trigger">
-                <UserIcon />
+                <GlobeIcon />
                 <span className="visually-hidden">{t("language")}</span>
                 <select className="select" aria-label={t("language")} value={locale} onChange={(event) => setLocale(event.target.value as "ar" | "en")}>
                   <option value="ar">العربية</option>
@@ -242,13 +291,44 @@ export default function AppShell() {
                 </select>
               </label>
               <label className="select-trigger">
-                <ChevronDownIcon />
+                <PaletteIcon />
                 <span className="visually-hidden">{t("appearance")}</span>
                 <select className="select" aria-label={t("appearance")} value={appearance} onChange={(event) => setAppearance(event.target.value as Appearance)}>
                   {appearanceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
-              <button type="button" className="btn btn-ghost sign-out-action" onClick={() => navigate("/login")}><LogoutIcon />{t("signOut")}</button>
+              <div className="profile-menu-wrap">
+                <button
+                  ref={profileButtonRef}
+                  type="button"
+                  className="btn btn-ghost profile-trigger"
+                  aria-haspopup="menu"
+                  aria-expanded={profileMenuOpen}
+                  aria-controls="profile-menu"
+                  onClick={() => setProfileMenuOpen((open) => !open)}
+                >
+                  <UserIcon />
+                  {t("profile")}
+                  <ChevronDownIcon />
+                </button>
+                {profileMenuOpen ? (
+                  <div ref={profileMenuRef} id="profile-menu" className="profile-menu" role="menu" aria-label={t("profile")}>
+                    <div className="profile-menu-header">
+                      <span className="profile-menu-meta">{t("signedInAs")}</span>
+                      <span className="profile-menu-name"><bdi>{localizedName}</bdi></span>
+                      <span className="profile-menu-meta">{localizedRole} · <bdi>{activeUser.email}</bdi></span>
+                    </div>
+                    <button ref={(element) => { profileMenuItemsRef.current[0] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => closeProfileMenu()}>
+                      <UserIcon />
+                      {t("account")}
+                    </button>
+                    <button ref={(element) => { profileMenuItemsRef.current[1] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/login"); }}>
+                      <LogoutIcon />
+                      {t("signOut")}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </header>
           <main id="main-content"><Outlet /></main>

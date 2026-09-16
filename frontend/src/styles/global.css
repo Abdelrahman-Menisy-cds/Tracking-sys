@@ -159,8 +159,9 @@
   --text-subtle: #64748b;
   --text-inverse: #f8fafc;
 
-  --accent: #0891b2;
-  --accent-strong: #0e7490;
+  /* Deep cyan scale keeps white action labels AA-compliant in both states. */
+  --accent: #0369a1;
+  --accent-strong: #075985;
   --accent-soft: rgb(8 145 178 / .11);
   --accent-border: rgb(8 145 178 / .36);
   --on-accent: #ffffff;
@@ -317,6 +318,44 @@ button { cursor: pointer; }
 .btn-ghost { min-height: 40px; padding-inline: var(--sp-3); background: transparent; color: var(--text-muted); }
 .btn-ghost:hover:not(:disabled) { color: var(--text); background: var(--surface-subtle); }
 .sign-out-action { border-inline-start-color: var(--divider); border-radius: var(--radius-none); margin-inline-start: var(--sp-1); }
+
+.profile-menu-wrap { position: relative; }
+.profile-trigger { min-height: var(--control-min-h); }
+.profile-menu {
+  position: absolute;
+  z-index: 45;
+  inset-block-start: calc(100% + var(--sp-2));
+  inset-inline-end: 0;
+  display: grid;
+  gap: var(--sp-2);
+  inline-size: min(280px, calc(100vw - (2 * var(--sp-4))));
+  padding: var(--sp-3);
+  border: var(--timeline-width) solid var(--card-border);
+  border-radius: var(--radius-surface);
+  background: var(--surface-overlay);
+  color: var(--text);
+  box-shadow: var(--elevation-2);
+}
+.profile-menu::before {
+  content: "";
+  position: absolute;
+  inset-block-start: -7px;
+  inset-inline-end: var(--sp-4);
+  inline-size: 12px;
+  block-size: 12px;
+  background: var(--surface-overlay);
+  border-block-start: var(--timeline-width) solid var(--card-border);
+  border-inline-start: var(--timeline-width) solid var(--card-border);
+  transform: rotate(45deg);
+}
+.profile-menu-header { display: grid; gap: var(--sp-1); padding: var(--sp-2) var(--sp-2) var(--sp-3); border-block-end: var(--timeline-width) solid var(--border-subtle); }
+.profile-menu-name { font-weight: 700; color: var(--text-strong); }
+.profile-menu-meta { color: var(--text-muted); font-size: var(--font-size-sm); }
+.profile-menu-item { justify-content: flex-start; inline-size: 100%; }
+html[dir="rtl"] .profile-menu-item { justify-content: flex-start; }
+@media (max-width: 639px) {
+  .profile-menu { inset-inline-end: calc(-1 * var(--sp-2)); }
+}
 .btn-danger { background: var(--danger); color: var(--on-danger); }
 .btn-danger:hover:not(:disabled) { background: var(--danger-strong); }
 .btn:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
