@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "build:demo": "tsc -b && vite build --mode demo",
     "lint": "oxlint",
+    "check:contrast": "node scripts/check-button-contrast.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
