@@ -1,8 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useApp, type Appearance, type DemoFixture } from "./AppContext";
 import type { Role } from "../i18n/dict";
 import BrandLockup from "../components/brand/BrandLockup";
+import {
+  ActivityIcon,
+  BellIcon,
+  ChevronDownIcon,
+  ClockIcon,
+  DocumentIcon,
+  HomeIcon,
+  LogoutIcon,
+  UserIcon,
+} from "../components/icons";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), select:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -88,21 +98,21 @@ export default function AppShell() {
     () => notificationItems.filter((notification) => !notification.is_read).length,
     [notificationItems],
   );
-  const navGroups: { label: string; items: { to: string; label: string; end?: boolean; badge?: number }[] }[] = [
+  const navGroups: { label: string; items: { to: string; label: string; end?: boolean; badge?: number; icon: ComponentType }[] }[] = [
     {
       label: locale === "ar" ? "عملي" : "My work",
       items: [
-        { to: "/", label: t("navHome"), end: true },
-        { to: "/requests", label: t("navMyRequests") },
-        { to: "/timesheets", label: t("navMyTimesheets") },
+        { to: "/", label: t("navHome"), end: true, icon: HomeIcon },
+        { to: "/requests", label: t("navMyRequests"), icon: DocumentIcon },
+        { to: "/timesheets", label: t("navMyTimesheets"), icon: ClockIcon },
       ],
     },
     ...(capabilities.canReview
-      ? [{ label: locale === "ar" ? "عمل المراجعة" : "Review work", items: [{ to: "/reviews", label: t("navTeamReviews") }] }]
+      ? [{ label: locale === "ar" ? "عمل المراجعة" : "Review work", items: [{ to: "/reviews", label: t("navTeamReviews"), icon: ActivityIcon }] }]
       : []),
     {
       label: locale === "ar" ? "التحديثات" : "Updates",
-      items: [{ to: "/notifications", label: t("navNotifications"), badge: unreadCount }],
+      items: [{ to: "/notifications", label: t("navNotifications"), badge: unreadCount, icon: BellIcon }],
     },
   ];
   const currentLabel = navGroups
@@ -145,20 +155,24 @@ export default function AppShell() {
           {navGroups.map((group) => (
             <div className="nav-group" key={group.label}>
               <div className="nav-group-title">{group.label}</div>
-              {group.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  className="nav-link"
-                  onClick={() => {
-                    if (isCompact) closeDrawer();
-                  }}
-                >
-                  {item.label}
-                  {item.badge ? <span className="nav-badge" aria-label={`${item.badge}`}>{item.badge}</span> : null}
-                </NavLink>
-              ))}
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    className="nav-link"
+                    onClick={() => {
+                      if (isCompact) closeDrawer();
+                    }}
+                  >
+                    <Icon />
+                    <span>{item.label}</span>
+                    {item.badge ? <span className="nav-badge" aria-label={`${item.badge}`}>{item.badge}</span> : null}
+                  </NavLink>
+                );
+              })}
             </div>
           ))}
           {isDemoMode ? (
@@ -171,6 +185,7 @@ export default function AppShell() {
                 aria-controls="demo-tools-panel"
                 onClick={() => setDemoToolsOpen((open) => !open)}
               >
+                <ChevronDownIcon />
                 {t("demoStatesTitle")}
               </button>
               {demoToolsOpen ? (
@@ -213,24 +228,27 @@ export default function AppShell() {
               aria-controls="app-rail-nav"
               onClick={() => setDrawerOpen((open) => !open)}
             >
+              <ChevronDownIcon />
               {t("menu")}
             </button>
             <strong>{currentLabel}</strong>
             <div className="header-actions">
-              <label>
+              <label className="select-trigger">
+                <UserIcon />
                 <span className="visually-hidden">{t("language")}</span>
                 <select className="select" aria-label={t("language")} value={locale} onChange={(event) => setLocale(event.target.value as "ar" | "en")}>
                   <option value="ar">العربية</option>
                   <option value="en">English</option>
                 </select>
               </label>
-              <label>
+              <label className="select-trigger">
+                <ChevronDownIcon />
                 <span className="visually-hidden">{t("appearance")}</span>
                 <select className="select" aria-label={t("appearance")} value={appearance} onChange={(event) => setAppearance(event.target.value as Appearance)}>
                   {appearanceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
-              <button type="button" className="btn btn-secondary" onClick={() => navigate("/login")}>{t("signOut")}</button>
+              <button type="button" className="btn btn-secondary" onClick={() => navigate("/login")}><LogoutIcon />{t("signOut")}</button>
             </div>
           </header>
           <main id="main-content"><Outlet /></main>

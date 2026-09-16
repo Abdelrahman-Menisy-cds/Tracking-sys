@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useApp } from "../app/AppContext";
 import type { RequestStatus, TimesheetStatus } from "../mock/data";
+import { AlertTriangleIcon, CheckIcon, ClockIcon, CloseIcon, DocumentIcon, InfoIcon, RtlArrowBackIcon } from "./icons";
 
 type StatusKey = "stDraft" | "stPendingManager" | "stPendingHr" | "stApproved" | "stRejected" | "stReturned" | "stCancelled" | "stSubmitted";
 type StatusMeta = { tone: string; key: StatusKey; icon: "draft" | "pending" | "approved" | "rejected" | "returned" | "cancelled" };
@@ -24,12 +25,12 @@ const timesheetStatusMeta: Record<TimesheetStatus, StatusMeta> = {
 };
 
 function StatusIcon({ icon }: { icon: StatusMeta["icon"] }) {
-  if (icon === "approved") return <svg aria-hidden="true" viewBox="0 0 16 16"><path d="m3 8 3 3 7-7" /></svg>;
-  if (icon === "rejected") return <svg aria-hidden="true" viewBox="0 0 16 16"><path d="m4 4 8 8M12 4 4 12" /></svg>;
-  if (icon === "returned") return <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M6 3 2 7l4 4M3 7h6a4 4 0 0 1 4 4v2" /></svg>;
-  if (icon === "pending") return <svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" /><path d="M8 5v3l2 1" /></svg>;
-  if (icon === "cancelled") return <svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" /><path d="M5 8h6" /></svg>;
-  return <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M4 2h6l2 2v10H4zM6 6h4M6 9h4" /></svg>;
+  if (icon === "approved") return <CheckIcon size={16} />;
+  if (icon === "rejected") return <CloseIcon size={16} />;
+  if (icon === "returned") return <RtlArrowBackIcon locale="ar" size={16} />;
+  if (icon === "pending") return <ClockIcon size={16} />;
+  if (icon === "cancelled") return <CloseIcon size={16} />;
+  return <DocumentIcon size={16} />;
 }
 
 function StatusPill({ meta }: { meta: StatusMeta }) {
@@ -46,7 +47,8 @@ export function TimesheetStatusPill({ status }: { status: TimesheetStatus }) {
 }
 
 export function Banner({ tone, children, role = "status" }: { tone: "info" | "success" | "error" | "warning" | "neutral"; children: ReactNode; role?: "status" | "alert" }) {
-  return <div className={`banner banner-${tone}`} role={role}>{children}</div>;
+  const icon = tone === "success" ? <CheckIcon /> : tone === "warning" || tone === "error" ? <AlertTriangleIcon /> : <InfoIcon />;
+  return <div className={`banner banner-${tone}`} role={role}>{icon}<div>{children}</div></div>;
 }
 
 export function SkeletonRows({ rows = 4 }: { rows?: number }) {
@@ -66,12 +68,12 @@ export function SkeletonRows({ rows = 4 }: { rows?: number }) {
 }
 
 export function EmptyState({ message, action }: { message: string; action?: ReactNode }) {
-  return <div className="empty-region"><p>{message}</p>{action}</div>;
+  return <div className="empty-region"><InfoIcon className="state-icon" /><p>{message}</p>{action}</div>;
 }
 
 export function ErrorState({ onRetry }: { onRetry: () => void }) {
   const { t } = useApp();
-  return <div className="error-region" role="alert"><p>{t("errorNetwork")}</p><button className="btn btn-secondary" onClick={onRetry}>{t("retry")}</button></div>;
+  return <div className="error-region" role="alert"><AlertTriangleIcon className="state-icon" /><p>{t("errorNetwork")}</p><button className="btn btn-secondary" onClick={onRetry}>{t("retry")}</button></div>;
 }
 
 export function Dialog({

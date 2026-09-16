@@ -125,6 +125,7 @@
   --on-critical: var(--on-danger);
 
   --control-min-h: 44px;
+  --icon-size: 20px;
   --icon-size-sm: 16px;
   --nav-badge-size: 22px;
   --timeline-width: 1px;
@@ -213,6 +214,7 @@ body {
 html[dir="rtl"] body { font-family: var(--font-ar); line-height: var(--line-height-ar); }
 ::selection { background: var(--selection-bg); color: var(--selection-text); }
 h1, h2, h3 { margin: var(--space-0) 0 var(--sp-3); line-height: var(--line-height-heading); text-wrap: balance; }
+h1, h2, h3 { display: flex; align-items: center; gap: var(--sp-2); }
 h1 { font-size: var(--font-size-3xl); }
 h2 { font-size: var(--font-size-xl); }
 h3 { font-size: var(--font-size-lg); }
@@ -229,6 +231,8 @@ button { cursor: pointer; }
 }
 .skip-link:focus-visible { inset-inline-start: var(--sp-2); }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.icon { flex: 0 0 auto; width: var(--icon-size); height: var(--icon-size); color: currentColor; }
+.icon-mirror { transform: scaleX(-1); }
 
 .demo-banner { background: var(--accent-soft); color: var(--text); border-block-end: var(--timeline-width) solid var(--border-subtle); padding: var(--sp-2) var(--sp-4); text-align: center; font-size: var(--font-size-sm); font-weight: 600; }
 .app-shell { display: flex; min-height: calc(100vh - 37px); }
@@ -296,13 +300,15 @@ button { cursor: pointer; }
 .status-action-row { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-4); flex-wrap: wrap; }
 
 .field { display: block; margin-block-end: var(--sp-6); }
-.field-label { display: block; margin-block-end: var(--sp-2); font-weight: 700; }
+.field-label { display: flex; align-items: center; gap: var(--sp-2); margin-block-end: var(--sp-2); font-weight: 700; }
 .field-hint { display: block; margin-block-start: var(--sp-2); color: var(--text-muted); font-size: var(--font-size-sm); }
 .field-error { display: block; margin-block-start: var(--sp-2); color: var(--danger-strong); font-weight: 700; }
 .input, .select, .textarea { width: 100%; min-height: var(--control-min-h); padding: var(--sp-2) var(--sp-3); border: var(--timeline-width) solid var(--border-control); border-radius: var(--radius-surface); background: var(--surface); color: var(--text); }
 .input:focus, .select:focus, .textarea:focus { border-color: var(--accent); outline: var(--space-1) solid var(--focus-ring); outline-offset: var(--space-1); }
 .input[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--danger); }
 .input:disabled, .select:disabled, .textarea:disabled { background: var(--surface-subtle); color: var(--text-muted); }
+.select-trigger { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.select-trigger .select { width: auto; }
 .textarea { min-height: 120px; resize: vertical; }
 .form-actions { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
 
@@ -337,12 +343,15 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .attachment-row { display: flex; justify-content: space-between; gap: var(--sp-3); flex-wrap: wrap; padding: var(--sp-3) var(--space-0); border-block-end: var(--timeline-width) solid var(--border-subtle); }
 
 .banner { display: flex; align-items: flex-start; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); margin-block-end: var(--sp-4); border-inline-start: var(--space-1) solid currentColor; }
+.banner > div { min-width: 0; }
 .banner-info { color: var(--accent-strong); background: var(--accent-soft); }
 .banner-warning { color: var(--warning-strong); background: var(--warning-soft); }
 .banner-success { color: var(--success-strong); background: var(--success-soft); }
 .banner-error { color: var(--danger-strong); background: var(--danger-soft); }
 .banner-neutral { color: var(--neutral-strong); background: var(--neutral-soft); }
 .empty-region, .error-region { padding: var(--sp-8); text-align: center; border: var(--timeline-width) solid var(--card-border); background: var(--surface); border-radius: var(--radius-surface); box-shadow: var(--elevation-1); }
+.state-icon { color: var(--accent-strong); margin-block-end: var(--sp-2); }
+.error-region .state-icon { color: var(--danger-strong); }
 .skeleton { min-height: var(--icon-size-sm); background: var(--surface-subtle); border-radius: var(--radius-xs); }
 .skeleton-title { width: 42%; height: var(--font-size-lg); }
 .skeleton-body { width: 78%; height: var(--font-size-md); }
