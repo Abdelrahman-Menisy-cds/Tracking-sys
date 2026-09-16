@@ -29,8 +29,10 @@ export default function NotificationsPage() {
                   <p><bdi>{notification.body[locale]}</bdi></p>
                   <div className="muted">{formatDateTime(notification.created_at, locale)}{notification.related_object && !notification.related_object.available ? <> · {t("relatedRecord")}: {t("relatedUnavailable")}</> : null}</div>
                 </div>
-                {!notification.is_read ? <button className="btn btn-secondary" onClick={() => markNotificationRead(notification.id)}>{t("markRead")}</button> : null}
-                {notification.related_object?.available ? <Link className="btn btn-secondary" to={`/requests/${notification.related_object.id}`}>{locale === "ar" ? "فتح السجل" : "Open record"}</Link> : null}
+                <div className="row-actions" aria-label={locale === "ar" ? "إجراءات الإشعار" : "Notification actions"}>
+                  {!notification.is_read ? <button className="btn btn-secondary" onClick={() => markNotificationRead(notification.id)}>{t("markRead")}</button> : null}
+                  {notification.related_object?.available ? <Link className="btn btn-secondary" to={`/requests/${notification.related_object.id}`}>{locale === "ar" ? "فتح السجل" : "Open record"}</Link> : null}
+                </div>
               </li>
             ))}
           </ul>

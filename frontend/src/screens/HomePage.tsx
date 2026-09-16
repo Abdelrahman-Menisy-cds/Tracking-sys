@@ -60,7 +60,8 @@ export default function HomePage() {
           <div className="section-heading"><h2 id="my-work-heading"><DocumentIcon />{locale === "ar" ? `العمل الشخصي · ${attentionRequests.length}` : `My work · ${attentionRequests.length}`}</h2><Link to="/requests">{t("viewAll")}</Link></div>
           {loading ? <SkeletonRows rows={2} /> : requestState.phase === "error" || timesheetState.phase === "error" ? <Banner tone="error" role="alert">{t("errorNetwork")}</Banner> : <div className="work-surface"><ul className="compact-list">{attentionRequests.map((request) => {
             const split = splitContextTitle(request.title);
-            return <li key={request.id} className="compact-row"><div><Link to={`/requests/${request.id}`}><strong><bdi>{split.title}</bdi></strong></Link>{split.meta ? <div className="muted"><bdi>{split.meta}</bdi></div> : null}<div className="muted">{request.status === "RETURNED" ? (locale === "ar" ? "مطلوب تصحيح" : "Correction required") : t("draft")}</div></div><RequestStatusPill status={request.status} /></li>;
+            const openRequestLabel = locale === "ar" ? `فتح الطلب: ${split.title}` : `Open request: ${split.title}`;
+            return <li key={request.id} className="compact-row"><div><Link to={`/requests/${request.id}`}><strong><bdi>{split.title}</bdi></strong></Link>{split.meta ? <div className="muted"><bdi>{split.meta}</bdi></div> : null}<div className="muted">{request.status === "RETURNED" ? (locale === "ar" ? "مطلوب تصحيح" : "Correction required") : t("draft")}</div></div><Link className="actionable-pill" to={`/requests/${request.id}`} aria-label={openRequestLabel}><RequestStatusPill status={request.status} /></Link></li>;
           })}{attentionRequests.length === 0 && <li>{t("noRequestsYet")}</li>}</ul></div>}
         </section>
         {currentWeek && <section className="section" aria-labelledby="week-heading">
