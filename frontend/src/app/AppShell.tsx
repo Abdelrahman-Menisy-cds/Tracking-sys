@@ -248,7 +248,7 @@ export default function AppShell() {
                   {appearanceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </label>
-              <button type="button" className="btn btn-secondary" onClick={() => navigate("/login")}><LogoutIcon />{t("signOut")}</button>
+              <button type="button" className="btn btn-ghost sign-out-action" onClick={() => navigate("/login")}><LogoutIcon />{t("signOut")}</button>
             </div>
           </header>
           <main id="main-content"><Outlet /></main>
