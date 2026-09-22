@@ -16,3 +16,5 @@ Transitions:
 - APPROVED -> RETURNED only through HR reopen with explicit confirmation, mandatory reason, and audit; terminal history is retained.
 
 No employee cancellation. No employee reopen. Submitted and approved records are read-only except the authorized HR reopen. Weekly container is unique per employee/week; week is Monday–Sunday in organization timezone. Entries use daily duration minutes plus unpaid break minutes, no rounding, max 24 worked hours/day and 168/week; reject invalid, negative, overlapping, or out-of-week data. All transitions append immutable TimesheetEvent and audit records transactionally with locking, version checks, and idempotency.
+
+Amendment: Duration may now be ATTENDANCE-DERIVED from the authoritative attendance record. Manual duration entry is permitted only for a day with no attendance record and must be FLAGGED so a reviewer can see that it was not captured by attendance. Existing states and transitions are unchanged.

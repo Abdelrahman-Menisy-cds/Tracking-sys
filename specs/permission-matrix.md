@@ -24,5 +24,20 @@ traceability: [prd.md, _bmad-output/planning-artifacts/product/product-policy-de
 | Team CSV reports | No | Yes | Yes |
 | Organization CSV reports/audit export | No | No | Yes |
 | Self-approve any workflow | No | No | No |
+| Clock self in/out | Yes | Yes | Yes |
+| View own attendance history | Yes | Yes | Yes |
+| Submit own attendance correction | Yes | Yes | Yes |
+| Submit own justification | Yes | Yes | Yes |
+| View team attendance/exceptions | No | Direct reports | Yes |
+| Resolve team exceptions | No | Direct reports | Yes |
+| Approve attendance corrections | No | Direct reports | Yes |
+| Set work schedule — own reports | No | Yes | Yes |
+| Set work schedule — organization | No | No | Yes |
+| Set leave entitlement / adjust balance | No | Propose only | Yes |
+| View org attendance + export | No | No | Yes |
+| Clock in/out on behalf of an employee | No | No | Yes, reason + audit |
+| Approve own attendance/leave/correction | No | No | No |
+
+Amendment: Added the attendance, schedule, leave-balance, exception, correction, export, and on-behalf clocking capabilities from the approved attendance design §4, including the explicit no-self-approval rule, so attendance authorization remains traceable and aligned with the existing server-derived scope model.
 
 All list, detail, search, counts, dashboards, attachments, events, and exports use server-derived scope. Inaccessible objects disclose no existence (404 policy). HR is not superuser. Every decision is state- and capability-gated, transactional, version-checked, and audited.
