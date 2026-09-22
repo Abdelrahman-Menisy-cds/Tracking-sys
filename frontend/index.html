@@ -8,6 +8,24 @@
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>هي فوضى؟ — شؤون الموظفين (عرض تجريبي)</title>
+    <script>
+      (() => {
+        try {
+          const locale = localStorage.getItem("tracking-sys.locale");
+          const appearance = localStorage.getItem("tracking-sys.appearance");
+          if (locale === "ar" || locale === "en") {
+            document.documentElement.lang = locale;
+            document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
+          }
+          const resolved = appearance === "light" || appearance === "dark"
+            ? appearance
+            : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          document.documentElement.dataset.theme = resolved;
+        } catch {
+          document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        }
+      })();
+    </script>
     <meta name="description" content="هي فوضى؟ — نظام طلبات وسجلات وقت الموظفين. نسخة عرض تجريبية ببيانات وهمية." />
   </head>
   <body>

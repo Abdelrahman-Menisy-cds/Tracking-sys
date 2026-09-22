@@ -12,7 +12,8 @@ import {
   GlobeIcon,
   HomeIcon,
   LogoutIcon,
-  PaletteIcon,
+  MoonIcon,
+  SunIcon,
   UserIcon,
 } from "../components/icons";
 import { demoUser } from "../mock/data";
@@ -28,7 +29,7 @@ export default function AppShell() {
     setRole,
     isDemoMode,
     capabilities,
-    appearance,
+    resolvedTheme,
     setAppearance,
     notificationItems,
     setDemoFixture,
@@ -177,11 +178,9 @@ export default function AppShell() {
     { value: "conflict", label: locale === "ar" ? "قرار قديم عند التأكيد" : "Stale decision on confirm" },
     { value: "unknown", label: locale === "ar" ? "نتيجة قرار غير معروفة" : "Unknown decision outcome" },
   ];
-  const appearanceOptions: { value: Appearance; label: string }[] = [
-    { value: "system", label: t("appearanceSystem") },
-    { value: "light", label: t("appearanceLight") },
-    { value: "dark", label: t("appearanceDark") },
-  ];
+  const targetLocale: Locale = locale === "en" ? "ar" : "en";
+  const targetTheme: Exclude<Appearance, "system"> = resolvedTheme === "light" ? "dark" : "light";
+  const ThemeIcon = resolvedTheme === "light" ? SunIcon : MoonIcon;
   const activeUser = demoUser[role];
   const localizedName = activeUser.name[locale as Locale];
   const localizedRole = roleOptions.find((option) => option.value === role)?.label ?? t("roleEmployee");
@@ -282,21 +281,6 @@ export default function AppShell() {
             </button>
             <strong>{currentLabel}</strong>
             <div className="header-actions">
-              <label className="select-trigger">
-                <GlobeIcon />
-                <span className="visually-hidden">{t("language")}</span>
-                <select className="select" aria-label={t("language")} value={locale} onChange={(event) => setLocale(event.target.value as "ar" | "en")}>
-                  <option value="ar">العربية</option>
-                  <option value="en">English</option>
-                </select>
-              </label>
-              <label className="select-trigger">
-                <PaletteIcon />
-                <span className="visually-hidden">{t("appearance")}</span>
-                <select className="select" aria-label={t("appearance")} value={appearance} onChange={(event) => setAppearance(event.target.value as Appearance)}>
-                  {appearanceOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </label>
               <div className="profile-menu-wrap">
                 <button
                   ref={profileButtonRef}
@@ -318,11 +302,40 @@ export default function AppShell() {
                       <span className="profile-menu-name"><bdi>{localizedName}</bdi></span>
                       <span className="profile-menu-meta">{localizedRole} · <bdi>{activeUser.email}</bdi></span>
                     </div>
-                    <button ref={(element) => { profileMenuItemsRef.current[0] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => closeProfileMenu()}>
+                    <div className="profile-settings-section" role="group" aria-label={t("settingsSection")}>
+                      <span className="profile-settings-title">{t("settingsSection")}</span>
+                      <div className="profile-settings-actions">
+                        <button
+                          ref={(element) => { profileMenuItemsRef.current[0] = element; }}
+                          type="button"
+                          className="btn btn-secondary preference-toggle language-toggle"
+                          role="menuitem"
+                          aria-pressed={locale === "en"}
+                          aria-label={targetLocale === "ar" ? t("switchToArabic") : t("switchToEnglish")}
+                          onClick={() => setLocale(targetLocale)}
+                        >
+                          <GlobeIcon />
+                          <span aria-hidden="true">{targetLocale.toUpperCase()}</span>
+                        </button>
+                        <button
+                          ref={(element) => { profileMenuItemsRef.current[1] = element; }}
+                          type="button"
+                          className="btn btn-secondary preference-toggle theme-toggle"
+                          role="menuitem"
+                          aria-pressed={resolvedTheme === "dark"}
+                          aria-label={targetTheme === "light" ? t("switchToLight") : t("switchToDark")}
+                          onClick={() => setAppearance(targetTheme)}
+                        >
+                          <ThemeIcon />
+                          <span>{targetTheme === "light" ? t("appearanceLight") : t("appearanceDark")}</span>
+                        </button>
+                      </div>
+                    </div>
+                    <button ref={(element) => { profileMenuItemsRef.current[2] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => closeProfileMenu()}>
                       <UserIcon />
                       {t("account")}
                     </button>
-                    <button ref={(element) => { profileMenuItemsRef.current[1] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/login"); }}>
+                    <button ref={(element) => { profileMenuItemsRef.current[3] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/login"); }}>
                       <LogoutIcon />
                       {t("signOut")}
                     </button>

@@ -28,6 +28,37 @@ import {
 } from "../mock/data";
 
 export type Appearance = "system" | "light" | "dark";
+
+const LOCALE_STORAGE_KEY = "tracking-sys.locale";
+const APPEARANCE_STORAGE_KEY = "tracking-sys.appearance";
+
+function readStoredLocale(): Locale {
+  if (typeof window === "undefined") return "ar";
+  try {
+    const value = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+    return value === "ar" || value === "en" ? value : "ar";
+  } catch {
+    return "ar";
+  }
+}
+
+function readStoredAppearance(): Appearance {
+  if (typeof window === "undefined") return "system";
+  try {
+    const value = window.localStorage.getItem(APPEARANCE_STORAGE_KEY);
+    return value === "system" || value === "light" || value === "dark" ? value : "system";
+  } catch {
+    return "system";
+  }
+}
+
+function storePreference(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Preferences still work for this session when persistent storage is unavailable.
+  }
+}
 export type DemoFixture = "ready" | "loading" | "empty" | "error" | "conflict" | "unknown";
 export type ReviewDecision = "APPROVE" | "REJECT" | "RETURN";
 export type DemoIdentity = Role;
@@ -151,9 +182,9 @@ function eventFor(
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("ar");
+  const [locale, setLocaleState] = useState<Locale>(readStoredLocale);
   const [role, setRoleState] = useState<DemoIdentity>("employee");
-  const [appearance, setAppearanceState] = useState<Appearance>("system");
+  const [appearance, setAppearanceState] = useState<Appearance>(readStoredAppearance);
   const [osTheme, setOsTheme] = useState<"light" | "dark">(systemTheme);
   const [identityStates, setIdentityStates] = useState<Record<DemoIdentity, IdentityState>>(initialIdentityStates);
   const activeIdentityRef = useRef<DemoIdentity>(role);
@@ -174,8 +205,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     root.dataset.theme = resolvedTheme;
   }, [locale, resolvedTheme]);
 
-  const setLocale = useCallback((nextLocale: Locale) => setLocaleState(nextLocale), []);
-  const setAppearance = useCallback((nextAppearance: Appearance) => setAppearanceState(nextAppearance), []);
+  const setLocale = useCallback((nextLocale: Locale) => {
+    setLocaleState(nextLocale);
+    storePreference(LOCALE_STORAGE_KEY, nextLocale);
+  }, []);
+  const setAppearance = useCallback((nextAppearance: Appearance) => {
+    setAppearanceState(nextAppearance);
+    storePreference(APPEARANCE_STORAGE_KEY, nextAppearance);
+  }, []);
   const setRole = useCallback((nextRole: DemoIdentity) => {
     if (!DEMO_MODE) return;
     activeIdentityRef.current = nextRole;

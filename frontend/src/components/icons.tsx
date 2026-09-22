@@ -5,8 +5,8 @@ export type IconProps = Omit<SVGProps<SVGSVGElement>, "name"> & { size?: number 
 type IconName =
   | "activity" | "alertTriangle" | "arrowLeft" | "bell" | "calendar" | "check"
   | "chevronDown" | "chevronLeft" | "chevronRight" | "clock" | "close" | "document"
-  | "edit" | "filter" | "globe" | "home" | "info" | "logout" | "palette" | "play"
-  | "plus" | "search" | "user";
+  | "edit" | "filter" | "globe" | "home" | "info" | "logout" | "moon" | "palette" | "play"
+  | "plus" | "search" | "sun" | "user";
 
 const paths: Record<IconName, ReturnType<typeof Fragment>> = {
   activity: <path d="M3 12h3l2.2-5 3.6 10 2.2-5h3" />,
@@ -27,10 +27,12 @@ const paths: Record<IconName, ReturnType<typeof Fragment>> = {
   home: <><path d="m3 9 7-6 7 6" /><path d="M5 8v8h10V8" /><path d="M8.5 16v-4h3v4" /></>,
   info: <><circle cx="10" cy="10" r="7" /><path d="M10 9v5" /><path d="M10 6h.01" /></>,
   logout: <><path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" /><path d="M12 7l3 3-3 3" /><path d="M15 10H8" /></>,
+  moon: <path d="M16 11.2A6.2 6.2 0 0 1 8.8 4 6.5 6.5 0 1 0 16 11.2Z" />,
   palette: <><path d="M10 3a7 7 0 1 0 0 14h1.2a1.8 1.8 0 0 0 1.3-3.1 1.8 1.8 0 0 1 1.3-3.1H16A7 7 0 0 0 10 3Z" /><path d="M6.5 8h.01M9 6h.01M13 6.5h.01M15 9h.01" /></>,
   play: <path d="M7 5.5v9l7-4.5-7-4.5Z" />,
   plus: <path d="M10 4v12M4 10h12" />,
   search: <><circle cx="9" cy="9" r="5" /><path d="m13 13 4 4" /></>,
+  sun: <><circle cx="10" cy="10" r="3.2" /><path d="M10 2.5v1.3M10 16.2v1.3M17.5 10h-1.3M3.8 10H2.5M15.3 4.7l-.9.9M5.6 14.4l-.9.9M15.3 15.3l-.9-.9M5.6 5.6l-.9-.9" /></>,
   user: <><circle cx="10" cy="7" r="3" /><path d="M4.5 17a5.5 5.5 0 0 1 11 0" /></>,
 };
 
@@ -56,10 +58,12 @@ export function GlobeIcon(props: IconProps) { return <SvgIcon name="globe" {...p
 export function HomeIcon(props: IconProps) { return <SvgIcon name="home" {...props} />; }
 export function InfoIcon(props: IconProps) { return <SvgIcon name="info" {...props} />; }
 export function LogoutIcon(props: IconProps) { return <SvgIcon name="logout" {...props} />; }
+export function MoonIcon(props: IconProps) { return <SvgIcon name="moon" {...props} />; }
 export function PaletteIcon(props: IconProps) { return <SvgIcon name="palette" {...props} />; }
 export function PlayIcon(props: IconProps) { return <SvgIcon name="play" {...props} />; }
 export function PlusIcon(props: IconProps) { return <SvgIcon name="plus" {...props} />; }
 export function SearchIcon(props: IconProps) { return <SvgIcon name="search" {...props} />; }
+export function SunIcon(props: IconProps) { return <SvgIcon name="sun" {...props} />; }
 export function UserIcon(props: IconProps) { return <SvgIcon name="user" {...props} />; }
 
 export function RtlChevronIcon({ locale, direction, ...props }: IconProps & { locale: "ar" | "en"; direction: "back" | "forward" }) {

@@ -50,17 +50,26 @@ const evaluate = async (expression, returnByValue = true) => (await cdp("Runtime
 await cdp("Page.enable");
 await cdp("DOM.enable");
 await cdp("CSS.enable");
+await cdp("Page.navigate", { url });
+for (let attempt = 0; attempt < 30; attempt += 1) {
+  if (await evaluate("document.readyState") === "complete") break;
+  await delay(250);
+}
 await delay(500);
 
+for (let attempt = 0; attempt < 30; attempt += 1) {
+  if (await evaluate("Boolean(document.body)") === true) break;
+  await delay(250);
+}
 await evaluate(`(() => {
   const fixture = document.createElement('div');
   fixture.id = 'contrast-fixture';
   fixture.style.cssText = 'position:fixed;inset:0 auto auto 0;z-index:99999;display:flex;gap:8px;padding:8px;background:var(--surface);';
   const style = document.createElement('style'); style.textContent = '#contrast-fixture, #contrast-fixture * { transition: none !important; animation: none !important; }'; document.head.append(style);
-  fixture.innerHTML = ['primary','secondary','ghost','danger'].map(v => '<a class="btn btn-'+v+'" href="#">'+v+'</a>').join('');
+  fixture.innerHTML = ['primary','secondary','ghost','danger','preference-toggle language-toggle','preference-toggle theme-toggle'].map((v, index) => '<a class="btn '+(index > 3 ? 'btn-secondary '+v : 'btn-'+v)+'" href="#" data-contrast-variant="'+(index > 3 ? (index === 4 ? 'language-toggle' : 'theme-toggle') : v)+'">'+v+'</a>').join('');
   document.body.append(fixture);
 })()`);
-const root = (await cdp("DOM.getDocument")).root.nodeId;
+const root = (await cdp("DOM.getDocument", { depth: -1, pierce: true })).root.nodeId;
 const rows = [];
 let failed = false;
 const contrastFor = `((selector) => {
@@ -74,9 +83,12 @@ const contrastFor = `((selector) => {
 for (const theme of ["light", "dark"]) {
   await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
   await delay(500);
-  for (const variant of ["primary", "secondary", "ghost", "danger"]) {
-    const selector = `#contrast-fixture .btn-${variant}`;
+  for (const variant of ["primary", "secondary", "ghost", "danger", "language-toggle", "theme-toggle"]) {
+    const selector = variant === "language-toggle" || variant === "theme-toggle"
+      ? `#contrast-fixture [data-contrast-variant="${variant}"]`
+      : `#contrast-fixture .btn-${variant}`;
     const node = await cdp("DOM.querySelector", { nodeId: root, selector });
+    if (!node.nodeId) throw new Error(`Contrast fixture selector not found: ${selector}`);
     for (const state of ["resting", "hover", "active"]) {
       await cdp("CSS.forcePseudoState", { nodeId: node.nodeId, forcedPseudoClasses: state === "resting" ? [] : [state] });
       const value = await evaluate(`${contrastFor}(${JSON.stringify(selector)})`);
