@@ -100,10 +100,22 @@ function cairoDateParts(value: string) {
   return { year, month, day };
 }
 
-/** Build an instant for a Cairo wall-clock time, accounting for its actual offset. */
-function cairoWallClockInstant(workDate: string, hour: string, minute = 0): Date {
-  const { year, month, day } = cairoDateParts(workDate);
-  const target = Date.UTC(year, month - 1, day, Number(hour), minute);
+/** Build a valid instant for a Cairo wall-clock time, accounting for its actual offset. */
+function cairoWallClockInstant(workDate: string, timeOrHour: string | number, minute = 0): Date {
+  const parsedDate = cairoDateParts(workDate);
+  const dateIsValid = Number.isInteger(parsedDate.year) && Number.isInteger(parsedDate.month) && Number.isInteger(parsedDate.day)
+    && parsedDate.month >= 1 && parsedDate.month <= 12 && parsedDate.day >= 1 && parsedDate.day <= 31;
+  const { hour: parsedHour, minute: parsedMinute } = typeof timeOrHour === "string" && timeOrHour.includes(":")
+    ? (() => { const [hour, min] = timeOrHour.split(":").map(Number); return { hour, minute: min }; })()
+    : { hour: Number(timeOrHour), minute: Number(minute) };
+  const validTime = Number.isFinite(parsedHour) && parsedHour >= 0 && parsedHour <= 23
+    && Number.isFinite(parsedMinute) && parsedMinute >= 0 && parsedMinute <= 59;
+  const year = dateIsValid ? parsedDate.year : 2000;
+  const month = dateIsValid ? parsedDate.month : 1;
+  const day = dateIsValid ? parsedDate.day : 1;
+  const hour = validTime ? parsedHour : 12;
+  const safeMinute = validTime ? parsedMinute : 0;
+  const target = Date.UTC(year, month - 1, day, hour, safeMinute);
   let instant = new Date(target);
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const shown = cairoDateTimeFormatter.formatToParts(instant).reduce<Record<string, string>>((result, part) => {
@@ -111,9 +123,9 @@ function cairoWallClockInstant(workDate: string, hour: string, minute = 0): Date
       return result;
     }, {});
     const shownAsUtc = Date.UTC(Number(shown.year), Number(shown.month) - 1, Number(shown.day), Number(shown.hour), Number(shown.minute));
-    instant = new Date(target + (target - shownAsUtc));
+    instant = new Date(instant.getTime() + (target - shownAsUtc));
   }
-  return instant;
+  return Number.isFinite(instant.getTime()) ? instant : new Date(Date.UTC(2000, 0, 1, 10));
 }
 
 const dateAt = (daysAgo: number, hour: number, minute = 0) => {
@@ -133,10 +145,15 @@ const isEgyptWorkingDay = (date: Date) => {
 export type AttendanceExceptionResult = "LATE" | "EARLY_LEAVE" | "NONE";
 export function attendanceExceptionForEvent(event: AttendanceEvent | null, workDate: string, schedule: WorkSchedule | null): AttendanceExceptionResult {
   if (!event || !schedule) return "NONE";
-  const expected = event.kind === "CLOCK_IN" ? cairoWallClockInstant(workDate, schedule.expected_start) : cairoWallClockInstant(workDate, schedule.expected_end);
+  const expectedWallClock = event.kind === "CLOCK_IN" ? schedule.expected_start : schedule.expected_end;
+  const wallClockMatch = /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(expectedWallClock);
+  const occurredAt = Date.parse(event.occurred_at);
+  if (!wallClockMatch || !Number.isFinite(occurredAt) || !Number.isFinite(schedule.grace_minutes) || schedule.grace_minutes < 0) return "NONE";
+  const expected = cairoWallClockInstant(workDate, expectedWallClock);
+  if (!Number.isFinite(expected.getTime())) return "NONE";
   const grace = event.kind === "CLOCK_IN" ? schedule.grace_minutes * 60000 : 0;
-  if (event.kind === "CLOCK_IN" && Date.parse(event.occurred_at) > expected.getTime() + grace) return "LATE";
-  if (event.kind === "CLOCK_OUT" && Date.parse(event.occurred_at) < expected.getTime()) return "EARLY_LEAVE";
+  if (event.kind === "CLOCK_IN" && occurredAt > expected.getTime() + grace) return "LATE";
+  if (event.kind === "CLOCK_OUT" && occurredAt < expected.getTime()) return "EARLY_LEAVE";
   return "NONE";
 }
 
