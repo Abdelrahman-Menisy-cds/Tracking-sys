@@ -94,6 +94,8 @@ interface AppState {
   teamTimesheetItems: TimesheetMock[];
   notificationItems: NotificationMock[];
   markNotificationRead: (notificationId: string) => void;
+  removeNotification: (notificationId: string) => void;
+  clearNotifications: () => void;
   saveDemoRequest: (input: { typeId: number; title: string; details: string; submit: boolean }) => Promise<RequestMock>;
   submitDemoTimesheet: (timesheetId: string, entries: TimeEntryMock[]) => Promise<TimesheetMock>;
   decideDemoRequest: (requestId: string, decision: ReviewDecision, comment: string, expectedVersion: number) => Promise<RequestMock>;
@@ -238,6 +240,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
               ? { ...notification, is_read: true, read_at: new Date().toISOString() }
               : notification,
           ),
+        },
+      }));
+    }, 150);
+  }, [role]);
+
+  const removeNotification = useCallback((notificationId: string) => {
+    const commandIdentity = role;
+    window.setTimeout(() => {
+      if (activeIdentityRef.current !== commandIdentity) return;
+      setIdentityStates((current) => ({
+        ...current,
+        [commandIdentity]: {
+          ...current[commandIdentity],
+          notificationItems: current[commandIdentity].notificationItems.filter((notification) => notification.id !== notificationId),
+        },
+      }));
+    }, 150);
+  }, [role]);
+
+  const clearNotifications = useCallback(() => {
+    const commandIdentity = role;
+    window.setTimeout(() => {
+      if (activeIdentityRef.current !== commandIdentity) return;
+      setIdentityStates((current) => ({
+        ...current,
+        [commandIdentity]: {
+          ...current[commandIdentity],
+          notificationItems: [],
         },
       }));
     }, 150);
@@ -417,6 +447,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     teamTimesheetItems: activeState.teamTimesheetItems,
     notificationItems: activeState.notificationItems,
     markNotificationRead,
+    removeNotification,
+    clearNotifications,
     saveDemoRequest,
     submitDemoTimesheet,
     decideDemoRequest,
@@ -431,6 +463,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     decideDemoTimesheet,
     locale,
     markNotificationRead,
+    removeNotification,
+    clearNotifications,
     resolvedTheme,
     role,
     saveDemoRequest,

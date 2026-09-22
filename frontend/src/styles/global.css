@@ -291,9 +291,17 @@ button { cursor: pointer; }
 .dashboard-grid .section { margin-block-start: var(--space-0); }
 .compact-list { list-style: none; padding: var(--space-0); margin: var(--space-0); }
 .compact-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; padding: var(--sp-4); margin-inline: calc(-1 * var(--sp-4)); border-block-end: var(--timeline-width) solid var(--border-subtle); border-radius: var(--radius-sm); transition: background-color 160ms ease, transform 120ms ease; }
-.row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; gap: var(--sp-2); inline-size: 16rem; flex: 0 0 16rem; margin-inline-start: auto; }
+.notification-actions { display: flex; align-items: center; gap: var(--sp-2); margin-inline-start: auto; }
+.row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: center; gap: var(--sp-2); inline-size: 16rem; flex: 0 0 16rem; }
 .row-action-slot { min-inline-size: 0; }
 .row-action-slot .btn { inline-size: 100%; }
+.icon-button { display: inline-flex; align-items: center; justify-content: center; inline-size: 2.5rem; min-inline-size: 2.5rem; padding-inline: 0; }
+.notification-remove { flex: 0 0 2.5rem; }
+.notification-confirmation { margin-block-end: var(--sp-4); }
+@media (max-width: 639px) {
+  .notification-actions { inline-size: 100%; justify-content: flex-end; }
+  .row-actions { flex: 1 1 auto; inline-size: auto; }
+}
 .actionable-pill { display: inline-flex; border-radius: var(--radius-pill); text-decoration: none; transition: transform 120ms ease, box-shadow 160ms ease; }
 .actionable-pill:hover { transform: translateY(-1px); }
 .actionable-pill:active { transform: translateY(1px); }
