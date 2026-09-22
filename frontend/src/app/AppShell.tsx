@@ -17,6 +17,7 @@ import {
   UserIcon,
 } from "../components/icons";
 import { demoUser } from "../mock/data";
+import { ClockAction } from "../screens/AttendancePage";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), select:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -290,6 +291,7 @@ export default function AppShell() {
             </button>
             <strong>{currentLabel}</strong>
             <div className="header-actions">
+              <ClockAction compact />
               <button
                 type="button"
                 className="btn btn-secondary icon-only theme-toggle-header"
