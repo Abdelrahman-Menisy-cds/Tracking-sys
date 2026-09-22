@@ -9,7 +9,6 @@ import {
   ChevronDownIcon,
   ClockIcon,
   DocumentIcon,
-  GlobeIcon,
   HomeIcon,
   LogoutIcon,
   MoonIcon,
@@ -292,12 +291,12 @@ export default function AppShell() {
               </button>
               <button
                 type="button"
-                className="btn btn-secondary icon-only language-toggle-header"
+                className="btn btn-secondary language-toggle-header"
                 aria-pressed={locale === "en"}
                 aria-label={targetLocale === "ar" ? t("switchToArabic") : t("switchToEnglish")}
                 onClick={() => setLocale(targetLocale)}
               >
-                <GlobeIcon />
+                {targetLocale.toUpperCase()}
               </button>
               <div className="profile-menu-wrap">
                 <button

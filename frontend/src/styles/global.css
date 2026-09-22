@@ -334,6 +334,7 @@ button { cursor: pointer; }
 .profile-trigger { min-height: var(--control-min-h); }
 .icon-only { inline-size: var(--control-min-h); padding-inline: var(--space-0); }
 .theme-toggle-header, .language-toggle-header { flex: 0 0 auto; }
+.language-toggle-header { inline-size: var(--control-min-h); padding-inline: var(--sp-2); }
 .profile-details { display: grid; gap: var(--sp-2); margin: var(--space-0); }
 .profile-details .record-field { padding-block: var(--sp-3); border-block-end: var(--timeline-width) solid var(--border-subtle); }
 .profile-details .record-field:last-child { border-block-end: 0; }
