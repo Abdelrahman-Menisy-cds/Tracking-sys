@@ -48,7 +48,7 @@ export default function NotificationsPage() {
 
   const hasNotifications = notificationItems.length > 0;
   const clearAction = hasNotifications ? (
-    <button className="btn btn-danger" type="button" onClick={() => setConfirmClear(true)}>
+    <button className="btn btn-danger-quiet" type="button" onClick={() => setConfirmClear(true)}>
       <TrashIcon size={17} />
       {t("clearNotifications")}
     </button>
