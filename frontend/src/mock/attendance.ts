@@ -82,15 +82,63 @@ export type AttendanceMutationResult<T = void> =
   | { ok: true; value?: T }
   | { ok: false; code: AttendanceMutationCode };
 
-const cairoDate = (date: Date) => date.toISOString().slice(0, 10);
-const dateAt = (daysAgo: number, hour: number, minute = 0) => {
-  const date = new Date();
-  date.setUTCHours(0, 0, 0, 0);
-  date.setUTCDate(date.getUTCDate() - daysAgo);
-  date.setUTCHours(hour - 2, minute, 0, 0);
-  return date;
+const CAIRO_TIME_ZONE = "Africa/Cairo";
+const cairoFormatter = new Intl.DateTimeFormat("en-CA", { timeZone: CAIRO_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+const cairoDateTimeFormatter = new Intl.DateTimeFormat("en-US", { timeZone: CAIRO_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+/** Return the organization-local work date, never the browser/UTC date. */
+export const cairoDate = (date: Date) => {
+  const parts = cairoFormatter.formatToParts(date).reduce<Record<string, string>>((result, part) => {
+    result[part.type] = part.value;
+    return result;
+  }, {});
+  return `${parts.year}-${parts.month}-${parts.day}`;
 };
-const isEgyptWorkingDay = (date: Date) => date.getUTCDay() >= 0 && date.getUTCDay() <= 4;
+
+function cairoDateParts(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return { year, month, day };
+}
+
+/** Build an instant for a Cairo wall-clock time, accounting for its actual offset. */
+function cairoWallClockInstant(workDate: string, hour: string, minute = 0): Date {
+  const { year, month, day } = cairoDateParts(workDate);
+  const target = Date.UTC(year, month - 1, day, Number(hour), minute);
+  let instant = new Date(target);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const shown = cairoDateTimeFormatter.formatToParts(instant).reduce<Record<string, string>>((result, part) => {
+      result[part.type] = part.value;
+      return result;
+    }, {});
+    const shownAsUtc = Date.UTC(Number(shown.year), Number(shown.month) - 1, Number(shown.day), Number(shown.hour), Number(shown.minute));
+    instant = new Date(target + (target - shownAsUtc));
+  }
+  return instant;
+}
+
+const dateAt = (daysAgo: number, hour: number, minute = 0) => {
+  const now = new Date();
+  const today = cairoDate(now);
+  const date = new Date(`${today}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - daysAgo);
+  const workDate = date.toISOString().slice(0, 10);
+  return cairoWallClockInstant(workDate, String(hour), minute);
+};
+
+const isEgyptWorkingDay = (date: Date) => {
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: CAIRO_TIME_ZONE, weekday: "short" }).format(date);
+  return ["Sun", "Mon", "Tue", "Wed", "Thu"].includes(weekday);
+};
+
+export type AttendanceExceptionResult = "LATE" | "EARLY_LEAVE" | "NONE";
+export function attendanceExceptionForEvent(event: AttendanceEvent | null, workDate: string, schedule: WorkSchedule | null): AttendanceExceptionResult {
+  if (!event || !schedule) return "NONE";
+  const expected = event.kind === "CLOCK_IN" ? cairoWallClockInstant(workDate, schedule.expected_start) : cairoWallClockInstant(workDate, schedule.expected_end);
+  const grace = event.kind === "CLOCK_IN" ? schedule.grace_minutes * 60000 : 0;
+  if (event.kind === "CLOCK_IN" && Date.parse(event.occurred_at) > expected.getTime() + grace) return "LATE";
+  if (event.kind === "CLOCK_OUT" && Date.parse(event.occurred_at) < expected.getTime()) return "EARLY_LEAVE";
+  return "NONE";
+}
 
 export const organizationSchedule: WorkSchedule = {
   id: "schedule-org-egypt",
@@ -214,11 +262,18 @@ export function deriveAttendanceDays(events: AttendanceEvent[], employee: string
     const breaks = pairs.slice(1).reduce((sum, pair, index) => sum + Math.max(0, Math.round((Date.parse(pair[0].occurred_at) - Date.parse(pairs[index][1].occurred_at)) / 60000)), 0);
     const first = dayEvents.find((event) => event.kind === "CLOCK_IN")?.occurred_at ?? null;
     const last = [...dayEvents].reverse().find((event) => event.kind === "CLOCK_OUT")?.occurred_at ?? null;
-    const late = Boolean(schedule && first && Date.parse(first) > Date.parse(`${workDate}T${schedule.expected_start}:00+02:00`) + schedule.grace_minutes * 60000);
-    const early = Boolean(schedule && last && pairs.length && Date.parse(last) < Date.parse(`${workDate}T${schedule.expected_end}:00+02:00`));
-    days.push({ employee, work_date: workDate, first_in_at: first, last_out_at: last, worked_minutes: worked, break_minutes: breaks, status: open ? "INCOMPLETE" : worked ? "PRESENT" : "OPEN", exception: open ? "MISSING_CLOCK_OUT" : late ? "LATE" : early ? "EARLY_LEAVE" : "NONE", expected_minutes: schedule?.expected_daily_minutes ?? 0 });
+    const firstException = attendanceExceptionForEvent(first ? { id: "derived-first", employee, occurred_at: first, kind: "CLOCK_IN", source: "WEB", recorded_by: employee, created_at: first } : null, workDate, schedule);
+    const lastException = attendanceExceptionForEvent(last ? { id: "derived-last", employee, occurred_at: last, kind: "CLOCK_OUT", source: "WEB", recorded_by: employee, created_at: last } : null, workDate, schedule);
+    days.push({ employee, work_date: workDate, first_in_at: first, last_out_at: last, worked_minutes: worked, break_minutes: breaks, status: open ? "INCOMPLETE" : worked ? "PRESENT" : "OPEN", exception: open ? "MISSING_CLOCK_OUT" : firstException === "LATE" ? "LATE" : lastException === "EARLY_LEAVE" ? "EARLY_LEAVE" : "NONE", expected_minutes: schedule?.expected_daily_minutes ?? 0 });
   });
   return days.sort((a, b) => b.work_date.localeCompare(a.work_date));
+}
+
+export function mergeAttendanceDays(existing: AttendanceDay[], derived: AttendanceDay[]): AttendanceDay[] {
+  const derivedByDate = new Map(derived.map((day) => [day.work_date, day]));
+  const merged = existing.map((day) => derivedByDate.get(day.work_date) ?? day);
+  const existingDates = new Set(existing.map((day) => day.work_date));
+  return [...merged, ...derived.filter((day) => !existingDates.has(day.work_date))].sort((a, b) => b.work_date.localeCompare(a.work_date));
 }
 
 export function fixtureAttendanceDays(identity: DemoIdentity): AttendanceDay[] {

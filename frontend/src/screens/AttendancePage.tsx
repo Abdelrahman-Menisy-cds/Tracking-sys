@@ -3,14 +3,13 @@ import { Link } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
 import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../components/ui";
 import { ClockIcon, InfoIcon } from "../components/icons";
-import { identityEmployeeId, type AttendanceDay, type AttendanceEvent } from "../mock/attendance";
+import { attendanceExceptionForEvent, cairoDate, identityEmployeeId, type AttendanceDay, type AttendanceEvent } from "../mock/attendance";
 import PageHeader from "../components/layout/PageHeader";
 
 type Pair = { inAt: string; outAt: string | null };
 type Correction = { id: string; workDate: string; inAt: string; outAt: string; reason: string; status: "SUBMITTED" };
 
-const pad = (value: number) => String(value).padStart(2, "0");
-const todayIso = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const todayIso = () => cairoDate(new Date());
 const formatTime = (value: string | null, locale: "ar" | "en") => value ? new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "—";
 const formatDate = (value: string, locale: "ar" | "en") => new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(`${value}T12:00:00`));
 const duration = (minutes: number, locale: "ar" | "en") => { const h = Math.floor(minutes / 60); const m = minutes % 60; return locale === "ar" ? `${h} س ${m} د` : `${h}h ${m}m`; };
@@ -19,23 +18,19 @@ const minutesBetween = (start: string, end: string) => Math.max(0, Math.round((D
 function eventPairs(events: AttendanceEvent[], date: string): Pair[] {
   const pairs: Pair[] = [];
   let openAt: string | null = null;
-  events.filter((event) => event.occurred_at.slice(0, 10) === date).sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)).forEach((event) => {
+  events.filter((event) => cairoDate(new Date(event.occurred_at)) === date).sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)).forEach((event) => {
     if (event.kind === "CLOCK_IN") openAt = event.occurred_at;
     else if (openAt) { pairs.push({ inAt: openAt, outAt: event.occurred_at }); openAt = null; }
   });
   if (openAt) pairs.push({ inAt: openAt, outAt: null });
   return pairs;
 }
-function statusLabel(day: AttendanceDay, locale: "ar" | "en") {
-  const ar: Record<string, string> = { OPEN: "مفتوح", PRESENT: "حاضر", ABSENT_CANDIDATE: "غياب مرشح", ABSENT: "غائب", LEAVE: "إجازة", HOLIDAY: "عطلة", REMOTE: "عن بُعد", INCOMPLETE: "غير مكتمل" };
-  const en: Record<string, string> = { OPEN: "Open", PRESENT: "Present", ABSENT_CANDIDATE: "Absence candidate", ABSENT: "Absent", LEAVE: "Leave", HOLIDAY: "Holiday", REMOTE: "Remote", INCOMPLETE: "Incomplete" };
-  return (locale === "ar" ? ar : en)[day.status] ?? day.status;
-}
-function exceptionLabel(exception: AttendanceDay["exception"], locale: "ar" | "en") {
-  const ar: Record<string, string> = { LATE: "تأخر", EARLY_LEAVE: "انصراف مبكر", MISSING_CLOCK_OUT: "انصراف مفقود", NONE: "لا يوجد" };
-  const en: Record<string, string> = { LATE: "Late", EARLY_LEAVE: "Early leave", MISSING_CLOCK_OUT: "Missing clock-out", NONE: "None" };
-  return (locale === "ar" ? ar : en)[exception];
-}
+const statusKeys: Record<AttendanceDay["status"], "attendanceStatusOpen" | "attendanceStatusPresent" | "attendanceStatusAbsentCandidate" | "attendanceStatusAbsent" | "attendanceStatusLeave" | "attendanceStatusHoliday" | "attendanceStatusRemote" | "attendanceStatusIncomplete"> = {
+  OPEN: "attendanceStatusOpen", PRESENT: "attendanceStatusPresent", ABSENT_CANDIDATE: "attendanceStatusAbsentCandidate", ABSENT: "attendanceStatusAbsent", LEAVE: "attendanceStatusLeave", HOLIDAY: "attendanceStatusHoliday", REMOTE: "attendanceStatusRemote", INCOMPLETE: "attendanceStatusIncomplete",
+};
+const exceptionKeys: Record<AttendanceDay["exception"], "attendanceExceptionLate" | "attendanceExceptionEarlyLeave" | "attendanceExceptionMissingClockOut" | "attendanceExceptionNone"> = { LATE: "attendanceExceptionLate", EARLY_LEAVE: "attendanceExceptionEarlyLeave", MISSING_CLOCK_OUT: "attendanceExceptionMissingClockOut", NONE: "attendanceExceptionNone" };
+function statusLabel(day: AttendanceDay, t: (key: keyof import("../i18n/dict").Dict) => string) { return t(statusKeys[day.status]); }
+function exceptionLabel(exception: AttendanceDay["exception"], t: (key: keyof import("../i18n/dict").Dict) => string) { return t(exceptionKeys[exception]); }
 function statusTone(status: AttendanceDay["status"]): "neutral" | "info" | "success" | "warning" | "danger" {
   if (status === "PRESENT" || status === "REMOTE") return "success";
   if (status === "INCOMPLETE" || status === "ABSENT_CANDIDATE") return "warning";
@@ -52,8 +47,9 @@ function mutationMessage(code: string, locale: "ar" | "en") {
   return messages[code]?.[locale === "ar" ? 0 : 1] ?? (locale === "ar" ? "تعذر تنفيذ الإجراء." : "The action could not be completed.");
 }
 
-function AttendanceStatus({ day, locale }: { day: AttendanceDay; locale: "ar" | "en" }) {
-  return <span className="attendance-status-stack"><StatusPill tone={statusTone(day.status)} label={statusLabel(day, locale)} /><span className="muted">{exceptionLabel(day.exception, locale)}</span></span>;
+function AttendanceStatus({ day }: { day: AttendanceDay }) {
+  const { t } = useApp();
+  return <span className="attendance-status-stack"><StatusPill tone={statusTone(day.status)} label={statusLabel(day, t)} /><span className="muted">{exceptionLabel(day.exception, t)}</span></span>;
 }
 
 export function ClockAction({ compact = false }: { compact?: boolean }) {
@@ -78,7 +74,7 @@ function TodayPanel() {
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
   const closedWorked = pairs.reduce((sum, pair) => sum + (pair.outAt ? minutesBetween(pair.inAt, pair.outAt) : 0), 0);
   const running = open ? closedWorked + minutesBetween(pairs.at(-1)!.inAt, new Date().toISOString()) : closedWorked;
-  const late = Boolean(schedule && pairs[0] && Date.parse(pairs[0].inAt) > Date.parse(`${date}T${schedule.expected_start}:00`)+schedule.grace_minutes*60000);
+  const late = attendanceExceptionForEvent(pairs[0] ? { id: "panel-first", employee, occurred_at: pairs[0].inAt, kind: "CLOCK_IN", source: "WEB", recorded_by: employee, created_at: pairs[0].inAt } : null, date, schedule) === "LATE";
   const action = () => { const result = open ? clockOut() : clockIn(); setFeedback(result.ok ? { tone: "success", text: locale === "ar" ? "تم تسجيل الإجراء بنجاح." : "Attendance action recorded successfully." } : { tone: "error", text: mutationMessage(result.code, locale) }); };
   return <>
     {feedback ? <Banner tone={feedback.tone} role={feedback.tone === "error" ? "alert" : "status"}>{feedback.text}</Banner> : null}
@@ -99,7 +95,7 @@ export default function AttendancePage() {
 }
 
 function AttendanceTable({ days, locale, detail = false }: { days: AttendanceDay[]; locale: "ar" | "en"; detail?: boolean }) {
-  return <div className="table-wrap"><table aria-label={locale === "ar" ? "سجل الحضور" : "Attendance records"}><thead><tr><th>{locale === "ar" ? "التاريخ" : "Date"}</th><th>{locale === "ar" ? "أول دخول" : "First in"}</th><th>{locale === "ar" ? "آخر انصراف" : "Last out"}</th><th>{locale === "ar" ? "العمل" : "Worked"}</th><th>{locale === "ar" ? "الراحة" : "Break"}</th><th>{locale === "ar" ? "الحالة / الاستثناء" : "Status / exception"}</th>{detail ? <th>{locale === "ar" ? "الإجراء" : "Action"}</th> : null}</tr></thead><tbody>{days.map((day) => <tr key={day.work_date}><th scope="row"><bdi>{formatDate(day.work_date, locale)}</bdi></th><td><bdi>{formatTime(day.first_in_at, locale)}</bdi></td><td><bdi>{formatTime(day.last_out_at, locale)}</bdi></td><td>{duration(day.worked_minutes, locale)}</td><td>{duration(day.break_minutes, locale)}</td><td><AttendanceStatus day={day} locale={locale} /></td>{detail ? <td>{day.status === "INCOMPLETE" || day.status === "ABSENT_CANDIDATE" ? <Link className="btn btn-ghost btn-compact" to="/attendance/corrections">{locale === "ar" ? "طلب تصحيح" : "Request correction"}</Link> : null}</td> : null}</tr>)}</tbody></table><div className="mobile-record-list">{days.map((day) => <article className="record-block" key={`mobile-${day.work_date}`}><strong><bdi>{formatDate(day.work_date, locale)}</bdi></strong><AttendanceStatus day={day} locale={locale} /><span>{locale === "ar" ? "العمل" : "Worked"}: {duration(day.worked_minutes, locale)} · {locale === "ar" ? "الراحة" : "Break"}: {duration(day.break_minutes, locale)}</span>{day.status === "INCOMPLETE" || day.status === "ABSENT_CANDIDATE" ? <Link className="btn btn-secondary" to="/attendance/corrections">{locale === "ar" ? "طلب تصحيح" : "Request correction"}</Link> : null}</article>)}</div></div>;
+  return <div className="table-wrap"><table aria-label={locale === "ar" ? "سجل الحضور" : "Attendance records"}><thead><tr><th>{locale === "ar" ? "التاريخ" : "Date"}</th><th>{locale === "ar" ? "أول دخول" : "First in"}</th><th>{locale === "ar" ? "آخر انصراف" : "Last out"}</th><th>{locale === "ar" ? "العمل" : "Worked"}</th><th>{locale === "ar" ? "الراحة" : "Break"}</th><th>{locale === "ar" ? "الحالة / الاستثناء" : "Status / exception"}</th>{detail ? <th>{locale === "ar" ? "الإجراء" : "Action"}</th> : null}</tr></thead><tbody>{days.map((day) => <tr key={day.work_date}><th scope="row"><bdi>{formatDate(day.work_date, locale)}</bdi></th><td><bdi>{formatTime(day.first_in_at, locale)}</bdi></td><td><bdi>{formatTime(day.last_out_at, locale)}</bdi></td><td>{duration(day.worked_minutes, locale)}</td><td>{duration(day.break_minutes, locale)}</td><td><AttendanceStatus day={day} /></td>{detail ? <td>{day.status === "INCOMPLETE" || day.status === "ABSENT_CANDIDATE" ? <Link className="btn btn-ghost btn-compact" to="/attendance/corrections">{locale === "ar" ? "طلب تصحيح" : "Request correction"}</Link> : null}</td> : null}</tr>)}</tbody></table><div className="mobile-record-list">{days.map((day) => <article className="record-block" key={`mobile-${day.work_date}`}><strong><bdi>{formatDate(day.work_date, locale)}</bdi></strong><AttendanceStatus day={day} /><span>{locale === "ar" ? "العمل" : "Worked"}: {duration(day.worked_minutes, locale)} · {locale === "ar" ? "الراحة" : "Break"}: {duration(day.break_minutes, locale)}</span>{day.status === "INCOMPLETE" || day.status === "ABSENT_CANDIDATE" ? <Link className="btn btn-secondary" to="/attendance/corrections">{locale === "ar" ? "طلب تصحيح" : "Request correction"}</Link> : null}</article>)}</div></div>;
 }
 
 export function AttendanceHistoryPage() {

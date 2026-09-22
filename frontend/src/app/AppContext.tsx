@@ -31,6 +31,7 @@ import {
   attendanceSchedules,
   deriveAttendanceDays,
   fixtureAttendanceDays,
+  mergeAttendanceDays,
   identityEmployeeId,
   leaveBalancesByIdentity,
   leaveBalanceSummary as deriveLeaveBalanceSummary,
@@ -316,7 +317,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setIdentityStates((current) => {
         const identityState = current[commandIdentity];
         const nextEvents = [...identityState.attendanceEvents, event];
-        return { ...current, [commandIdentity]: { ...identityState, attendanceEvents: nextEvents, attendanceDays: deriveAttendanceDays(nextEvents, employee, identityState.schedules) } };
+        return { ...current, [commandIdentity]: { ...identityState, attendanceEvents: nextEvents, attendanceDays: mergeAttendanceDays(identityState.attendanceDays, deriveAttendanceDays(nextEvents, employee, identityState.schedules)) } };
       });
     }, 150);
     return { ok: true, value: event };
@@ -332,7 +333,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const additions: AttendanceEvent[] = [{ id: `demo-correction-in-${Date.now()}`, employee, occurred_at: input.inAt, kind: "CLOCK_IN", source: "WEB", recorded_by: employee, created_at: new Date().toISOString(), note: input.reason }];
         if (input.outAt) additions.push({ id: `demo-correction-out-${Date.now()}`, employee, occurred_at: input.outAt, kind: "CLOCK_OUT", source: "WEB", recorded_by: employee, created_at: new Date().toISOString(), note: input.reason });
         const events = [...state.attendanceEvents, ...additions];
-        return { ...current, [commandIdentity]: { ...state, attendanceEvents: events, attendanceDays: deriveAttendanceDays(events, employee, state.schedules) } };
+        return { ...current, [commandIdentity]: { ...state, attendanceEvents: events, attendanceDays: mergeAttendanceDays(state.attendanceDays, deriveAttendanceDays(events, employee, state.schedules)) } };
       });
     }, 150);
     return { ok: true };

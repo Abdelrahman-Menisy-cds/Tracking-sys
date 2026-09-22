@@ -36,8 +36,6 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/attendance/history" element={<AttendanceHistoryPage />} />
             <Route path="/attendance/corrections" element={<AttendanceCorrectionsPage />} />
-            <Route path="/attendance/team" element={<AttendancePage />} />
-            <Route path="/attendance/schedule" element={<AttendancePage />} />
           </Route>
         </Routes>
       </BrowserRouter>

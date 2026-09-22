@@ -160,8 +160,6 @@ export default function AppShell() {
       items: [
         { to: "/attendance", label: t("attendanceTitle"), icon: CalendarIcon },
         { to: "/attendance/history", label: t("navAttendanceHistory"), icon: ClockIcon },
-        ...(capabilities.canViewTeamAttendance ? [{ to: "/attendance/team", label: t("navAttendanceTeam"), icon: ActivityIcon }] : []),
-        ...(capabilities.canSetScheduleForReports || capabilities.canSetOrgSchedule ? [{ to: "/attendance/schedule", label: t("navAttendanceSchedule"), icon: CalendarIcon }] : []),
       ],
     },
     ...(capabilities.canReview
