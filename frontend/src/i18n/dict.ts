@@ -162,6 +162,8 @@ export const dict = {
     noNotifications: "لا توجد إشعارات.",
     relatedRecord: "السجل المرتبط",
     relatedUnavailable: "هذا المحتوى غير متاح لك.",
+    openRelatedRecord: "فتح السجل المرتبط",
+
     // states
     errorNetwork: "تعذر الاتصال بالخادم. تحقق من الاتصال وأعد المحاولة.",
     errorGeneric: "حدث خطأ غير متوقع. أعد المحاولة.",
@@ -321,6 +323,7 @@ export const dict = {
     noNotifications: "No notifications.",
     relatedRecord: "Related record",
     relatedUnavailable: "This content is not available to you.",
+    openRelatedRecord: "Open the related record",
     errorNetwork: "Could not reach the server. Check your connection and retry.",
     errorGeneric: "Something unexpected went wrong. Please retry.",
     emptyFirstUse: "No data yet.",

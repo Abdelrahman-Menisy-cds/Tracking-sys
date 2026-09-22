@@ -85,11 +85,25 @@ export default function NotificationsPage() {
             {notificationItems.map((notification) => {
               const title = notification.title[locale];
               return (
-                <li className="compact-row notification-row" key={notification.id}>
+                <li className={`compact-row notification-row${notification.related_object?.available ? " notification-row--link" : ""}`} key={notification.id}>
                   <div>
                     <div className="notification-title">
                       <StatusPill tone={notification.is_read ? "neutral" : "unread"} label={notification.is_read ? t("read") : t("unread")} icon={notification.is_read ? "approved" : "unread"} />
-                      <strong>{title}</strong>
+                      {notification.related_object?.available ? (
+                        <Link
+                          className="notification-title-link"
+                          to={`/requests/${notification.related_object.id}`}
+                          aria-label={`${t("openRelatedRecord")}: ${title}`}
+                          onKeyDown={(event) => {
+                            if (event.key === " ") {
+                              event.preventDefault();
+                              event.currentTarget.click();
+                            }
+                          }}
+                        >
+                          <strong>{title}</strong>
+                        </Link>
+                      ) : <strong>{title}</strong>}
                     </div>
                     <p><bdi>{notification.body[locale]}</bdi></p>
                     <div className="muted">{formatDateTime(notification.created_at, locale)}{notification.related_object && !notification.related_object.available ? <> · {t("relatedRecord")}: {t("relatedUnavailable")}</> : null}</div>
@@ -98,9 +112,6 @@ export default function NotificationsPage() {
                     <div className="row-actions" aria-label={locale === "ar" ? "إجراءات الإشعار" : "Notification actions"}>
                       <div className="row-action-slot">
                         {!notification.is_read ? <button className="btn btn-secondary" type="button" onClick={() => markNotificationRead(notification.id)}>{t("markRead")}</button> : null}
-                      </div>
-                      <div className="row-action-slot">
-                        {notification.related_object?.available ? <Link className="btn btn-secondary" to={`/requests/${notification.related_object.id}`}>{locale === "ar" ? "فتح السجل" : "Open record"}</Link> : null}
                       </div>
                     </div>
                     <button
