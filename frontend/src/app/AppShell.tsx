@@ -290,6 +290,15 @@ export default function AppShell() {
               >
                 <ThemeIcon />
               </button>
+              <button
+                type="button"
+                className="btn btn-secondary icon-only language-toggle-header"
+                aria-pressed={locale === "en"}
+                aria-label={targetLocale === "ar" ? t("switchToArabic") : t("switchToEnglish")}
+                onClick={() => setLocale(targetLocale)}
+              >
+                <GlobeIcon />
+              </button>
               <div className="profile-menu-wrap">
                 <button
                   ref={profileButtonRef}
@@ -311,28 +320,11 @@ export default function AppShell() {
                       <span className="profile-menu-name"><bdi>{localizedName}</bdi></span>
                       <span className="profile-menu-meta">{localizedRole} · <bdi>{activeUser.email}</bdi></span>
                     </div>
-                    <div className="profile-settings-section" role="group" aria-label={t("settingsSection")}>
-                      <span className="profile-settings-title">{t("settingsSection")}</span>
-                      <div className="profile-settings-actions">
-                        <button
-                          ref={(element) => { profileMenuItemsRef.current[0] = element; }}
-                          type="button"
-                          className="btn btn-secondary preference-toggle language-toggle"
-                          role="menuitem"
-                          aria-pressed={locale === "en"}
-                          aria-label={targetLocale === "ar" ? t("switchToArabic") : t("switchToEnglish")}
-                          onClick={() => setLocale(targetLocale)}
-                        >
-                          <GlobeIcon />
-                          <span aria-hidden="true">{targetLocale.toUpperCase()}</span>
-                        </button>
-                      </div>
-                    </div>
-                    <button ref={(element) => { profileMenuItemsRef.current[1] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/profile"); }}>
+                    <button ref={(element) => { profileMenuItemsRef.current[0] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/profile"); }}>
                       <UserIcon />
                       {t("account")}
                     </button>
-                    <button ref={(element) => { profileMenuItemsRef.current[2] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/login"); }}>
+                    <button ref={(element) => { profileMenuItemsRef.current[1] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/login"); }}>
                       <LogoutIcon />
                       {t("signOut")}
                     </button>

@@ -66,7 +66,7 @@ await evaluate(`(() => {
   fixture.id = 'contrast-fixture';
   fixture.style.cssText = 'position:fixed;inset:0 auto auto 0;z-index:99999;display:flex;gap:8px;padding:8px;background:var(--surface);';
   const style = document.createElement('style'); style.textContent = '#contrast-fixture, #contrast-fixture * { transition: none !important; animation: none !important; }'; document.head.append(style);
-  fixture.innerHTML = ['primary','secondary','ghost','danger','preference-toggle language-toggle','theme-toggle-header'].map((v, index) => '<a class="btn '+(index > 3 ? 'btn-secondary '+v : 'btn-'+v)+'" href="#" data-contrast-variant="'+(index > 3 ? (index === 4 ? 'language-toggle' : 'theme-toggle-header') : v)+'">'+v+'</a>').join('');
+  fixture.innerHTML = ['primary','secondary','ghost','danger','language-toggle-header','theme-toggle-header'].map((v, index) => '<a class="btn '+(index > 3 ? 'btn-secondary '+v : 'btn-'+v)+'" href="#" data-contrast-variant="'+(index > 3 ? v : v)+'">'+v+'</a>').join('');
   document.body.append(fixture);
 })()`);
 const root = (await cdp("DOM.getDocument", { depth: -1, pierce: true })).root.nodeId;
@@ -83,8 +83,8 @@ const contrastFor = `((selector) => {
 for (const theme of ["light", "dark"]) {
   await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)}`);
   await delay(500);
-  for (const variant of ["primary", "secondary", "ghost", "danger", "language-toggle", "theme-toggle-header"]) {
-    const selector = variant === "language-toggle" || variant === "theme-toggle-header"
+  for (const variant of ["primary", "secondary", "ghost", "danger", "language-toggle-header", "theme-toggle-header"]) {
+    const selector = variant === "language-toggle-header" || variant === "theme-toggle-header"
       ? `#contrast-fixture [data-contrast-variant="${variant}"]`
       : `#contrast-fixture .btn-${variant}`;
     const node = await cdp("DOM.querySelector", { nodeId: root, selector });
