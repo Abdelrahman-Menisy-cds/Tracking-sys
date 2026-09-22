@@ -281,6 +281,15 @@ export default function AppShell() {
             </button>
             <strong>{currentLabel}</strong>
             <div className="header-actions">
+              <button
+                type="button"
+                className="btn btn-secondary icon-only theme-toggle-header"
+                aria-pressed={resolvedTheme === "dark"}
+                aria-label={targetTheme === "light" ? t("switchToLight") : t("switchToDark")}
+                onClick={() => setAppearance(targetTheme)}
+              >
+                <ThemeIcon />
+              </button>
               <div className="profile-menu-wrap">
                 <button
                   ref={profileButtonRef}
@@ -317,25 +326,13 @@ export default function AppShell() {
                           <GlobeIcon />
                           <span aria-hidden="true">{targetLocale.toUpperCase()}</span>
                         </button>
-                        <button
-                          ref={(element) => { profileMenuItemsRef.current[1] = element; }}
-                          type="button"
-                          className="btn btn-secondary preference-toggle theme-toggle"
-                          role="menuitem"
-                          aria-pressed={resolvedTheme === "dark"}
-                          aria-label={targetTheme === "light" ? t("switchToLight") : t("switchToDark")}
-                          onClick={() => setAppearance(targetTheme)}
-                        >
-                          <ThemeIcon />
-                          <span>{targetTheme === "light" ? t("appearanceLight") : t("appearanceDark")}</span>
-                        </button>
                       </div>
                     </div>
-                    <button ref={(element) => { profileMenuItemsRef.current[2] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => closeProfileMenu()}>
+                    <button ref={(element) => { profileMenuItemsRef.current[1] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/profile"); }}>
                       <UserIcon />
                       {t("account")}
                     </button>
-                    <button ref={(element) => { profileMenuItemsRef.current[3] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/login"); }}>
+                    <button ref={(element) => { profileMenuItemsRef.current[2] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/login"); }}>
                       <LogoutIcon />
                       {t("signOut")}
                     </button>

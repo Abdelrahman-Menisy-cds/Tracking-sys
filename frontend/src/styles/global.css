@@ -332,6 +332,12 @@ button { cursor: pointer; }
 
 .profile-menu-wrap { position: relative; }
 .profile-trigger { min-height: var(--control-min-h); }
+.icon-only { inline-size: var(--control-min-h); padding-inline: var(--space-0); }
+.theme-toggle-header { flex: 0 0 auto; }
+.profile-details { display: grid; gap: var(--sp-2); margin: var(--space-0); }
+.profile-details .record-field { padding-block: var(--sp-3); border-block-end: var(--timeline-width) solid var(--border-subtle); }
+.profile-details .record-field:last-child { border-block-end: 0; }
+.profile-details dd { margin: var(--space-0); overflow-wrap: anywhere; }
 .profile-menu {
   position: absolute;
   z-index: 45;
@@ -501,7 +507,7 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
   .app-main { padding: var(--sp-4) var(--sp-4) var(--sp-8); }
   .app-header { margin-block-end: var(--sp-6); }
   .app-header > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .header-actions { display: flex; flex: 0 1 auto; min-width: 0; }
+  .header-actions { display: flex; flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; }
   .profile-trigger { max-inline-size: 100%; padding-inline: var(--sp-2); gap: var(--sp-1); font-size: 0; }
   .profile-trigger .icon { width: var(--icon-size); height: var(--icon-size); }
   .page-header { display: grid; align-items: start; gap: var(--sp-4); margin-block-end: var(--sp-6); }

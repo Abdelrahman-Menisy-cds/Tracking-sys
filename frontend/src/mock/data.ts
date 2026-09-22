@@ -132,11 +132,53 @@ const ev = (
   created_at: iso(daysAgo),
 });
 
-/** Current demo user names per role. */
-export const demoUser = {
-  employee: { name: { ar: "كريم مصطفى", en: "Karim Mostafa" }, email: "karim.mostafa@example.com" },
-  manager: { name: { ar: "هالة عبد الرحمن", en: "Hala Abdelrahman" }, email: "hala.abdelrahman@example.com" },
-  hr: { name: { ar: "منى شريف", en: "Mona Sherif" }, email: "mona.sherif@example.com" },
+/** Current demo identities per role; all values are fictional fixture data. */
+export interface DemoUserProfile {
+  name: { ar: string; en: string };
+  email: string;
+  jobTitle: { ar: string; en: string };
+  department: { ar: string; en: string };
+  employeeNumber: string;
+  phone: string;
+  address: { ar: string; en: string };
+  directManager: { ar: string; en: string };
+  joinDate: string;
+}
+
+export const demoUser: Record<Role, DemoUserProfile> = {
+  employee: {
+    name: { ar: "كريم مصطفى", en: "Karim Mostafa" },
+    email: "karim.mostafa@example.com",
+    jobTitle: { ar: "أخصائي عمليات", en: "Operations Specialist" },
+    department: { ar: "العمليات", en: "Operations" },
+    employeeNumber: "EMP-1042",
+    phone: "+20 10 5555 1842",
+    address: { ar: "شارع النيل، الدقي، الجيزة", en: "Nile Street, Dokki, Giza" },
+    directManager: { ar: "هالة عبد الرحمن", en: "Hala Abdelrahman" },
+    joinDate: "2022-04-17",
+  },
+  manager: {
+    name: { ar: "هالة عبد الرحمن", en: "Hala Abdelrahman" },
+    email: "hala.abdelrahman@example.com",
+    jobTitle: { ar: "مدير عمليات الموظفين", en: "Employee Operations Manager" },
+    department: { ar: "العمليات", en: "Operations" },
+    employeeNumber: "MGR-2087",
+    phone: "+20 11 2740 6381",
+    address: { ar: "شارع الثورة، مصر الجديدة، القاهرة", en: "El-Thawra Street, Heliopolis, Cairo" },
+    directManager: { ar: "طارق منصور", en: "Tarek Mansour" },
+    joinDate: "2019-09-02",
+  },
+  hr: {
+    name: { ar: "منى شريف", en: "Mona Sherif" },
+    email: "mona.sherif@example.com",
+    jobTitle: { ar: "شريك أعمال الموارد البشرية", en: "HR Business Partner" },
+    department: { ar: "الموارد البشرية", en: "Human Resources" },
+    employeeNumber: "HR-3016",
+    phone: "+20 12 8831 4027",
+    address: { ar: "شارع التسعين، التجمع الخامس، القاهرة", en: "90th Street, New Cairo, Cairo" },
+    directManager: { ar: "سارة حمدي", en: "Sara Hamdy" },
+    joinDate: "2020-01-13",
+  },
 };
 
 /** Team members for manager/HR demo scope. */
