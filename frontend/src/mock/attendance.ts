@@ -1,0 +1,247 @@
+import type { Role } from "../i18n/dict";
+
+export type DemoIdentity = Role;
+
+export type AttendanceEventKind = "CLOCK_IN" | "CLOCK_OUT";
+export type AttendanceEventSource = "WEB";
+export type AttendanceDayStatus = "OPEN" | "PRESENT" | "ABSENT_CANDIDATE" | "ABSENT" | "LEAVE" | "HOLIDAY" | "REMOTE" | "INCOMPLETE";
+export type AttendanceException = "LATE" | "EARLY_LEAVE" | "MISSING_CLOCK_OUT" | "NONE";
+export type ScheduleScope = "ORGANIZATION" | "TEAM" | "EMPLOYEE";
+export type LeaveTypeCode = "ANNUAL" | "SICK" | "UNPAID" | "EMERGENCY";
+
+export interface AttendanceEvent {
+  id: string;
+  employee: string;
+  occurred_at: string;
+  kind: AttendanceEventKind;
+  source: AttendanceEventSource;
+  recorded_by: string;
+  created_at: string;
+  note?: string;
+}
+
+export interface AttendanceDay {
+  employee: string;
+  work_date: string;
+  first_in_at: string | null;
+  last_out_at: string | null;
+  worked_minutes: number;
+  break_minutes: number;
+  status: AttendanceDayStatus;
+  exception: AttendanceException;
+  expected_minutes: number;
+  justification?: string;
+  resolved_by?: string;
+  resolved_at?: string;
+}
+
+export interface WorkSchedule {
+  id: string;
+  scope: ScheduleScope;
+  target?: string;
+  working_weekdays: number[];
+  expected_start: string;
+  expected_end: string;
+  expected_daily_minutes: number;
+  grace_minutes: number;
+  effective_from: string;
+  effective_to?: string;
+}
+
+export interface LeaveType {
+  code: LeaveTypeCode;
+  is_paid: boolean;
+  requires_attachment: boolean;
+  counts_against_balance: boolean;
+  allow_negative: boolean;
+}
+
+export interface LeaveAdjustment {
+  id: string;
+  days: number;
+  reason: string;
+  created_at: string;
+  recorded_by: string;
+}
+
+export interface LeaveBalance {
+  employee: string;
+  leave_type: LeaveTypeCode;
+  period: string;
+  entitlement_days: number;
+  carry_over_days: number;
+  carry_over_cap_days: number;
+  carry_over_expiry_months: number;
+  used_days: number;
+  pending_days: number;
+  adjustments: LeaveAdjustment[];
+}
+
+export type AttendanceMutationCode = "CAPABILITY_DENIED" | "CLOCK_IN_ALREADY_OPEN" | "CLOCK_OUT_WITHOUT_OPEN_CLOCK_IN" | "MISSING_RECORD" | "INVALID_INPUT";
+export type AttendanceMutationResult<T = void> =
+  | { ok: true; value?: T }
+  | { ok: false; code: AttendanceMutationCode };
+
+const cairoDate = (date: Date) => date.toISOString().slice(0, 10);
+const dateAt = (daysAgo: number, hour: number, minute = 0) => {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() - daysAgo);
+  date.setUTCHours(hour - 2, minute, 0, 0);
+  return date;
+};
+const isEgyptWorkingDay = (date: Date) => date.getUTCDay() >= 0 && date.getUTCDay() <= 4;
+
+export const organizationSchedule: WorkSchedule = {
+  id: "schedule-org-egypt",
+  scope: "ORGANIZATION",
+  working_weekdays: [0, 1, 2, 3, 4],
+  expected_start: "09:00",
+  expected_end: "17:00",
+  expected_daily_minutes: 480,
+  grace_minutes: 15,
+  effective_from: "2024-01-01",
+};
+
+export const employeeScheduleOverride: WorkSchedule = {
+  id: "schedule-e1-operations",
+  scope: "EMPLOYEE",
+  target: "e1",
+  working_weekdays: [0, 1, 2, 3, 4],
+  expected_start: "09:30",
+  expected_end: "16:30",
+  expected_daily_minutes: 420,
+  grace_minutes: 10,
+  effective_from: "2025-01-01",
+};
+
+export const attendanceSchedules: WorkSchedule[] = [organizationSchedule, employeeScheduleOverride];
+
+export const leaveTypes: LeaveType[] = [
+  { code: "ANNUAL", is_paid: true, requires_attachment: false, counts_against_balance: true, allow_negative: false },
+  { code: "SICK", is_paid: true, requires_attachment: true, counts_against_balance: true, allow_negative: false },
+  { code: "UNPAID", is_paid: false, requires_attachment: false, counts_against_balance: false, allow_negative: true },
+  { code: "EMERGENCY", is_paid: true, requires_attachment: false, counts_against_balance: true, allow_negative: false },
+];
+
+const fixtureNames: Record<string, string> = { e1: "demo-employee", m1: "demo-manager", hr1: "demo-hr" };
+
+function eventsForEmployee(employee: string, prefix: string): AttendanceEvent[] {
+  const events: AttendanceEvent[] = [];
+  let workingIndex = 0;
+  for (let daysAgo = 1; daysAgo <= 35 && workingIndex < 20; daysAgo += 1) {
+    const date = dateAt(daysAgo, 9);
+    if (!isEgyptWorkingDay(date)) continue;
+    const workDate = cairoDate(date);
+    const created = date.toISOString();
+    const add = (kind: AttendanceEventKind, hour: number, minute = 0, note?: string) => events.push({
+      id: `${prefix}-${workDate}-${kind.toLowerCase()}-${events.length}`,
+      employee,
+      occurred_at: dateAt(daysAgo, hour, minute).toISOString(),
+      kind,
+      source: "WEB",
+      recorded_by: employee,
+      created_at: created,
+      note,
+    });
+    const pattern = workingIndex % 8;
+    if (pattern === 3) {
+      // A closed scheduled day with no events becomes ABSENT_CANDIDATE.
+    } else if (pattern === 4) {
+      add("CLOCK_IN", 9, 40, "Late arrival");
+      add("CLOCK_OUT", 17);
+    } else if (pattern === 5) {
+      add("CLOCK_IN", 9);
+      add("CLOCK_OUT", 14, 30, "Early departure");
+    } else if (pattern === 6) {
+      add("CLOCK_IN", 9, 15);
+      // Intentionally unmatched so the derived day is INCOMPLETE.
+    } else {
+      add("CLOCK_IN", pattern === 1 ? 9 : 9, pattern === 1 ? 5 : 0);
+      add("CLOCK_OUT", 13);
+      add("CLOCK_IN", 14);
+      add("CLOCK_OUT", 17);
+    }
+    workingIndex += 1;
+  }
+  return events;
+}
+
+export const attendanceEventsByIdentity: Record<DemoIdentity, AttendanceEvent[]> = {
+  employee: eventsForEmployee("e1", "att-e1"),
+  manager: eventsForEmployee("m1", "att-m1"),
+  hr: eventsForEmployee("hr1", "att-hr1"),
+};
+
+export const leaveBalancesByIdentity: Record<DemoIdentity, LeaveBalance[]> = {
+  employee: [
+    { employee: "e1", leave_type: "ANNUAL", period: "2026", entitlement_days: 21, carry_over_days: 3, carry_over_cap_days: 5, carry_over_expiry_months: 3, used_days: 4, pending_days: 2, adjustments: [{ id: "adj-e1-1", days: 1, reason: "Service recognition grant", created_at: "2026-01-03T09:00:00Z", recorded_by: "hr1" }] },
+    { employee: "e1", leave_type: "SICK", period: "2026", entitlement_days: 14, carry_over_days: 0, carry_over_cap_days: 0, carry_over_expiry_months: 0, used_days: 1, pending_days: 0, adjustments: [] },
+  ],
+  manager: [
+    { employee: "m1", leave_type: "ANNUAL", period: "2026", entitlement_days: 24, carry_over_days: 2, carry_over_cap_days: 5, carry_over_expiry_months: 3, used_days: 7, pending_days: 1, adjustments: [{ id: "adj-m1-1", days: -1, reason: "Prior-period correction", created_at: "2026-02-08T09:00:00Z", recorded_by: "hr1" }] },
+  ],
+  hr: [
+    { employee: "hr1", leave_type: "ANNUAL", period: "2026", entitlement_days: 25, carry_over_days: 4, carry_over_cap_days: 5, carry_over_expiry_months: 3, used_days: 3, pending_days: 2, adjustments: [{ id: "adj-hr1-1", days: 2, reason: "Accrual correction", created_at: "2026-01-05T09:00:00Z", recorded_by: "hr1" }] },
+  ],
+};
+
+export function resolveScheduleFixture(employee: string, date: string, schedules = attendanceSchedules): WorkSchedule | null {
+  const active = schedules.filter((schedule) => schedule.effective_from <= date && (!schedule.effective_to || date <= schedule.effective_to));
+  const employeeMatch = active.filter((schedule) => schedule.scope === "EMPLOYEE" && schedule.target === employee).sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0];
+  if (employeeMatch) return employeeMatch;
+  const teamMatch = active.filter((schedule) => schedule.scope === "TEAM").sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0];
+  if (teamMatch) return teamMatch;
+  return active.filter((schedule) => schedule.scope === "ORGANIZATION").sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0] ?? null;
+}
+
+export function deriveAttendanceDays(events: AttendanceEvent[], employee: string, schedules = attendanceSchedules): AttendanceDay[] {
+  const byDate = new Map<string, AttendanceEvent[]>();
+  events.filter((event) => event.employee === employee).sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)).forEach((event) => {
+    const date = cairoDate(new Date(event.occurred_at));
+    byDate.set(date, [...(byDate.get(date) ?? []), event]);
+  });
+  const days: AttendanceDay[] = [];
+  byDate.forEach((dayEvents, workDate) => {
+    const schedule = resolveScheduleFixture(employee, workDate, schedules);
+    const pairs: Array<[AttendanceEvent, AttendanceEvent]> = [];
+    let open: AttendanceEvent | null = null;
+    dayEvents.forEach((event) => {
+      if (event.kind === "CLOCK_IN") open = event;
+      else if (open) { pairs.push([open, event]); open = null; }
+    });
+    const worked = pairs.reduce((sum, pair) => sum + Math.max(0, Math.round((Date.parse(pair[1].occurred_at) - Date.parse(pair[0].occurred_at)) / 60000)), 0);
+    const breaks = pairs.slice(1).reduce((sum, pair, index) => sum + Math.max(0, Math.round((Date.parse(pair[0].occurred_at) - Date.parse(pairs[index][1].occurred_at)) / 60000)), 0);
+    const first = dayEvents.find((event) => event.kind === "CLOCK_IN")?.occurred_at ?? null;
+    const last = [...dayEvents].reverse().find((event) => event.kind === "CLOCK_OUT")?.occurred_at ?? null;
+    const late = Boolean(schedule && first && Date.parse(first) > Date.parse(`${workDate}T${schedule.expected_start}:00+02:00`) + schedule.grace_minutes * 60000);
+    const early = Boolean(schedule && last && pairs.length && Date.parse(last) < Date.parse(`${workDate}T${schedule.expected_end}:00+02:00`));
+    days.push({ employee, work_date: workDate, first_in_at: first, last_out_at: last, worked_minutes: worked, break_minutes: breaks, status: open ? "INCOMPLETE" : worked ? "PRESENT" : "OPEN", exception: open ? "MISSING_CLOCK_OUT" : late ? "LATE" : early ? "EARLY_LEAVE" : "NONE", expected_minutes: schedule?.expected_daily_minutes ?? 0 });
+  });
+  return days.sort((a, b) => b.work_date.localeCompare(a.work_date));
+}
+
+export function fixtureAttendanceDays(identity: DemoIdentity): AttendanceDay[] {
+  const employee = identity === "employee" ? "e1" : identity === "manager" ? "m1" : "hr1";
+  const events = attendanceEventsByIdentity[identity];
+  const days = deriveAttendanceDays(events, employee);
+  const existing = new Set(days.map((day) => day.work_date));
+  let absentAdded = false;
+  for (let daysAgo = 1; daysAgo <= 35 && !absentAdded; daysAgo += 1) {
+    const date = dateAt(daysAgo, 9);
+    const workDate = cairoDate(date);
+    if (isEgyptWorkingDay(date) && !existing.has(workDate)) {
+      days.push({ employee, work_date: workDate, first_in_at: null, last_out_at: null, worked_minutes: 0, break_minutes: 0, status: "ABSENT_CANDIDATE", exception: "NONE", expected_minutes: resolveScheduleFixture(employee, workDate)?.expected_daily_minutes ?? 0 });
+      absentAdded = true;
+    }
+  }
+  return days.sort((a, b) => b.work_date.localeCompare(a.work_date));
+}
+
+export function leaveBalanceSummary(balance: LeaveBalance) {
+  const adjustments = balance.adjustments.reduce((sum, adjustment) => sum + adjustment.days, 0);
+  return { ...balance, adjustments_total: adjustments, remaining: balance.entitlement_days + balance.carry_over_days + adjustments - balance.used_days - balance.pending_days };
+}
+
+export function identityEmployeeId(identity: DemoIdentity): string { return identity === "employee" ? "e1" : identity === "manager" ? "m1" : "hr1"; }
+export { fixtureNames };

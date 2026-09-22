@@ -13,6 +13,7 @@ import { MyTimesheetsPage, TimesheetDetailPage } from "./screens/MyTimesheetsPag
 import TeamReviewsPage, { ReviewRequestDetailPage, ReviewTimesheetDetailPage } from "./screens/TeamReviewsPage";
 import NotificationsPage from "./screens/NotificationsPage";
 import ProfilePage from "./screens/ProfilePage";
+import AttendancePlaceholderPage from "./screens/AttendancePlaceholderPage";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -32,6 +33,10 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/reviews/timesheets/:id" element={<ReviewTimesheetDetailPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/attendance" element={<AttendancePlaceholderPage />} />
+            <Route path="/attendance/history" element={<AttendancePlaceholderPage />} />
+            <Route path="/attendance/team" element={<AttendancePlaceholderPage />} />
+            <Route path="/attendance/schedule" element={<AttendancePlaceholderPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

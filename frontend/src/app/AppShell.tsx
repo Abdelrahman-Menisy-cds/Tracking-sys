@@ -6,6 +6,7 @@ import BrandLockup from "../components/brand/BrandLockup";
 import {
   ActivityIcon,
   BellIcon,
+  CalendarIcon,
   ChevronDownIcon,
   ClockIcon,
   DocumentIcon,
@@ -151,6 +152,15 @@ export default function AppShell() {
         { to: "/", label: t("navHome"), end: true, icon: HomeIcon },
         { to: "/requests", label: t("navMyRequests"), icon: DocumentIcon },
         { to: "/timesheets", label: t("navMyTimesheets"), icon: ClockIcon },
+      ],
+    },
+    {
+      label: t("navAttendance"),
+      items: [
+        { to: "/attendance", label: t("attendanceTitle"), icon: CalendarIcon },
+        { to: "/attendance/history", label: t("navAttendanceHistory"), icon: ClockIcon },
+        ...(capabilities.canViewTeamAttendance ? [{ to: "/attendance/team", label: t("navAttendanceTeam"), icon: ActivityIcon }] : []),
+        ...(capabilities.canSetScheduleForReports || capabilities.canSetOrgSchedule ? [{ to: "/attendance/schedule", label: t("navAttendanceSchedule"), icon: CalendarIcon }] : []),
       ],
     },
     ...(capabilities.canReview

@@ -26,6 +26,22 @@ import {
   type TimesheetMock,
   type TimesheetStatus,
 } from "../mock/data";
+import {
+  attendanceEventsByIdentity,
+  attendanceSchedules,
+  deriveAttendanceDays,
+  fixtureAttendanceDays,
+  identityEmployeeId,
+  leaveBalancesByIdentity,
+  leaveBalanceSummary as deriveLeaveBalanceSummary,
+  resolveScheduleFixture,
+  type AttendanceDay,
+  type AttendanceEvent,
+  type AttendanceEventKind,
+  type AttendanceMutationResult,
+  type LeaveBalance,
+  type WorkSchedule,
+} from "../mock/attendance";
 
 export type Appearance = "system" | "light" | "dark";
 
@@ -71,8 +87,16 @@ export type DemoMutationIssue = "conflict" | "unknown" | "missing";
  */
 export const DEMO_MODE = import.meta.env.MODE === "demo";
 
-interface DemoCapabilities {
+export interface DemoCapabilities {
   canReview: boolean;
+  canClock: boolean;
+  canViewTeamAttendance: boolean;
+  canResolveExceptions: boolean;
+  canApproveCorrections: boolean;
+  canSetScheduleForReports: boolean;
+  canSetOrgSchedule: boolean;
+  canManageLeaveBalance: boolean;
+  canViewOrgAttendance: boolean;
 }
 
 interface AppState {
@@ -93,6 +117,18 @@ interface AppState {
   myTimesheetItems: TimesheetMock[];
   teamTimesheetItems: TimesheetMock[];
   notificationItems: NotificationMock[];
+  attendanceEvents: AttendanceEvent[];
+  attendanceDays: AttendanceDay[];
+  leaveBalances: LeaveBalance[];
+  schedules: WorkSchedule[];
+  clockIn: (occurredAt?: string, note?: string) => AttendanceMutationResult<AttendanceEvent>;
+  clockOut: (occurredAt?: string, note?: string) => AttendanceMutationResult<AttendanceEvent>;
+  submitAttendanceCorrection: (input: { workDate: string; inAt: string; outAt?: string; reason: string }) => AttendanceMutationResult;
+  resolveAttendanceException: (workDate: string, status: AttendanceDay["status"], reason: string) => AttendanceMutationResult;
+  setWorkSchedule: (schedule: WorkSchedule) => AttendanceMutationResult;
+  adjustLeaveBalance: (leaveType: LeaveBalance["leave_type"], days: number, reason: string) => AttendanceMutationResult;
+  resolveScheduleFor: (employee: string, date: string) => WorkSchedule | null;
+  leaveBalanceSummary: (balance: LeaveBalance) => ReturnType<typeof deriveLeaveBalanceSummary>;
   markNotificationRead: (notificationId: string) => void;
   removeNotification: (notificationId: string) => void;
   clearNotifications: () => void;
@@ -110,6 +146,10 @@ type IdentityState = {
   teamRequestItems: RequestMock[];
   teamTimesheetItems: TimesheetMock[];
   notificationItems: NotificationMock[];
+  attendanceEvents: AttendanceEvent[];
+  attendanceDays: AttendanceDay[];
+  schedules: WorkSchedule[];
+  leaveBalances: LeaveBalance[];
 };
 
 const AppContext = createContext<AppState | null>(null);
@@ -144,6 +184,10 @@ function initialIdentityState(identity: DemoIdentity): IdentityState {
     teamRequestItems: identity === "employee" ? [] : cloneFixture(teamRequests),
     teamTimesheetItems: identity === "employee" ? [] : cloneFixture(teamTimesheets),
     notificationItems: cloneFixture(notifications),
+    attendanceEvents: cloneFixture(attendanceEventsByIdentity[identity]),
+    attendanceDays: cloneFixture(fixtureAttendanceDays(identity)),
+    schedules: cloneFixture(attendanceSchedules),
+    leaveBalances: cloneFixture(leaveBalancesByIdentity[identity]),
   };
 }
 
@@ -222,7 +266,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     stateDemoControl.fixture = "ready";
   }, []);
   const capabilities = useMemo<DemoCapabilities>(
-    () => ({ canReview: DEMO_MODE && (role === "manager" || role === "hr") }),
+    () => ({
+      canReview: DEMO_MODE && (role === "manager" || role === "hr"),
+      canClock: DEMO_MODE,
+      canViewTeamAttendance: DEMO_MODE && (role === "manager" || role === "hr"),
+      canResolveExceptions: DEMO_MODE && (role === "manager" || role === "hr"),
+      canApproveCorrections: DEMO_MODE && (role === "manager" || role === "hr"),
+      canSetScheduleForReports: DEMO_MODE && (role === "manager" || role === "hr"),
+      canSetOrgSchedule: DEMO_MODE && role === "hr",
+      canManageLeaveBalance: DEMO_MODE && role === "hr",
+      canViewOrgAttendance: DEMO_MODE && role === "hr",
+    }),
     [role],
   );
   const activeState = identityStates[role];
@@ -244,6 +298,83 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }));
     }, 150);
   }, [role]);
+
+  const clockMutation = useCallback((kind: AttendanceEventKind, occurredAt?: string, note?: string): AttendanceMutationResult<AttendanceEvent> => {
+    if (!capabilities.canClock) return { ok: false, code: "CAPABILITY_DENIED" };
+    const commandIdentity = role;
+    const employee = identityEmployeeId(commandIdentity);
+    const timestamp = occurredAt ?? new Date().toISOString();
+    const state = identityStates[commandIdentity];
+    const ordered = [...state.attendanceEvents].filter((event) => event.employee === employee).sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
+    let open: AttendanceEvent | null = null;
+    ordered.forEach((event) => { open = event.kind === "CLOCK_IN" ? event : null; });
+    if (kind === "CLOCK_IN" && open) return { ok: false, code: "CLOCK_IN_ALREADY_OPEN" };
+    if (kind === "CLOCK_OUT" && !open) return { ok: false, code: "CLOCK_OUT_WITHOUT_OPEN_CLOCK_IN" };
+    const event: AttendanceEvent = { id: `demo-att-${Date.now()}`, employee, occurred_at: timestamp, kind, source: "WEB", recorded_by: employee, created_at: new Date().toISOString(), note };
+    window.setTimeout(() => {
+      if (activeIdentityRef.current !== commandIdentity) return;
+      setIdentityStates((current) => {
+        const identityState = current[commandIdentity];
+        const nextEvents = [...identityState.attendanceEvents, event];
+        return { ...current, [commandIdentity]: { ...identityState, attendanceEvents: nextEvents, attendanceDays: deriveAttendanceDays(nextEvents, employee, identityState.schedules) } };
+      });
+    }, 150);
+    return { ok: true, value: event };
+  }, [capabilities.canClock, identityStates, role]);
+
+  const submitAttendanceCorrection = useCallback((input: { workDate: string; inAt: string; outAt?: string; reason: string }): AttendanceMutationResult => {
+    if (!DEMO_MODE || !input.reason.trim()) return { ok: false, code: DEMO_MODE ? "INVALID_INPUT" : "CAPABILITY_DENIED" };
+    const commandIdentity = role;
+    window.setTimeout(() => {
+      if (activeIdentityRef.current !== commandIdentity) return;
+      setIdentityStates((current) => {
+        const state = current[commandIdentity]; const employee = identityEmployeeId(commandIdentity);
+        const additions: AttendanceEvent[] = [{ id: `demo-correction-in-${Date.now()}`, employee, occurred_at: input.inAt, kind: "CLOCK_IN", source: "WEB", recorded_by: employee, created_at: new Date().toISOString(), note: input.reason }];
+        if (input.outAt) additions.push({ id: `demo-correction-out-${Date.now()}`, employee, occurred_at: input.outAt, kind: "CLOCK_OUT", source: "WEB", recorded_by: employee, created_at: new Date().toISOString(), note: input.reason });
+        const events = [...state.attendanceEvents, ...additions];
+        return { ...current, [commandIdentity]: { ...state, attendanceEvents: events, attendanceDays: deriveAttendanceDays(events, employee, state.schedules) } };
+      });
+    }, 150);
+    return { ok: true };
+  }, [role]);
+
+  const resolveAttendanceException = useCallback((workDate: string, status: AttendanceDay["status"], reason: string): AttendanceMutationResult => {
+    if (!capabilities.canResolveExceptions) return { ok: false, code: "CAPABILITY_DENIED" };
+    const commandIdentity = role;
+    window.setTimeout(() => {
+      if (activeIdentityRef.current !== commandIdentity) return;
+      setIdentityStates((current) => ({ ...current, [commandIdentity]: { ...current[commandIdentity], attendanceDays: current[commandIdentity].attendanceDays.map((day) => day.work_date === workDate ? { ...day, status, justification: reason, resolved_by: identityEmployeeId(commandIdentity), resolved_at: new Date().toISOString() } : day) } }));
+    }, 150);
+    return { ok: true };
+  }, [capabilities.canResolveExceptions, role]);
+
+  const setWorkSchedule = useCallback((schedule: WorkSchedule): AttendanceMutationResult => {
+    const allowed = schedule.scope === "ORGANIZATION" ? capabilities.canSetOrgSchedule : capabilities.canSetScheduleForReports;
+    if (!allowed) return { ok: false, code: "CAPABILITY_DENIED" };
+    const commandIdentity = role;
+    window.setTimeout(() => {
+      if (activeIdentityRef.current !== commandIdentity) return;
+      setIdentityStates((current) => ({ ...current, [commandIdentity]: { ...current[commandIdentity], schedules: [...current[commandIdentity].schedules.filter((item) => item.id !== schedule.id), schedule] } }));
+    }, 150);
+    return { ok: true };
+  }, [capabilities.canSetOrgSchedule, capabilities.canSetScheduleForReports, role]);
+
+  const adjustLeaveBalance = useCallback((leaveType: LeaveBalance["leave_type"], days: number, reason: string): AttendanceMutationResult => {
+    if (!capabilities.canManageLeaveBalance) return { ok: false, code: "CAPABILITY_DENIED" };
+    if (!reason.trim()) return { ok: false, code: "INVALID_INPUT" };
+    const commandIdentity = role;
+    window.setTimeout(() => {
+      if (activeIdentityRef.current !== commandIdentity) return;
+      setIdentityStates((current) => ({ ...current, [commandIdentity]: { ...current[commandIdentity], leaveBalances: current[commandIdentity].leaveBalances.map((balance) => balance.leave_type === leaveType ? { ...balance, adjustments: [...balance.adjustments, { id: `adj-${Date.now()}`, days, reason, created_at: new Date().toISOString(), recorded_by: identityEmployeeId(commandIdentity) }] } : balance) } }));
+    }, 150);
+    return { ok: true };
+  }, [capabilities.canManageLeaveBalance, role]);
+
+  const resolveScheduleFor = useCallback((employee: string, date: string) => resolveScheduleFixture(employee, date, activeState.schedules), [activeState.schedules]);
+  const leaveBalanceSummary = useCallback((balance: LeaveBalance) => deriveLeaveBalanceSummary(balance), []);
+
+  const clockIn = useCallback((occurredAt?: string, note?: string) => clockMutation("CLOCK_IN", occurredAt, note), [clockMutation]);
+  const clockOut = useCallback((occurredAt?: string, note?: string) => clockMutation("CLOCK_OUT", occurredAt, note), [clockMutation]);
 
   const removeNotification = useCallback((notificationId: string) => {
     const commandIdentity = role;
@@ -446,6 +577,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     myTimesheetItems: activeState.myTimesheetItems,
     teamTimesheetItems: activeState.teamTimesheetItems,
     notificationItems: activeState.notificationItems,
+    attendanceEvents: activeState.attendanceEvents,
+    attendanceDays: activeState.attendanceDays,
+    schedules: activeState.schedules,
+    leaveBalances: activeState.leaveBalances,
+    clockIn,
+    clockOut,
+    submitAttendanceCorrection,
+    resolveAttendanceException,
+    setWorkSchedule,
+    adjustLeaveBalance,
+    resolveScheduleFor,
+    leaveBalanceSummary,
     markNotificationRead,
     removeNotification,
     clearNotifications,
@@ -471,6 +614,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAppearance,
     setDemoFixture,
     setLocale,
+    adjustLeaveBalance,
+    clockIn,
+    clockOut,
+    leaveBalanceSummary,
+    resolveAttendanceException,
+    resolveScheduleFor,
+    setWorkSchedule,
+    submitAttendanceCorrection,
     setRole,
     submitDemoTimesheet,
   ]);
