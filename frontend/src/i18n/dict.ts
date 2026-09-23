@@ -9,7 +9,7 @@ export const dict = {
   ar: {
     brand: "هي فوضى؟",
     brandLatin: "Heya Fawda?",
-    descriptor: "شؤون الموظفين",
+    descriptor: "خلّي السيستم يتصرف",
     tagline: "من الفوضى إلى النظام",
     demoLabel: "نسخة عرض تجريبي — البيانات المعروضة وهمية وليست حقيقية",
     skipToMain: "تجاوز إلى المحتوى الرئيسي",
@@ -290,7 +290,7 @@ export const dict = {
   en: {
     brand: "Heya Fawda?",
     brandLatin: "Heya Fawda?",
-    descriptor: "Employee Operations",
+    descriptor: "خلّي السيستم يتصرف",
     tagline: "From chaos to clarity",
     demoLabel: "Visual demo — all data shown is mock data, not real records",
     skipToMain: "Skip to main content",
