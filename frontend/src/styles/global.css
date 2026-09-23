@@ -255,7 +255,10 @@ button { cursor: pointer; }
 .app-main { flex: 1; min-width: 0; width: 100%; padding: var(--sp-6) var(--sp-8) var(--sp-12); }
 .app-main > .app-header, .app-main > main { width: min(100%, var(--content-max)); margin-inline: auto; }
 .app-header { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); min-height: var(--control-min-h); margin-block-end: var(--sp-8); }
-.header-page-indicator { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; color: var(--text); }
+.header-page-context { display: inline-flex; align-items: center; gap: var(--sp-2); min-width: 0; }
+.header-page-indicator { display: inline-flex; min-width: 0; align-items: center; color: var(--text); font-size: var(--font-size-lg); line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.header-notifications { position: relative; flex: 0 0 auto; }
+.header-notifications .nav-badge { position: absolute; inset-block-start: -5px; inset-inline-end: -5px; margin: 0; pointer-events: none; }
 .header-actions { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; justify-content: flex-end; }
 .brand-lockup { display: flex; align-items: center; min-width: 0; padding-block-end: var(--sp-6); border-block-end: var(--timeline-width) solid var(--border-subtle); }
 .brand-logo { display: block; flex: 0 1 auto; width: min(180px, 100%); max-width: 100%; height: auto; }
@@ -525,7 +528,7 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
   h1 { font-size: var(--font-size-2xl); }
   .app-main { padding: var(--sp-4) var(--sp-4) var(--sp-8); }
   .app-header { margin-block-end: var(--sp-6); }
-  .app-header > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .header-page-context { min-width: 0; flex: 1 1 auto; }
   .header-actions { display: flex; flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; }
   .profile-trigger { max-inline-size: 100%; padding-inline: var(--sp-2); gap: var(--sp-1); font-size: 0; }
   .profile-trigger .icon { width: var(--icon-size); height: var(--icon-size); }

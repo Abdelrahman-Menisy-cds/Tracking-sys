@@ -165,16 +165,11 @@ export default function AppShell() {
     ...(capabilities.canReview
       ? [{ label: locale === "ar" ? "عمل المراجعة" : "Review work", items: [{ to: "/reviews", label: t("navTeamReviews"), icon: ActivityIcon }] }]
       : []),
-    {
-      label: locale === "ar" ? "التحديثات" : "Updates",
-      items: [{ to: "/notifications", label: t("navNotifications"), badge: unreadCount, icon: BellIcon }],
-    },
   ];
   const currentItem = navGroups
     .flatMap((group) => group.items)
     .filter((item) => item.to === location.pathname || (item.to !== "/" && location.pathname.startsWith(item.to)))
     .sort((left, right) => right.to.length - left.to.length)[0] ?? { to: "/", label: t("navHome"), icon: HomeIcon };
-  const CurrentIcon = currentItem.icon;
   const roleOptions: { value: Role; label: string }[] = [
     { value: "employee", label: t("roleEmployee") },
     { value: "manager", label: t("roleManager") },
@@ -289,9 +284,17 @@ export default function AppShell() {
               <ChevronDownIcon />
               {t("menu")}
             </button>
-            <strong className="header-page-indicator" aria-label={currentItem.label} title={currentItem.label}>
-              <CurrentIcon />
-            </strong>
+            <div className="header-page-context">
+              <strong className="header-page-indicator">{currentItem.label}</strong>
+              <NavLink
+                to="/notifications"
+                className="btn btn-secondary icon-only header-notifications"
+                aria-label={unreadCount > 0 ? `${t("navNotifications")}, ${unreadCount} ${locale === "ar" ? "غير مقروءة" : "unread"}` : t("navNotifications")}
+              >
+                <BellIcon />
+                {unreadCount > 0 ? <span className="nav-badge" aria-hidden="true">{unreadCount}</span> : null}
+              </NavLink>
+            </div>
             <div className="header-actions">
               <ClockAction compact />
               <button
