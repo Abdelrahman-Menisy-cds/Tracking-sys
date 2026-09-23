@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useApp, type Appearance, type DemoFixture } from "./AppContext";
 import type { Locale, Role } from "../i18n/dict";
 import BrandLockup from "../components/brand/BrandLockup";
@@ -166,10 +166,11 @@ export default function AppShell() {
       ? [{ label: locale === "ar" ? "عمل المراجعة" : "Review work", items: [{ to: "/reviews", label: t("navTeamReviews"), icon: ActivityIcon }] }]
       : []),
   ];
-  const currentItem = navGroups
+  const matchedCurrentItem = navGroups
     .flatMap((group) => group.items)
     .filter((item) => item.to === location.pathname || (item.to !== "/" && location.pathname.startsWith(item.to)))
-    .sort((left, right) => right.to.length - left.to.length)[0] ?? { to: "/", label: t("navHome"), icon: HomeIcon };
+    .sort((left, right) => right.to.length - left.to.length)[0];
+  const currentItem = matchedCurrentItem ?? { to: "", label: t("navHome"), icon: HomeIcon };
   const roleOptions: { value: Role; label: string }[] = [
     { value: "employee", label: t("roleEmployee") },
     { value: "manager", label: t("roleManager") },
@@ -211,11 +212,11 @@ export default function AppShell() {
               {group.items.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <NavLink
+                  <Link
                     key={item.to}
                     to={item.to}
-                    end={item.end}
-                    className="nav-link"
+                    className={`nav-link${item.to === currentItem.to ? " active" : ""}`}
+                    aria-current={item.to === currentItem.to ? "page" : undefined}
                     onClick={() => {
                       if (isCompact) closeDrawer();
                     }}
@@ -223,7 +224,7 @@ export default function AppShell() {
                     <Icon />
                     <span>{item.label}</span>
                     {item.badge ? <span className="nav-badge" aria-label={`${item.badge}`}>{item.badge}</span> : null}
-                  </NavLink>
+                  </Link>
                 );
               })}
             </div>
