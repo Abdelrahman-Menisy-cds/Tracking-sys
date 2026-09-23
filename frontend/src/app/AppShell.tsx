@@ -170,9 +170,11 @@ export default function AppShell() {
       items: [{ to: "/notifications", label: t("navNotifications"), badge: unreadCount, icon: BellIcon }],
     },
   ];
-  const currentLabel = navGroups
+  const currentItem = navGroups
     .flatMap((group) => group.items)
-    .find((item) => item.to === location.pathname || (item.to !== "/" && location.pathname.startsWith(item.to)))?.label ?? t("navHome");
+    .filter((item) => item.to === location.pathname || (item.to !== "/" && location.pathname.startsWith(item.to)))
+    .sort((left, right) => right.to.length - left.to.length)[0] ?? { to: "/", label: t("navHome"), icon: HomeIcon };
+  const CurrentIcon = currentItem.icon;
   const roleOptions: { value: Role; label: string }[] = [
     { value: "employee", label: t("roleEmployee") },
     { value: "manager", label: t("roleManager") },
@@ -287,7 +289,9 @@ export default function AppShell() {
               <ChevronDownIcon />
               {t("menu")}
             </button>
-            <strong>{currentLabel}</strong>
+            <strong className="header-page-indicator" aria-label={currentItem.label} title={currentItem.label}>
+              <CurrentIcon />
+            </strong>
             <div className="header-actions">
               <ClockAction compact />
               <button
