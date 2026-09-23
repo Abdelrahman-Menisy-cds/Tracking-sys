@@ -53,60 +53,60 @@
   --elevation-3: 0 10px 28px rgb(0 0 0 / .28), 0 28px 72px rgb(0 0 0 / .26);
   --elevation-focus: 0 0 0 var(--space-1) var(--focus-ring);
 
-  --page-bg: #08111f;
-  --surface: #0d1a2b;
-  --surface-raised: #102033;
-  --surface-subtle: #16263a;
-  --surface-inset: #0a1524;
-  --surface-overlay: #13243a;
-  --card-border: rgba(255, 255, 255, .07);
+  --page-bg: #0E0E10;
+  --surface: #18181B;
+  --surface-raised: #1F1F23;
+  --surface-subtle: #232327;
+  --surface-inset: #141416;
+  --surface-overlay: #232327;
+  --card-border: rgba(255, 255, 255, .08);
   --border-subtle: var(--card-border);
-  --border-control: rgb(203 213 225 / .28);
-  --divider: rgb(255 255 255 / .09);
+  --border-control: rgb(212 212 216 / .30);
+  --divider: rgb(255 255 255 / .10);
 
-  --text: #f8fafc;
-  --text-strong: #ffffff;
-  --text-muted: #b8c4d6;
-  --text-subtle: #91a0b6;
-  --text-inverse: #06111f;
+  --text: #F4F4F5;
+  --text-strong: #FFFFFF;
+  --text-muted: #A1A1AA;
+  --text-subtle: #8B8B94;
+  --text-inverse: #F4F4F5;
 
-  --accent: #22d3ee;
-  --accent-strong: #67e8f9;
-  --accent-soft: rgb(34 211 238 / .13);
-  --accent-border: rgb(34 211 238 / .42);
-  --on-accent: #06111f;
+  --accent: #FF6B6B;
+  --accent-strong: #FF8A8A;
+  --accent-soft: rgb(255 107 107 / .14);
+  --accent-border: rgb(255 107 107 / .38);
+  --on-accent: #1A1A1A;
 
-  --warning: #f59e0b;
-  --warning-strong: #fbbf24;
-  --warning-soft: rgb(245 158 11 / .15);
-  --warning-border: rgb(245 158 11 / .48);
-  --on-warning: #1f1300;
+  --warning: #FBBF24;
+  --warning-strong: #FCD34D;
+  --warning-soft: rgb(251 191 36 / .15);
+  --warning-border: rgb(251 191 36 / .38);
+  --on-warning: #1A1A1A;
 
-  --neutral: #94a3b8;
-  --neutral-strong: #cbd5e1;
-  --neutral-soft: rgb(148 163 184 / .14);
-  --neutral-border: rgb(148 163 184 / .36);
-  --on-neutral: #08111f;
+  --neutral: #A1A1AA;
+  --neutral-strong: #D4D4D8;
+  --neutral-soft: rgb(161 161 170 / .15);
+  --neutral-border: rgb(161 161 170 / .38);
+  --on-neutral: #1A1A1A;
 
-  --unread: #e879f9;
-  --unread-strong: #f0abfc;
-  --unread-soft: rgb(232 121 249 / .15);
-  --unread-border: rgb(232 121 249 / .42);
-  --on-unread: #1d0824;
+  --unread: #FF6B6B;
+  --unread-strong: #FF8A8A;
+  --unread-soft: rgb(255 107 107 / .14);
+  --unread-border: rgb(255 107 107 / .38);
+  --on-unread: #1A1A1A;
 
-  --success: #34d399;
-  --success-strong: #6ee7b7;
+  --success: #34D399;
+  --success-strong: #6EE7B7;
   --success-soft: rgb(52 211 153 / .14);
-  --success-border: rgb(52 211 153 / .44);
-  --on-success: #031b12;
+  --success-border: rgb(52 211 153 / .38);
+  --on-success: #1A1A1A;
 
-  --danger: #fb7185;
-  --danger-strong: #fda4af;
-  --danger-soft: rgb(251 113 133 / .15);
-  --danger-border: rgb(251 113 133 / .46);
-  --on-danger: #2a0710;
+  --danger: #FB923C;
+  --danger-strong: #FDBA74;
+  --danger-soft: rgb(251 146 60 / .15);
+  --danger-border: rgb(251 146 60 / .38);
+  --on-danger: #1A1A1A;
 
-  --focus-ring: rgb(34 211 238 / .52);
+  --focus-ring: rgb(255 107 107 / .45);
   --overlay-scrim: rgb(2 6 23 / .68);
   --selection-bg: var(--accent);
   --selection-text: var(--on-accent);
@@ -143,60 +143,59 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --page-bg: #f3f6fb;
-  --surface: #ffffff;
-  --surface-raised: #ffffff;
-  --surface-subtle: #eef3f8;
-  --surface-inset: #e8eef6;
-  --surface-overlay: #ffffff;
-  --card-border: rgb(15 23 42 / .10);
-  --border-control: rgb(15 23 42 / .34);
-  --divider: rgb(15 23 42 / .12);
+  --page-bg: #F4F4F5;
+  --surface: #FFFFFF;
+  --surface-raised: #FFFFFF;
+  --surface-subtle: #ECECEE;
+  --surface-inset: #E8E8EA;
+  --surface-overlay: #FFFFFF;
+  --card-border: rgb(24 24 27 / .10);
+  --border-control: rgb(24 24 27 / .34);
+  --divider: rgb(24 24 27 / .12);
 
-  --text: #111827;
-  --text-strong: #020617;
-  --text-muted: #4b5563;
-  --text-subtle: #64748b;
-  --text-inverse: #f8fafc;
+  --text: #18181B;
+  --text-strong: #09090B;
+  --text-muted: #606060;
+  --text-subtle: #6B6B74;
+  --text-inverse: #F4F4F5;
 
-  /* Deep cyan scale keeps white action labels AA-compliant in both states. */
-  --accent: #0369a1;
-  --accent-strong: #075985;
-  --accent-soft: rgb(8 145 178 / .11);
-  --accent-border: rgb(8 145 178 / .36);
-  --on-accent: #ffffff;
+  --accent: #C80000;
+  --accent-strong: #A30000;
+  --accent-soft: rgb(200 0 0 / .10);
+  --accent-border: rgb(200 0 0 / .34);
+  --on-accent: #FFFFFF;
 
-  --warning: #b45309;
-  --warning-strong: #92400e;
-  --warning-soft: rgb(180 83 9 / .13);
-  --warning-border: rgb(180 83 9 / .38);
-  --on-warning: #ffffff;
+  --warning: #A16207;
+  --warning-strong: #854D0E;
+  --warning-soft: rgb(161 98 7 / .13);
+  --warning-border: rgb(161 98 7 / .38);
+  --on-warning: #FFFFFF;
 
-  --neutral: #64748b;
-  --neutral-strong: #475569;
-  --neutral-soft: rgb(100 116 139 / .13);
-  --neutral-border: rgb(100 116 139 / .34);
-  --on-neutral: #ffffff;
+  --neutral: #606060;
+  --neutral-strong: #4B4B4B;
+  --neutral-soft: rgb(96 96 96 / .13);
+  --neutral-border: rgb(96 96 96 / .34);
+  --on-neutral: #FFFFFF;
 
-  --unread: #c026d3;
-  --unread-strong: #a21caf;
-  --unread-soft: rgb(192 38 211 / .12);
-  --unread-border: rgb(192 38 211 / .34);
-  --on-unread: #ffffff;
+  --unread: #C80000;
+  --unread-strong: #A30000;
+  --unread-soft: rgb(200 0 0 / .12);
+  --unread-border: rgb(200 0 0 / .34);
+  --on-unread: #FFFFFF;
 
   --success: #047857;
-  --success-strong: #065f46;
+  --success-strong: #065F46;
   --success-soft: rgb(4 120 87 / .12);
   --success-border: rgb(4 120 87 / .34);
-  --on-success: #ffffff;
+  --on-success: #FFFFFF;
 
-  --danger: #be123c;
-  --danger-strong: #9f1239;
-  --danger-soft: rgb(190 18 60 / .12);
-  --danger-border: rgb(190 18 60 / .36);
-  --on-danger: #ffffff;
+  --danger: #BF4A0A;
+  --danger-strong: #9A3412;
+  --danger-soft: rgb(191 74 10 / .12);
+  --danger-border: rgb(191 74 10 / .34);
+  --on-danger: #FFFFFF;
 
-  --focus-ring: rgb(8 145 178 / .40);
+  --focus-ring: rgb(200 0 0 / .40);
   --overlay-scrim: rgb(15 23 42 / .56);
   --selection-bg: var(--accent);
   --selection-text: var(--on-accent);
