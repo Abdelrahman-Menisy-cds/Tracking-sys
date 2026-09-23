@@ -257,11 +257,8 @@ button { cursor: pointer; }
 .app-header { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); min-height: var(--control-min-h); margin-block-end: var(--sp-8); }
 .header-page-indicator { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; color: var(--text); }
 .header-actions { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; justify-content: flex-end; }
-.brand-lockup { display: flex; align-items: center; gap: var(--sp-3); padding-block-end: var(--sp-6); border-block-end: var(--timeline-width) solid var(--border-subtle); }
-.brand-mark { flex: 0 0 auto; color: var(--text); }
-.brand-slip { fill: var(--accent); }
-.brand-name { font-size: var(--font-size-lg); font-weight: 700; }
-.brand-descriptor { color: var(--text-muted); font-size: var(--font-size-sm); }
+.brand-lockup { display: flex; align-items: center; min-width: 0; padding-block-end: var(--sp-6); border-block-end: var(--timeline-width) solid var(--border-subtle); }
+.brand-logo { display: block; flex: 0 1 auto; width: min(180px, 100%); max-width: 100%; height: auto; }
 .nav-group { display: grid; gap: var(--sp-1); }
 .nav-group-title, .demo-tools-label { color: var(--text-muted); font-size: var(--font-size-xs); font-weight: 700; padding: var(--sp-2) var(--sp-3) var(--sp-1); }
 .nav-link { display: flex; align-items: center; min-height: var(--control-min-h); gap: var(--sp-2); padding: var(--space-0) var(--sp-3); color: var(--text); text-decoration: none; border-inline-start: var(--space-1) solid transparent; border-radius: var(--radius-sm); transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease; }
