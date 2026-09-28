@@ -3,6 +3,30 @@ import { useNavigate } from "react-router-dom";
 import { useApp, usePageTitle, type Appearance } from "../app/AppContext";
 import BrandLockup from "../components/brand/BrandLockup";
 import { GlobeIcon, MoonIcon, SunIcon } from "../components/icons";
+import type { Role } from "../i18n/dict";
+
+const ROLE_OPTIONS: Role[] = ["employee", "manager", "hr"];
+
+const MANAGER_EMAIL_TOKENS = ["manager", "mgr", "admin"];
+const HR_EMAIL_TOKENS = ["hr", "people", "humanresources"];
+
+/**
+ * The sign-in form derives the fixture identity from the email local part so
+ * the reviewer can reach a manager or HR view without a visible switcher.
+ * Token matching is exact per `.`/`_`/`+`/`-` segment, so "chris@…" is NOT hr.
+ */
+function roleFromEmail(email: string): Role {
+  const tokens = email.split("@")[0].toLowerCase().split(/[._+-]+/).filter(Boolean);
+  if (tokens.some((token) => MANAGER_EMAIL_TOKENS.includes(token))) return "manager";
+  if (tokens.some((token) => HR_EMAIL_TOKENS.includes(token))) return "hr";
+  return "employee";
+}
+
+/** Opt-in dev affordance: `?dev=1` or `?dev=True` reveals the role switcher. */
+function devQueryEnabled(): boolean {
+  const dev = new URLSearchParams(window.location.search).get("dev");
+  return dev !== null && ["1", "true"].includes(dev.toLowerCase());
+}
 
 function EyeIcon() {
   return (
@@ -42,9 +66,16 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [devRole, setDevRole] = useState<Role | null>(null);
 
   const targetLocale = locale === "ar" ? "en" : "ar";
   const languageLabel = targetLocale === "ar" ? t("switchToArabic") : t("switchToEnglish");
+
+  const devToolsEnabled = devQueryEnabled();
+  const effectiveRole = devRole ?? roleFromEmail(identifier);
+  const roleLabel = (value: Role) =>
+    value === "employee" ? t("roleEmployee") : value === "manager" ? t("roleManager") : t("roleHr");
+  const showRoleBlock = devToolsEnabled || (identifier.trim().length > 0 && effectiveRole !== "employee");
 
   const targetTheme: Exclude<Appearance, "system"> = resolvedTheme === "light" ? "dark" : "light";
   const ThemeIcon = resolvedTheme === "light" ? SunIcon : MoonIcon;
@@ -65,7 +96,7 @@ export default function LoginPage() {
     setError(null);
     window.setTimeout(() => {
       setBusy(false);
-      setRole("employee");
+      setRole(effectiveRole);
       navigate("/");
     }, 500);
   };
@@ -142,6 +173,33 @@ export default function LoginPage() {
               </button>
             </div>
           </label>
+          {showRoleBlock ? (
+            <div className="login-role-block">
+              {devToolsEnabled ? (
+                <fieldset className="login-role-picker">
+                  <legend className="field-label">{t("role")}</legend>
+                  <div className="role-segmented">
+                    {ROLE_OPTIONS.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        className={`role-segmented-option${effectiveRole === option ? " is-selected" : ""}`}
+                        aria-pressed={effectiveRole === option}
+                        onClick={() => setDevRole(option)}
+                      >
+                        {roleLabel(option)}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              ) : null}
+              {identifier.trim().length > 0 ? (
+                <p className="muted login-role-hint" role="status">
+                  {t("role")}: {roleLabel(effectiveRole)}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <button className="btn btn-primary login-submit" type="submit" disabled={busy}>
             {busy ? (
               <>

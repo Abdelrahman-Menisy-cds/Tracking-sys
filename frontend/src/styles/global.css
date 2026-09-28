@@ -516,6 +516,15 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 :root[data-theme="dark"] .login-brand-watermark img { opacity: 0.09; }
 .login-header-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); margin-block-end: var(--sp-6); }
 .login-panel .login-header-row .brand-lockup { margin-block-end: var(--space-0); }
+.login-role-block { display: grid; gap: var(--sp-2); }
+.login-role-picker { margin: var(--space-0); padding: var(--space-0); border: var(--radius-none); }
+.login-role-picker .field-label { margin-block-end: var(--sp-2); }
+.role-segmented { display: flex; gap: var(--sp-1); padding: var(--sp-1); background: var(--surface-inset); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); }
+.role-segmented-option { flex: 1 1 0; min-height: 36px; padding: var(--space-0) var(--sp-2); border: var(--radius-none); border-radius: var(--radius-sm); background: transparent; color: var(--text-muted); font: inherit; font-weight: 700; cursor: pointer; }
+.role-segmented-option:hover:not(.is-selected) { background: var(--surface-subtle); color: var(--text); }
+.role-segmented-option.is-selected { background: var(--accent); color: var(--on-accent); }
+.role-segmented-option:focus-visible { outline: var(--space-1) solid var(--focus-ring); outline-offset: var(--space-1); }
+.login-role-hint { margin-block-end: var(--space-0); font-size: var(--font-size-sm); }
 .login-preferences-header { display: flex; flex: 0 0 auto; justify-content: flex-end; gap: var(--sp-2); margin-block-end: var(--space-0); }
 .login-panel .brand-lockup { margin-block-end: var(--sp-6); border: var(--radius-none); padding: var(--space-0); }
 .login-panel h1 { margin-block-end: var(--sp-6); }
