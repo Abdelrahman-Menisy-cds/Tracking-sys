@@ -444,6 +444,18 @@ html[dir="rtl"] .profile-menu-item { justify-content: flex-start; }
 .filter-toolbar .field { margin: var(--space-0); min-width: 200px; }
 .applied-filters { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-block-end: var(--sp-4); }
 .filter-chip { display: inline-flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); border: var(--timeline-width) solid var(--border-subtle); border-radius: var(--radius-pill); background: var(--surface-subtle); font-size: var(--font-size-sm); }
+.filter-panel { padding: var(--sp-4); margin-block-end: var(--sp-4); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: var(--surface-subtle); }
+.filter-panel .filter-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(220px, 1.2fr); gap: var(--sp-3) var(--sp-4); align-items: end; margin-block-end: var(--sp-3); }
+.filter-panel .filter-toolbar .field { margin: var(--space-0); min-width: 0; }
+.filter-panel .filter-panel-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4); margin-block-end: var(--sp-3); }
+.filter-panel .filter-panel-heading h2 { margin-block-end: var(--space-0); font-size: var(--font-size-md); }
+.filter-panel .applied-filters { padding: var(--sp-2) var(--sp-3); border: var(--timeline-width) dashed var(--border-subtle); background: var(--surface-inset); margin-block: 0 var(--sp-3); }
+.filter-panel .filter-chip { padding: 0.125rem 0 var(--sp-2) 0; gap: var(--sp-1); }
+.filter-chip .btn { padding: 0 var(--sp-1); min-height: 22px; line-height: 1; }
+.filter-chip .icon { width: 0.875rem; height: 0.875rem; }
+.filter-count-line { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border: var(--timeline-width) solid var(--card-border); border-block-end: var(--radius-none); border-start-start-radius: var(--radius-surface); border-start-end-radius: var(--radius-surface); margin: 0; background: var(--surface-subtle); }
+.filter-count-line .table-caption { padding: var(--space-0); margin: var(--space-0); }
+@media (max-width: 639px) { .filter-panel .filter-toolbar { grid-template-columns: 1fr; gap: var(--sp-3); } }
 
 .table-wrap { overflow-x: auto; border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--elevation-1); }
 table { width: 100%; border-collapse: collapse; }

@@ -3,7 +3,7 @@ import { t as translate } from "../i18n/dict";
 import { Link } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
 import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../components/ui";
-import { ClockIcon, InfoIcon } from "../components/icons";
+import { ClockIcon, CloseIcon, InfoIcon } from "../components/icons";
 import { attendanceExceptionForEvent, cairoDate, identityEmployeeId, type AttendanceDay, type AttendanceEvent } from "../mock/attendance";
 import PageHeader from "../components/layout/PageHeader";
 
@@ -101,9 +101,102 @@ function AttendanceTable({ days, locale, detail = false }: { days: AttendanceDay
 
 export function AttendanceHistoryPage() {
   const { locale, attendanceDays } = useApp();
-  const [from, setFrom] = useState(""); const [to, setTo] = useState(""); const [filter, setFilter] = useState("ALL"); const [state, setState] = useState<"ready" | "loading" | "error">("ready");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [filter, setFilter] = useState("ALL");
+  const [state, setState] = useState<"ready" | "loading" | "error">("ready");
   const filtered = useMemo(() => attendanceDays.filter((day) => (!from || day.work_date >= from) && (!to || day.work_date <= to) && (filter === "ALL" || day.status === filter || day.exception === filter)), [attendanceDays, filter, from, to]);
-  return <main className="page"><PageHeader title={translate(locale, "attendanceHistoryTitle")} subtitle={translate(locale, "attendanceHistorySubtitle")} /><Banner tone="info"><strong>{translate(locale, "attendanceWhatStatesMean")}</strong> {translate(locale, "attendanceStatesHelp")}</Banner><section className="work-surface"><div className="filter-toolbar"><label className="field"><span className="field-label">{translate(locale, "attendanceFrom")}</span><input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label><label className="field"><span className="field-label">{translate(locale, "attendanceTo")}</span><input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label><label className="field"><span className="field-label">{translate(locale, "attendanceStatusOrException")}</span><select className="select" value={filter} onChange={(e) => setFilter(e.target.value)}><option value="ALL">{translate(locale, "attendanceAll")}</option><option value="PRESENT">{translate(locale, "attendanceStatusPresent")}</option><option value="INCOMPLETE">{translate(locale, "attendanceStatusIncomplete")}</option><option value="ABSENT_CANDIDATE">{translate(locale, "attendanceStatusAbsentCandidate")}</option><option value="LATE">{translate(locale, "attendanceExceptionLate")}</option><option value="EARLY_LEAVE">{translate(locale, "attendanceExceptionEarlyLeave")}</option><option value="MISSING_CLOCK_OUT">{translate(locale, "attendanceExceptionMissingClockOut")}</option></select></label><button className="btn btn-secondary" type="button" onClick={() => setState("error")}>{translate(locale, "attendancePreviewError")}</button></div><p className="table-caption" aria-live="polite">{filtered.length} {translate(locale, "attendanceRecordsCount")}</p>{state === "loading" ? <SkeletonRows /> : state === "error" ? <ErrorState onRetry={() => setState("ready")} /> : filtered.length ? <AttendanceTable days={filtered} locale={locale} detail /> : <EmptyState message={translate(locale, "attendanceNoFilteredRecords")} />}</section></main>;
+  const filterLabels: Record<string, string> = {
+    PRESENT: translate(locale, "attendanceStatusPresent"),
+    INCOMPLETE: translate(locale, "attendanceStatusIncomplete"),
+    ABSENT_CANDIDATE: translate(locale, "attendanceStatusAbsentCandidate"),
+    LATE: translate(locale, "attendanceExceptionLate"),
+    EARLY_LEAVE: translate(locale, "attendanceExceptionEarlyLeave"),
+    MISSING_CLOCK_OUT: translate(locale, "attendanceExceptionMissingClockOut"),
+  };
+  const activeFilters = [
+    from ? { key: "from", label: `${translate(locale, "attendanceFrom")} ${locale === "ar" ? formatArabicDigits(from) : from}` } : null,
+    to ? { key: "to", label: `${translate(locale, "attendanceTo")} ${locale === "ar" ? formatArabicDigits(to) : to}` } : null,
+    filter !== "ALL" ? { key: "filter", label: filterLabels[filter] ?? filter } : null,
+  ].filter(Boolean) as { key: string; label: string }[];
+  const clearFilter = (key: string) => { if (key === "from") setFrom(""); if (key === "to") setTo(""); if (key === "filter") setFilter("ALL"); };
+  const clearAllFilters = () => { setFrom(""); setTo(""); setFilter("ALL"); };
+  return (
+    <main className="page">
+      <PageHeader title={translate(locale, "attendanceHistoryTitle")} subtitle={translate(locale, "attendanceHistorySubtitle")} />
+      <Banner tone="info">
+        <strong>{translate(locale, "attendanceWhatStatesMean")}</strong> {translate(locale, "attendanceStatesHelp")}
+      </Banner>
+      <section className="work-surface">
+        <section className="filter-panel" aria-labelledby="attendance-history-filters-heading">
+          <div className="filter-panel-heading">
+            <h2 id="attendance-history-filters-heading">{translate(locale, "attendanceHistoryFilters")}</h2>
+            {activeFilters.length > 0 ? (
+              <button className="btn btn-ghost btn-compact" type="button" onClick={clearAllFilters}>{translate(locale, "attendanceClearAllFilters")}</button>
+            ) : null}
+          </div>
+          <div className="filter-toolbar">
+            <label className="field">
+              <span className="field-label">{translate(locale, "attendanceFrom")}</span>
+              <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+            </label>
+            <label className="field">
+              <span className="field-label">{translate(locale, "attendanceTo")}</span>
+              <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+            </label>
+            <label className="field">
+              <span className="field-label">{translate(locale, "attendanceStatusOrException")}</span>
+              <select className="select" value={filter} onChange={(e) => setFilter(e.target.value)}>
+                <option value="ALL">{translate(locale, "attendanceAll")}</option>
+                <option value="PRESENT">{translate(locale, "attendanceStatusPresent")}</option>
+                <option value="INCOMPLETE">{translate(locale, "attendanceStatusIncomplete")}</option>
+                <option value="ABSENT_CANDIDATE">{translate(locale, "attendanceStatusAbsentCandidate")}</option>
+                <option value="LATE">{translate(locale, "attendanceExceptionLate")}</option>
+                <option value="EARLY_LEAVE">{translate(locale, "attendanceExceptionEarlyLeave")}</option>
+                <option value="MISSING_CLOCK_OUT">{translate(locale, "attendanceExceptionMissingClockOut")}</option>
+              </select>
+            </label>
+          </div>
+          {activeFilters.length > 0 ? (
+            <div className="applied-filters" aria-live="polite">
+              <span>{translate(locale, "attendanceAppliedFilters")}</span>
+              {activeFilters.map((activeFilter) => (
+                <span className="filter-chip" key={activeFilter.key}>
+                  {activeFilter.label}
+                  <button
+                    className="btn btn-ghost btn-compact chip-clear"
+                    type="button"
+                    aria-label={translate(locale, "attendanceClearFilterAriaTemplate").replace("%s", activeFilter.label)}
+                    onClick={() => clearFilter(activeFilter.key)}
+                  >
+                    <CloseIcon />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </section>
+        <div className="filter-count-line">
+          <p className="table-caption" aria-live="polite">{filtered.length} {translate(locale, "attendanceRecordsCount")}</p>
+        </div>
+        {state === "loading" ? (
+            <SkeletonRows />
+          ) : state === "error" ? (
+            <ErrorState onRetry={() => setState("ready")} />
+          ) : filtered.length ? (
+            <AttendanceTable days={filtered} locale={locale} detail />
+          ) : (
+            <EmptyState message={translate(locale, "attendanceNoFilteredRecords")} action={<button className="btn btn-secondary" type="button" onClick={clearAllFilters}>{translate(locale, "attendanceClearAllFilters")}</button>} />
+          )}
+      </section>
+    </main>
+  );
+}
+
+function formatArabicDigits(value: string): string {
+  const westernDigits = "0123456789";
+  const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
+  return value.replace(/[0-9]/g, (digit) => arabicDigits[westernDigits.indexOf(digit)]);
 }
 
 export function AttendanceCorrectionsPage() {
