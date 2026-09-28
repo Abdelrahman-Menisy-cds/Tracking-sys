@@ -77,10 +77,10 @@ export default function LoginPage() {
 
   return (
     <main className="login-page">
+      <div className="login-brand-watermark" aria-hidden="true">
+        <img src={`/brand/logo-${resolvedTheme}.png`} alt="" />
+      </div>
       <section className="login-panel" aria-labelledby="sign-in-heading">
-        <div className="login-brand-watermark" aria-hidden="true">
-          <img src={`/brand/logo-${resolvedTheme}.png`} alt="" />
-        </div>
         <div className="login-preferences-header">
           <button
             type="button"
