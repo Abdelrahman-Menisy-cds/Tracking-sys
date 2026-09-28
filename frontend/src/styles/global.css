@@ -510,15 +510,24 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .decision-choices { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 
 .login-page { min-height: 100vh; display: grid; place-items: center; padding: var(--sp-6) var(--sp-4); background: var(--page-bg); }
-.login-panel { width: min(520px, 100%); padding: var(--sp-8); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--elevation-2); }
-.login-panel .brand-lockup { margin-block-end: var(--sp-8); border: var(--radius-none); padding: var(--space-0); }
+.login-panel { position: relative; overflow: hidden; width: min(520px, 100%); padding: var(--sp-8); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--elevation-2); }
+.login-brand-watermark { position: absolute; inset: 0; z-index: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.login-brand-watermark img { width: min(72%, 340px); max-height: 72%; object-fit: contain; opacity: 0.06; }
+:root[data-theme="dark"] .login-brand-watermark img { opacity: 0.08; }
+.login-panel > *:not(.login-brand-watermark) { position: relative; z-index: 1; }
+.login-preferences-header { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-block-end: var(--sp-6); }
+.login-panel .brand-lockup { margin-block-end: var(--sp-6); border: var(--radius-none); padding: var(--space-0); }
 .login-panel h1 { margin-block-end: var(--sp-6); }
-.password-field { display: flex; gap: var(--sp-2); align-items: start; }
-.password-field .input { min-width: 0; }
+.login-panel form { display: grid; gap: var(--sp-6); }
+.login-panel .field { margin-block-end: var(--space-0); }
+.password-field { position: relative; }
+.password-field .input { padding-inline-end: calc(var(--control-min-h) + var(--sp-2)); }
+.password-visibility-toggle { position: absolute; inset-inline-end: var(--sp-2); top: 50%; transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center; inline-size: 40px; block-size: 40px; min-inline-size: 40px; padding: var(--space-0); border: none; border-radius: var(--radius-surface); background: transparent; color: var(--text-muted); }
+.password-visibility-toggle:hover:not(:disabled), .password-visibility-toggle:focus-visible { background: var(--surface-subtle); color: var(--text); }
+.password-visibility-toggle:focus-visible { outline: var(--space-1) solid var(--focus-ring); outline-offset: var(--space-1); }
+.password-visibility-toggle .icon { width: var(--icon-size); height: var(--icon-size); }
 .login-submit { width: 100%; }
-.login-preferences { display: flex; gap: var(--sp-3); flex-wrap: wrap; margin-block: var(--sp-6); padding-block: var(--sp-4); border-block: var(--timeline-width) solid var(--border-subtle); }
-.login-preferences label { display: grid; gap: var(--sp-1); font-size: var(--font-size-sm); font-weight: 700; }
-.login-preferences .select { width: auto; }
+.login-demo-note { margin-block-start: var(--sp-6); margin-block-end: var(--space-0); padding-block-start: var(--sp-4); border-block-start: var(--timeline-width) solid var(--border-subtle); }
 @media (forced-colors: active) { :focus-visible { outline: var(--space-1) solid CanvasText; } .btn, .pill, .nav-link, .work-surface, .table-wrap { border: var(--timeline-width) solid ButtonText; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; scroll-behavior: auto !important; } .skeleton { animation: none; } }
 @media (max-width: 1023px) { .app-rail { position: fixed; inset-block: 0; inset-inline-start: 0; transform: translateX(-100%); z-index: 40; overflow-y: auto; clip-path: inset(0 100% 0 0); } html[dir="rtl"] .app-rail { transform: translateX(100%); clip-path: inset(0 0 0 100%); } .app-rail.open { transform: translateX(0); clip-path: none; } .menu-toggle { display: inline-flex !important; } .app-main { padding-inline: var(--sp-6); } .dashboard-grid { grid-template-columns: 1fr; } .drawer-backdrop { position: fixed; inset: 0; z-index: 30; border: var(--radius-none); background: var(--overlay-scrim); } }
