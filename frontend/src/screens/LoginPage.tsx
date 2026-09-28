@@ -22,8 +22,6 @@ function EyeOffIcon() {
   );
 }
 
-const APPEARANCE_SEQUENCE: Appearance[] = ["system", "light", "dark"];
-
 export default function LoginPage() {
   const {
     t,
@@ -31,7 +29,6 @@ export default function LoginPage() {
     setLocale,
     setRole,
     isDemoMode,
-    appearance,
     setAppearance,
     resolvedTheme,
   } = useApp();
@@ -49,9 +46,7 @@ export default function LoginPage() {
   const targetLocale = locale === "ar" ? "en" : "ar";
   const languageLabel = targetLocale === "ar" ? t("switchToArabic") : t("switchToEnglish");
 
-  const nextAppearance = APPEARANCE_SEQUENCE[(APPEARANCE_SEQUENCE.indexOf(appearance) + 1) % APPEARANCE_SEQUENCE.length];
-  const nextAppearanceLabel = nextAppearance === "light" ? t("appearanceLight") : nextAppearance === "dark" ? t("appearanceDark") : t("appearanceSystem");
-  const currentAppearanceLabel = appearance === "light" ? t("appearanceLight") : appearance === "dark" ? t("appearanceDark") : t("appearanceSystem");
+  const targetTheme: Exclude<Appearance, "system"> = resolvedTheme === "light" ? "dark" : "light";
   const ThemeIcon = resolvedTheme === "light" ? SunIcon : MoonIcon;
 
   const submit = (event: FormEvent) => {
@@ -81,26 +76,28 @@ export default function LoginPage() {
         <img src={`/brand/logo-${resolvedTheme}.png`} alt="" />
       </div>
       <section className="login-panel" aria-labelledby="sign-in-heading">
-        <div className="login-preferences-header">
-          <button
-            type="button"
-            className="btn btn-secondary icon-only language-toggle-header"
-            aria-label={languageLabel}
-            onClick={() => setLocale(targetLocale)}
-          >
-            <GlobeIcon />
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary icon-only theme-toggle-header"
-            aria-label={`${t("appearance")}: ${currentAppearanceLabel} — ${nextAppearanceLabel}`}
-            aria-pressed={resolvedTheme === "dark"}
-            onClick={() => setAppearance(nextAppearance)}
-          >
-            <ThemeIcon />
-          </button>
+        <div className="login-header-row">
+          <BrandLockup showTagline />
+          <div className="login-preferences-header">
+            <button
+              type="button"
+              className="btn btn-secondary icon-only language-toggle-header"
+              aria-label={languageLabel}
+              onClick={() => setLocale(targetLocale)}
+            >
+              <GlobeIcon />
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary icon-only theme-toggle-header"
+              aria-label={targetTheme === "light" ? t("switchToLight") : t("switchToDark")}
+              aria-pressed={resolvedTheme === "dark"}
+              onClick={() => setAppearance(targetTheme)}
+            >
+              <ThemeIcon />
+            </button>
+          </div>
         </div>
-        <BrandLockup showTagline />
         <h1 id="sign-in-heading">{t("signIn")}</h1>
         <form onSubmit={submit} noValidate>
           {error && (

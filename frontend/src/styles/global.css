@@ -514,7 +514,9 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .login-brand-watermark { position: fixed; inset: 0; z-index: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .login-brand-watermark img { width: min(72vw, 1000px); max-width: 100%; max-height: 90vh; object-fit: contain; opacity: 0.07; }
 :root[data-theme="dark"] .login-brand-watermark img { opacity: 0.09; }
-.login-preferences-header { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-block-end: var(--sp-6); }
+.login-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); margin-block-end: var(--sp-6); }
+.login-panel .login-header-row .brand-lockup { margin-block-end: var(--space-0); }
+.login-preferences-header { display: flex; flex: 0 0 auto; justify-content: flex-end; gap: var(--sp-2); margin-block-end: var(--space-0); }
 .login-panel .brand-lockup { margin-block-end: var(--sp-6); border: var(--radius-none); padding: var(--space-0); }
 .login-panel h1 { margin-block-end: var(--sp-6); }
 .login-panel form { display: grid; gap: var(--sp-6); }
