@@ -53,12 +53,12 @@
   --elevation-3: 0 10px 28px rgb(0 0 0 / .28), 0 28px 72px rgb(0 0 0 / .26);
   --elevation-focus: 0 0 0 var(--space-1) var(--focus-ring);
 
-  --page-bg: #0E0E10;
-  --surface: #18181B;
-  --surface-raised: #1F1F23;
-  --surface-subtle: #232327;
-  --surface-inset: #141416;
-  --surface-overlay: #232327;
+  --page-bg: #1A1A1F;
+  --surface: #232329;
+  --surface-raised: #26262D;
+  --surface-subtle: #2A2A30;
+  --surface-inset: #15151A;
+  --surface-overlay: #2A2A30;
   --card-border: rgba(255, 255, 255, .08);
   --border-subtle: var(--card-border);
   --border-control: rgb(212 212 216 / .30);
@@ -67,46 +67,46 @@
   --text: #F4F4F5;
   --text-strong: #FFFFFF;
   --text-muted: #A1A1AA;
-  --text-subtle: #8B8B94;
+  --text-subtle: #9698A0;
   --text-inverse: #F4F4F5;
 
-  --accent: #FF6B6B;
-  --accent-strong: #FF8A8A;
-  --accent-soft: rgb(255 107 107 / .14);
-  --accent-border: rgb(255 107 107 / .38);
-  --on-accent: #1A1A1A;
+  --accent: #F06060;
+  --accent-strong: #F28888;
+  --accent-soft: rgb(240 96 96 / .14);
+  --accent-border: rgb(240 96 96 / .38);
+  --on-accent: #172129;
 
-  --warning: #FBBF24;
-  --warning-strong: #FCD34D;
+  --warning: #F2B84B;
+  --warning-strong: #F6C96B;
   --warning-soft: rgb(251 191 36 / .15);
   --warning-border: rgb(251 191 36 / .38);
-  --on-warning: #1A1A1A;
+  --on-warning: #172129;
 
   --neutral: #A1A1AA;
   --neutral-strong: #D4D4D8;
   --neutral-soft: rgb(161 161 170 / .15);
   --neutral-border: rgb(161 161 170 / .38);
-  --on-neutral: #1A1A1A;
+  --on-neutral: #172129;
 
-  --unread: #FF6B6B;
-  --unread-strong: #FF8A8A;
-  --unread-soft: rgb(255 107 107 / .14);
-  --unread-border: rgb(255 107 107 / .38);
-  --on-unread: #1A1A1A;
+  --unread: #F06060;
+  --unread-strong: #F28888;
+  --unread-soft: rgb(240 96 96 / .14);
+  --unread-border: rgb(240 96 96 / .38);
+  --on-unread: #172129;
 
-  --success: #34D399;
-  --success-strong: #6EE7B7;
+  --success: #3FCE96;
+  --success-strong: #6FDAAD;
   --success-soft: rgb(52 211 153 / .14);
   --success-border: rgb(52 211 153 / .38);
-  --on-success: #1A1A1A;
+  --on-success: #172129;
 
-  --danger: #FB923C;
-  --danger-strong: #FDBA74;
+  --danger: #F28A50;
+  --danger-strong: #F5A16E;
   --danger-soft: rgb(251 146 60 / .15);
   --danger-border: rgb(251 146 60 / .38);
-  --on-danger: #1A1A1A;
+  --on-danger: #172129;
 
-  --focus-ring: rgb(255 107 107 / .45);
+  --focus-ring: rgb(240 96 96 / .45);
   --overlay-scrim: rgb(2 6 23 / .68);
   --selection-bg: var(--accent);
   --selection-text: var(--on-accent);
