@@ -379,6 +379,7 @@ export const dict = {
     adminOverviewNoEmployees: "لا يوجد موظفون في النطاق.",
     adminOverviewHistoryLink: "فتح سجل الحضور الكامل",
     adminOverviewEmptyTable: "لا أحد في هذه الحالة اليوم.",
+    adminOverviewNotYetIn: "لسه مسجّلش",
     // admin suite — shared "Adjust leave balance" dialog §1.2 + §2.4
     adminAdjustDialogDescription: "تسجيل تعديل موقّع على رصيد إجازة مع سبب إلزامي.",
     adminAdjustPending: "جارٍ تسجيل التعديل…",
@@ -748,6 +749,7 @@ export const dict = {
     adminOverviewNoEmployees: "No employees in scope.",
     adminOverviewHistoryLink: "Open the full attendance history",
     adminOverviewEmptyTable: "Nobody is in this status today.",
+    adminOverviewNotYetIn: "Not clocked in yet",
     // admin suite — shared "Adjust leave balance" dialog §1.2 + §2.4
     adminAdjustDialogDescription: "Record a signed leave-balance adjustment with a mandatory reason.",
     adminAdjustPending: "Recording adjustment…",

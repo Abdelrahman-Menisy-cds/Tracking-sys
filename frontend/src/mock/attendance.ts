@@ -238,6 +238,11 @@ export const attendanceEventsByIdentity: Record<DemoIdentity, AttendanceEvent[]>
   hr: eventsForEmployee("hr1", "att-hr1"),
 };
 
+/**
+ * Today's snapshot for the directory — see `directoryEventsByIdentity` at the
+ * bottom of this file (it must be defined after the holidays register it reads).
+ */
+
 export const leaveBalancesByIdentity: Record<DemoIdentity, LeaveBalance[]> = {
   employee: [
     { employee: "e1", leave_type: "ANNUAL", period: "2026", entitlement_days: 21, carry_over_days: 3, carry_over_cap_days: 5, carry_over_expiry_months: 3, used_days: 4, pending_days: 2, adjustments: [{ id: "adj-e1-1", days: 1, reason: "Service recognition grant", created_at: "2026-01-03T09:00:00Z", recorded_by: "hr1" }] },
@@ -282,7 +287,10 @@ export function deriveAttendanceDays(events: AttendanceEvent[], employee: string
     const firstException = attendanceExceptionForEvent(first ? { id: "derived-first", employee, occurred_at: first, kind: "CLOCK_IN", source: "WEB", recorded_by: employee, created_at: first } : null, workDate, schedule);
     const lastException = attendanceExceptionForEvent(last ? { id: "derived-last", employee, occurred_at: last, kind: "CLOCK_OUT", source: "WEB", recorded_by: employee, created_at: last } : null, workDate, schedule);
     const isHoliday = isPublicHoliday(workDate);
-    days.push({ employee, work_date: workDate, first_in_at: first, last_out_at: last, worked_minutes: worked, break_minutes: breaks, status: isHoliday && !worked ? "HOLIDAY" : open ? "INCOMPLETE" : worked ? "PRESENT" : "OPEN", exception: open ? "MISSING_CLOCK_OUT" : firstException === "LATE" ? "LATE" : lastException === "EARLY_LEAVE" ? "EARLY_LEAVE" : "NONE", expected_minutes: schedule?.expected_daily_minutes ?? 0 });
+    // "On approved leave" is carried as a lone CLOCK_OUT whose note starts
+    // with "LEAVE:" — a half-day works by pairing it with real clock events.
+    const onLeave = dayEvents.some((event) => /^LEAVE:/.test(event.note ?? ""));
+    days.push({ employee, work_date: workDate, first_in_at: first, last_out_at: last, worked_minutes: worked, break_minutes: breaks, status: isHoliday && !worked ? "HOLIDAY" : open ? "INCOMPLETE" : worked ? "PRESENT" : onLeave ? "LEAVE" : "OPEN", exception: open ? "MISSING_CLOCK_OUT" : firstException === "LATE" ? "LATE" : lastException === "EARLY_LEAVE" ? "EARLY_LEAVE" : "NONE", expected_minutes: schedule?.expected_daily_minutes ?? 0 });
   });
   return days.sort((a, b) => b.work_date.localeCompare(a.work_date));
 }
@@ -433,3 +441,53 @@ export function defaultLeaveBalancesFor(entry: EmployeeDirectoryEntry, period: s
 export function directoryLeaveBalances(period: string): LeaveBalance[] {
   return employeeDirectory.flatMap((entry) => defaultLeaveBalancesFor(entry, period));
 }
+
+/**
+ * Today's snapshot for the directory — the 35-day history above starts only at
+ * daysAgo 1, so the Overview would show all-zero counts. These events, kept on
+ * the HR identity's state (the /admin Overview reads only the active
+ * identity's `attendanceEvents`), represent one normal working day across the
+ * directory. e1 is deliberately absent so the personal /attendance page still
+ * shows "you have not clocked in yet" and the clock-in demo stays intact.
+ *
+ * Guarded by isEgyptWorkingDay + the public-holidays register above so a
+ * Friday, a Saturday, or a registered holiday seed nothing — the Overview then
+ * shows its own holiday banner instead of one of these rows. Lives at the
+ * bottom of the file because it reads the register at module init.
+ */
+function directoryTodayEvents(): AttendanceEvent[] {
+  const now = new Date();
+  const today = cairoDate(now);
+  const dateTodayAt = (hour: number, minute = 0) => cairoWallClockInstant(today, String(hour), minute).toISOString();
+  if (!isEgyptWorkingDay(now) || isPublicHoliday(today)) return [];
+  const add = (employee: string, kind: AttendanceEventKind, hour: number, minute = 0, note?: string): AttendanceEvent => {
+    const occurred_at = dateTodayAt(hour, minute);
+    return {
+      id: `att-dir-today-${employee}-${kind.toLowerCase()}`,
+      employee,
+      occurred_at,
+      kind,
+      source: "WEB",
+      recorded_by: employee,
+      created_at: occurred_at,
+      note,
+    };
+  };
+  return [
+    // PRESENT — complete in/out pair (m morning block already closed).
+    add("m1", "CLOCK_IN", 9),
+    add("m1", "CLOCK_OUT", 13),
+    // INCOMPLETE — clocked in, day still open (no clock-out yet).
+    add("e2", "CLOCK_IN", 9, 5),
+    // LEAVE — "on approved leave" is carried as a lone CLOCK_OUT whose note
+    // starts with "LEAVE:" (the derivation's only LEAVE path; a half-day
+    // works by pairing this marker with real clock events).
+    { ...add("e3", "CLOCK_OUT", 9), note: "LEAVE: on approved leave — all-day" },
+  ];
+}
+
+export const directoryEventsByIdentity: Record<DemoIdentity, AttendanceEvent[]> = {
+  employee: [],
+  manager: [],
+  hr: directoryTodayEvents(),
+};

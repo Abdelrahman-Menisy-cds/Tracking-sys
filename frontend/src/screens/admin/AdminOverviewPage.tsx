@@ -8,14 +8,13 @@ import AdjustLeaveDialog, { leaveTypeKeys } from "./AdjustLeaveDialog";
 import AdminNav from "./AdminNav";
 import {
   cairoDate,
-  identityEmployeeId,
   isPublicHoliday,
   type AttendanceDay,
   type AttendanceDayStatus,
   type DemoIdentity,
   type LeaveBalance,
 } from "../../mock/attendance";
-import { demoUser } from "../../mock/data";
+import { demoUser, employeeDirectory } from "../../mock/data";
 
 type DictKey = keyof import("../../i18n/dict").Dict;
 
@@ -24,13 +23,14 @@ type DictKey = keyof import("../../i18n/dict").Dict;
  * Derived strictly from the committed per-identity attendance fixtures;
  * full history lives at /attendance/history and is linked, never embedded.
  */
-type OverviewBucket = "PRESENT" | "ABSENT" | "LEAVE" | "INCOMPLETE";
+type OverviewBucket = "PRESENT" | "ABSENT" | "LEAVE" | "INCOMPLETE" | "OPEN";
 
 const bucketFor = (status: AttendanceDayStatus): OverviewBucket => {
   if (status === "PRESENT" || status === "REMOTE") return "PRESENT";
   if (status === "ABSENT" || status === "ABSENT_CANDIDATE") return "ABSENT";
   if (status === "LEAVE" || status === "HOLIDAY") return "LEAVE";
-  return "INCOMPLETE"; // OPEN + INCOMPLETE = under review / incomplete
+  if (status === "OPEN") return "OPEN"; // not clocked in yet — the normal early-day state
+  return "INCOMPLETE";
 };
 
 const bucketKeys: Record<OverviewBucket, DictKey> = {
@@ -38,17 +38,19 @@ const bucketKeys: Record<OverviewBucket, DictKey> = {
   ABSENT: "attendanceStatusAbsent",
   LEAVE: "attendanceStatusLeave",
   INCOMPLETE: "attendanceStatusIncomplete",
+  OPEN: "adminOverviewNotYetIn",
 };
 
-const bucketTones: Record<OverviewBucket, "success" | "danger" | "info" | "warning"> = {
+const bucketTones: Record<OverviewBucket, "success" | "danger" | "info" | "warning" | "neutral"> = {
   PRESENT: "success",
   ABSENT: "danger",
   LEAVE: "info",
   INCOMPLETE: "warning",
+  OPEN: "neutral", // not a fault — muted, not danger/success
 };
 
 /** Minimal local view of an event — derived from the existing fixture events. */
-type EventPair = { kind: "CLOCK_IN" | "CLOCK_OUT"; occurred_at: string };
+type EventPair = { kind: "CLOCK_IN" | "CLOCK_OUT"; note?: string; occurred_at: string };
 
 type DayRow = {
   identity: DemoIdentity;
@@ -56,39 +58,55 @@ type DayRow = {
   day: Pick<AttendanceDay, "first_in_at" | "last_out_at" | "worked_minutes" | "status" | "exception">;
 };
 
-/** Derive today's per-employee row from the existing event fixtures and the committed public-holidays register. */
+/** Derive one employee's today-row from their event fixtures; null = no events (OPEN). */
+function todayRowFor(employee: string, events: EventPair[], today: string): DayRow | null {
+  const identity = employee === "e1" ? "employee" : employee === "m1" ? "manager" : "hr";
+  const dayEvents = events.filter((event) => event.occurred_at.slice(0, 10) === today);
+  if (!dayEvents.length) return null;
+  const ordered = [...dayEvents].sort((l, r) => l.occurred_at.localeCompare(r.occurred_at));
+  const open = ordered.reduce<EventPair | null>((prev, e) => (e.kind === "CLOCK_IN" ? e : prev), null);
+  let worked = 0;
+  let openPair: string | null = null;
+  ordered.forEach((event) => {
+    if (event.kind === "CLOCK_IN") openPair = event.occurred_at;
+    else if (openPair) {
+      worked += Math.max(0, Math.round((Date.parse(event.occurred_at) - Date.parse(openPair)) / 60000));
+      openPair = null;
+    }
+  });
+  // "On approved leave" arrives as the deriveAttendanceDays LEAVE marker: a
+  // lone CLOCK_OUT whose note starts with "LEAVE:" (src/mock/attendance.ts).
+  const onLeave = ordered.some((event) => /^LEAVE:/.test(event.note ?? ""));
+  const status: AttendanceDayStatus =
+    isPublicHoliday(today) && !worked ? "HOLIDAY" : open ? "INCOMPLETE" : worked ? "PRESENT" : onLeave ? "LEAVE" : "OPEN";
+  return {
+    identity,
+    employee,
+    day: {
+      first_in_at: ordered.find((e) => e.kind === "CLOCK_IN")?.occurred_at ?? null,
+      last_out_at: [...ordered].reverse().find((e) => e.kind === "CLOCK_OUT")?.occurred_at ?? null,
+      worked_minutes: worked,
+      status,
+      exception: open ? "MISSING_CLOCK_OUT" : "NONE",
+    },
+  };
+}
+
+/**
+ * Today's row per DIRECTORY employee (spec §3 scope is the whole directory).
+ * Employees with no events today are still returned, as OPEN rows — the
+ * "not clocked in yet" bucket; a person is never dropped from the snapshot.
+ */
 function todayRows(
-  eventsByIdentity: Record<DemoIdentity, EventPair[]>,
+  eventsByEmployee: Record<string, EventPair[]>,
   today: string,
 ): DayRow[] {
-  return (["employee", "manager", "hr"] as DemoIdentity[]).flatMap((identity) => {
-    const employee = identityEmployeeId(identity);
-    const dayEvents = eventsByIdentity[identity]
-      .filter((event) => event.occurred_at.slice(0, 10) === today);
-    if (!dayEvents.length) return [];
-    const ordered = [...dayEvents].sort((l, r) => l.occurred_at.localeCompare(r.occurred_at));
-    const open = ordered.reduce<EventPair | null>((prev, e) => (e.kind === "CLOCK_IN" ? e : prev), null);
-    let worked = 0;
-    let openPair: string | null = null;
-    ordered.forEach((event) => {
-      if (event.kind === "CLOCK_IN") openPair = event.occurred_at;
-      else if (openPair) {
-        worked += Math.max(0, Math.round((Date.parse(event.occurred_at) - Date.parse(openPair)) / 60000));
-        openPair = null;
-      }
-    });
-    const status: AttendanceDayStatus =
-      isPublicHoliday(today) && !worked ? "HOLIDAY" : open ? "INCOMPLETE" : worked ? "PRESENT" : "OPEN";
-    return [{
-      identity,
-      employee,
-      day: {
-        first_in_at: ordered.find((e) => e.kind === "CLOCK_IN")?.occurred_at ?? null,
-        last_out_at: [...ordered].reverse().find((e) => e.kind === "CLOCK_OUT")?.occurred_at ?? null,
-        worked_minutes: worked,
-        status,
-        exception: open ? "MISSING_CLOCK_OUT" : "NONE",
-      },
+  return employeeDirectory.flatMap((entry) => {
+    const row = todayRowFor(entry.id, eventsByEmployee[entry.id] ?? [], today);
+    return row ? [row] : [{
+      identity: entry.id === "e1" ? "employee" : entry.id === "m1" ? "manager" : "hr",
+      employee: entry.id,
+      day: { first_in_at: null, last_out_at: null, worked_minutes: 0, status: "OPEN" as AttendanceDayStatus, exception: "NONE" },
     }];
   });
 }
@@ -119,13 +137,13 @@ export default function AdminOverviewPage() {
     t={t}
     locale={locale}
     eventsByEmployee={Object.fromEntries(
-      (["employee", "manager", "hr"] as DemoIdentity[]).map((identity) => [
-        identity,
+      employeeDirectory.map((entry) => [
+        entry.id,
         attendanceEvents
-          .filter((event) => event.employee === identityEmployeeId(identity))
-          .map((event) => ({ kind: event.kind, occurred_at: event.occurred_at })),
+          .filter((event) => event.employee === entry.id)
+          .map((event) => ({ kind: event.kind, note: event.note, occurred_at: event.occurred_at })),
       ]),
-    ) as Record<DemoIdentity, EventPair[]>}
+    ) as Record<string, EventPair[]>}
     onAdjust={(employeeId, type) => setAdjustTarget({ employeeId, type })}
     adjustDialog={
       adjustTarget ? (
@@ -171,7 +189,7 @@ function OverviewBody({
 
   const rows = useMemo(() => todayRows(eventsByEmployee, today), [eventsByEmployee, today]);
   const buckets = useMemo(() => {
-    const grouped: Record<OverviewBucket, DayRow[]> = { PRESENT: [], ABSENT: [], LEAVE: [], INCOMPLETE: [] };
+    const grouped: Record<OverviewBucket, DayRow[]> = { PRESENT: [], ABSENT: [], LEAVE: [], INCOMPLETE: [], OPEN: [] };
     rows.forEach((row) => grouped[bucketFor(row.day.status)].push(row));
     return grouped;
   }, [rows]);
@@ -253,14 +271,14 @@ function OverviewBody({
       ) : (
         <>
           <div className="summary-strip" aria-live="polite">
-            {(["PRESENT", "ABSENT", "LEAVE", "INCOMPLETE"] as OverviewBucket[]).map((bucket) => (
+            {(["PRESENT", "ABSENT", "LEAVE", "INCOMPLETE", "OPEN"] as OverviewBucket[]).map((bucket) => (
               <div className="summary-item" key={bucket}>
                 <span className="summary-label">{t(bucketKeys[bucket])}</span>
                 <span className="summary-value">{fmt(buckets[bucket].length)}</span>
               </div>
             ))}
           </div>
-          {(["PRESENT", "ABSENT", "LEAVE", "INCOMPLETE"] as OverviewBucket[]).map((bucket) => (
+          {(["PRESENT", "ABSENT", "LEAVE", "INCOMPLETE", "OPEN"] as OverviewBucket[]).map((bucket) => (
             <section className="work-surface section" key={bucket} aria-labelledby={`overview-${bucket}`}>
               <div className="section-heading">
                 <h2 id={`overview-${bucket}`}>{t(bucketKeys[bucket])}</h2>

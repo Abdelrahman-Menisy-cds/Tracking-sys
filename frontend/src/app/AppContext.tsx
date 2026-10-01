@@ -36,6 +36,7 @@ import {
 } from "../mock/data";
 import {
   attendanceEventsByIdentity,
+  directoryEventsByIdentity,
   attendanceSchedules,
   deriveAttendanceDays,
   directoryLeaveBalances,
@@ -211,7 +212,7 @@ function initialIdentityState(identity: DemoIdentity): IdentityState {
     teamRequestItems: identity === "employee" ? [] : cloneFixture(teamRequests),
     teamTimesheetItems: identity === "employee" ? [] : cloneFixture(teamTimesheets),
     notificationItems: cloneFixture(notifications),
-    attendanceEvents: cloneFixture(attendanceEventsByIdentity[identity]),
+    attendanceEvents: [...cloneFixture(attendanceEventsByIdentity[identity]), ...cloneFixture(directoryEventsByIdentity[identity])],
     attendanceDays: cloneFixture(fixtureAttendanceDays(identity)),
     schedules: cloneFixture(attendanceSchedules),
     leaveBalances: cloneFixture(leaveBalancesByIdentity[identity]),
