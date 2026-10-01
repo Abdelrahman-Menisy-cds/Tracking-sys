@@ -10,6 +10,7 @@ import {
   ChevronDownIcon,
   ClockIcon,
   DocumentIcon,
+  GlobeIcon,
   HomeIcon,
   LogoutIcon,
   MoonIcon,
@@ -164,6 +165,9 @@ export default function AppShell() {
     },
     ...(capabilities.canReview
       ? [{ label: locale === "ar" ? "عمل المراجعة" : "Review work", items: [{ to: "/reviews", label: t("navTeamReviews"), icon: ActivityIcon }] }]
+      : []),
+    ...(capabilities.canSetOrgSchedule && capabilities.canManageLeaveBalance && capabilities.canViewOrgAttendance
+      ? [{ label: t("adminTitle"), items: [{ to: "/admin", label: t("adminTitle"), icon: GlobeIcon }] }]
       : []),
   ];
   const matchedCurrentItem = navGroups

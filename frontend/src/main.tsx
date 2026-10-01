@@ -14,6 +14,7 @@ import TeamReviewsPage, { ReviewRequestDetailPage, ReviewTimesheetDetailPage } f
 import NotificationsPage from "./screens/NotificationsPage";
 import ProfilePage from "./screens/ProfilePage";
 import AttendancePage, { AttendanceCorrectionsPage, AttendanceHistoryPage } from "./screens/AttendancePage";
+import AdminPage from "./screens/AdminPage";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -36,6 +37,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/attendance/history" element={<AttendanceHistoryPage />} />
             <Route path="/attendance/corrections" element={<AttendanceCorrectionsPage />} />
+            <Route path="/admin" element={<AdminPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
