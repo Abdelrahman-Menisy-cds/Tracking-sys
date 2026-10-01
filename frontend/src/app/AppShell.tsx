@@ -345,7 +345,7 @@ export default function AppShell() {
                       <UserIcon />
                       {t("account")}
                     </button>
-                    <button ref={(element) => { profileMenuItemsRef.current[1] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/login"); }}>
+                    <button ref={(element) => { profileMenuItemsRef.current[1] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); setRole("employee"); navigate("/login"); }}>
                       <LogoutIcon />
                       {t("signOut")}
                     </button>
