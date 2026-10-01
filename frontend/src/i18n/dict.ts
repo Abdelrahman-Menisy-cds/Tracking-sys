@@ -366,6 +366,27 @@ export const dict = {
     hrAnnouncementSentPending: "تم إنشاء الإعلان؛ لا يمكن تأكيد وصوله فورًا.",
     hrAnnouncementEmpty: "لا توجد إعلانات بعد.",
     hrPublicHoliday: "عطلة رسمية",
+    // admin suite — skeleton / sub-nav (keep contiguous; later stages append own blocks below)
+    adminNavLabel: "أقسام الإدارة",
+    adminNavOverview: "نظرة عامة",
+    adminNavSettings: "إعدادات المؤسسة",
+    adminNavPeople: "إعدادات الموظفين",
+    adminNavAnnouncements: "الإعلانات",
+    // admin suite — Overview (today snapshot) §3
+    adminOverviewTitle: "نظرة عامة",
+    adminOverviewSnapshotPrefix: "لقطة اليوم:",
+    adminOverviewScopeBanner: "لقطة اليوم فقط. للأيام السابقة، افتح سجل الحضور.",
+    adminOverviewNoEmployees: "لا يوجد موظفون في النطاق.",
+    adminOverviewHistoryLink: "فتح سجل الحضور الكامل",
+    adminOverviewEmptyTable: "لا أحد في هذه الحالة اليوم.",
+    // admin suite — shared "Adjust leave balance" dialog §1.2 + §2.4
+    adminAdjustDialogDescription: "تسجيل تعديل موقّع على رصيد إجازة مع سبب إلزامي.",
+    adminAdjustPending: "جارٍ تسجيل التعديل…",
+    adminAdjustPreview: "الصف الناتج بعد التعديل",
+    adminAdjustNoBalance: "لا يوجد صف رصيد لنوع الإجازة المختار في البيانات الحالية.",
+    adminAdjustResultingRemaining: "المتبقي بعد التعديل",
+    // admin suite — placeholders (honest, replaced by later stages)
+    adminPlaceholderNote: "هذا القسم لم يُبنَ بعد. سيُبنى في مرحلة لاحقة من خطة مجموعة إدارة الموارد البشرية.",
   },
   en: {
     brand: "Heya Fawda?",
@@ -714,6 +735,27 @@ export const dict = {
     hrAnnouncementSentPending: "Announcement created; delivery cannot be confirmed yet.",
     hrAnnouncementEmpty: "No announcements yet.",
     hrPublicHoliday: "Public holiday",
+    // admin suite — skeleton / sub-nav (keep contiguous; later stages append own blocks below)
+    adminNavLabel: "Administration sections",
+    adminNavOverview: "Overview",
+    adminNavSettings: "Organization settings",
+    adminNavPeople: "Employee settings",
+    adminNavAnnouncements: "Announcements",
+    // admin suite — Overview (today snapshot) §3
+    adminOverviewTitle: "Overview",
+    adminOverviewSnapshotPrefix: "Snapshot for:",
+    adminOverviewScopeBanner: "Snapshot — day only. For earlier days, open attendance history.",
+    adminOverviewNoEmployees: "No employees in scope.",
+    adminOverviewHistoryLink: "Open the full attendance history",
+    adminOverviewEmptyTable: "Nobody is in this status today.",
+    // admin suite — shared "Adjust leave balance" dialog §1.2 + §2.4
+    adminAdjustDialogDescription: "Record a signed leave-balance adjustment with a mandatory reason.",
+    adminAdjustPending: "Recording adjustment…",
+    adminAdjustPreview: "Resulting row after the adjustment",
+    adminAdjustNoBalance: "No balance row exists for the selected leave type in the current data.",
+    adminAdjustResultingRemaining: "Remaining after the adjustment",
+    // admin suite — placeholders (honest, replaced by later stages)
+    adminPlaceholderNote: "This section is not built yet. It is implemented in a later stage of the HR administration suite plan.",
   },
 } as const;
 
