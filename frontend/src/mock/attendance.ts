@@ -281,7 +281,8 @@ export function deriveAttendanceDays(events: AttendanceEvent[], employee: string
     const last = [...dayEvents].reverse().find((event) => event.kind === "CLOCK_OUT")?.occurred_at ?? null;
     const firstException = attendanceExceptionForEvent(first ? { id: "derived-first", employee, occurred_at: first, kind: "CLOCK_IN", source: "WEB", recorded_by: employee, created_at: first } : null, workDate, schedule);
     const lastException = attendanceExceptionForEvent(last ? { id: "derived-last", employee, occurred_at: last, kind: "CLOCK_OUT", source: "WEB", recorded_by: employee, created_at: last } : null, workDate, schedule);
-    days.push({ employee, work_date: workDate, first_in_at: first, last_out_at: last, worked_minutes: worked, break_minutes: breaks, status: open ? "INCOMPLETE" : worked ? "PRESENT" : "OPEN", exception: open ? "MISSING_CLOCK_OUT" : firstException === "LATE" ? "LATE" : lastException === "EARLY_LEAVE" ? "EARLY_LEAVE" : "NONE", expected_minutes: schedule?.expected_daily_minutes ?? 0 });
+    const isHoliday = isPublicHoliday(workDate);
+    days.push({ employee, work_date: workDate, first_in_at: first, last_out_at: last, worked_minutes: worked, break_minutes: breaks, status: isHoliday && !worked ? "HOLIDAY" : open ? "INCOMPLETE" : worked ? "PRESENT" : "OPEN", exception: open ? "MISSING_CLOCK_OUT" : firstException === "LATE" ? "LATE" : lastException === "EARLY_LEAVE" ? "EARLY_LEAVE" : "NONE", expected_minutes: schedule?.expected_daily_minutes ?? 0 });
   });
   return days.sort((a, b) => b.work_date.localeCompare(a.work_date));
 }
@@ -317,3 +318,118 @@ export function leaveBalanceSummary(balance: LeaveBalance) {
 
 export function identityEmployeeId(identity: DemoIdentity): string { return identity === "employee" ? "e1" : identity === "manager" ? "m1" : "hr1"; }
 export { fixtureNames };
+
+/* ================== Public holidays register + hybrid-aware allocation ================== */
+
+import { employeeDirectory, type EmploymentType, type EmployeeDirectoryEntry } from "./data";
+
+export interface PublicHoliday {
+  id: string;
+  /** ISO calendar date (Cairo local), e.g. 2026-04-25. */
+  date: string;
+  name: { ar: string; en: string };
+  /** Repeats every year on the same month/day while true. */
+  recurring?: boolean;
+}
+
+/** ~7 plausible Egyptian public holidays across the current year (2026). */
+export const publicHolidays: PublicHoliday[] = [
+  { id: "hol-1", date: "2026-01-07", name: { ar: "عيد الميلاد", en: "Coptic Christmas" }, recurring: true },
+  { id: "hol-2", date: "2026-04-25", name: { ar: "عيد تحرير سيناء", en: "Sinai Liberation Day" }, recurring: true },
+  { id: "hol-3", date: "2026-05-01", name: { ar: "عيد العمال", en: "Labour Day" }, recurring: true },
+  { id: "hol-4", date: "2026-06-30", name: { ar: "عيد 30 يونيو", en: "June 30 Revolution Day" }, recurring: true },
+  { id: "hol-4b", date: "2026-07-23", name: { ar: "عيد ثورة 23 يوليو", en: "July 23 Revolution Day" }, recurring: true },
+  { id: "hol-5", date: "2026-10-06", name: { ar: "عيد القوات المسلحة", en: "Armed Forces Day" }, recurring: true },
+  { id: "hol-6", date: "2026-12-25", name: { ar: "عيد الميلاد الغريغوري", en: "Gregorian Christmas" }, recurring: true },
+];
+
+/**
+ * Does an ISO date fall on a public holiday? Recurring entries match on
+ * month/day for later years; dated entries only on their exact date.
+ */
+export function isPublicHoliday(date: string): boolean {
+  const monthDay = date.slice(5); // "MM-DD"
+  return publicHolidays.some((holiday) => holiday.recurring
+    ? holiday.date.slice(5) === monthDay
+    : holiday.date === date);
+}
+
+/** All holidays between two ISO dates (inclusive). */
+export function publicHolidaysInRange(from: string, to: string): PublicHoliday[] {
+  return publicHolidays.filter((holiday) => {
+    const dates = [];
+    if (holiday.recurring) {
+      // Expand a recurring holiday across the range's years on its month/day.
+      const fromYear = Number(from.slice(0, 4));
+      const toYear = Number(to.slice(0, 4));
+      const monthDay = holiday.date.slice(5);
+      for (let year = Math.min(fromYear, toYear); year <= Math.max(fromYear, toYear); year += 1) {
+        dates.push(`${String(year).padStart(4, "0")}-${monthDay}`);
+      }
+    } else {
+      dates.push(holiday.date);
+    }
+    return dates.some((date) => date >= from && date <= to);
+  });
+}
+
+/** Default per-employee-type annual entitlement used by the leave allocation. */
+const entitlementByEmploymentType: Record<EmploymentType, number> = {
+  FULL: 21,
+  PART: 14,
+  HYBRID: 21,
+  REMOTE: 21,
+};
+
+/** Sick-leave default by employment type; part-timers get a prorated pool. */
+const sickEntitlementByEmploymentType: Record<EmploymentType, number> = {
+  FULL: 14,
+  PART: 10,
+  HYBRID: 14,
+  REMOTE: 14,
+};
+
+/**
+ * Derive the per-employee leave allocation for a directory entry. The type
+ * defaults differ by employment type (a part-timer is not entitled to the
+ * same annual days as a full-timer). The three role identities keep the
+ * exact balances already in `leaveBalancesByIdentity` — `entryId` is one of
+ * their directory ids and their values above are skipped here.
+ */
+export function defaultLeaveBalancesFor(entry: EmployeeDirectoryEntry, period: string): LeaveBalance[] {
+  const identityForFixture = ({ e1: "employee", m1: "manager", hr1: "hr" } as const)[entry.id as "e1" | "m1" | "hr1"];
+  if (identityForFixture) return leaveBalancesByIdentity[identityForFixture];
+  const annualEntitlement = entitlementByEmploymentType[entry.employment_type];
+  const sickEntitlement = sickEntitlementByEmploymentType[entry.employment_type];
+  return [
+    {
+      employee: entry.id,
+      leave_type: "ANNUAL",
+      period,
+      entitlement_days: annualEntitlement,
+      carry_over_days: 0,
+      carry_over_cap_days: 5,
+      carry_over_expiry_months: 3,
+      used_days: 0,
+      pending_days: 0,
+      adjustments: [],
+    },
+    {
+      employee: entry.id,
+      leave_type: "SICK",
+      period,
+      entitlement_days: sickEntitlement,
+      carry_over_days: 0,
+      carry_over_cap_days: 0,
+      carry_over_expiry_months: 0,
+      used_days: 0,
+      pending_days: 0,
+      adjustments: [],
+    },
+  ];
+}
+
+/** Leave balances for the whole directory; identity balances come verbatim. */
+export function directoryLeaveBalances(period: string): LeaveBalance[] {
+  return employeeDirectory.flatMap((entry) => defaultLeaveBalancesFor(entry, period));
+}

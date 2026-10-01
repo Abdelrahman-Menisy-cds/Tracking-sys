@@ -18,6 +18,14 @@ import {
   stateDemoControl,
   teamRequests,
   teamTimesheets,
+  createAnnouncementFixture,
+  employeeDirectory,
+  visibleEmployeeFile,
+  announcements as announcementFixture,
+  type AnnouncementMock,
+  type AnnouncementChannel,
+  type AnnouncementStatus,
+  type EmployeeDirectoryEntry,
   type NotificationMock,
   type RequestEventMock,
   type RequestMock,
@@ -30,11 +38,15 @@ import {
   attendanceEventsByIdentity,
   attendanceSchedules,
   deriveAttendanceDays,
+  directoryLeaveBalances,
   fixtureAttendanceDays,
-  mergeAttendanceDays,
   identityEmployeeId,
+  isPublicHoliday,
   leaveBalancesByIdentity,
   leaveBalanceSummary as deriveLeaveBalanceSummary,
+  mergeAttendanceDays,
+  publicHolidays,
+  publicHolidaysInRange,
   resolveScheduleFixture,
   type AttendanceDay,
   type AttendanceEvent,
@@ -98,6 +110,9 @@ export interface DemoCapabilities {
   canSetOrgSchedule: boolean;
   canManageLeaveBalance: boolean;
   canViewOrgAttendance: boolean;
+  canManageDirectory: boolean;
+  canManageHolidays: boolean;
+  canSendAnnouncements: boolean;
 }
 
 interface AppState {
@@ -122,6 +137,17 @@ interface AppState {
   attendanceDays: AttendanceDay[];
   leaveBalances: LeaveBalance[];
   schedules: WorkSchedule[];
+  /** Full fixture directory (HR-only fields intact; gate via canManageDirectory). */
+  employeeDirectory: EmployeeDirectoryEntry[];
+  /** View-filtered copy of a file (HR-only fields removed for non-HR). */
+  visibleEmployeeFile: typeof import("../mock/data").visibleEmployeeFile;
+  publicHolidays: typeof import("../mock/attendance").publicHolidays;
+  isPublicHoliday: (date: string) => boolean;
+  publicHolidaysInRange: (from: string, to: string) => typeof import("../mock/attendance").publicHolidays;
+  directoryLeaveBalances: LeaveBalance[];
+  announcementItems: AnnouncementMock[];
+  sendAnnouncement: (input: { subject: string; body: string; channel: AnnouncementChannel; audience: "ALL" | "SELECTED"; recipientIds: string[] }) => AttendanceMutationResult<AnnouncementMock>;
+  settleAnnouncement: (announcementId: string, status: Exclude<AnnouncementStatus, "PENDING">) => AttendanceMutationResult<AnnouncementMock>;
   clockIn: (occurredAt?: string, note?: string) => AttendanceMutationResult<AttendanceEvent>;
   clockOut: (occurredAt?: string, note?: string) => AttendanceMutationResult<AttendanceEvent>;
   submitAttendanceCorrection: (input: { workDate: string; inAt: string; outAt?: string; reason: string }) => AttendanceMutationResult;
@@ -234,6 +260,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [appearance, setAppearanceState] = useState<Appearance>(readStoredAppearance);
   const [osTheme, setOsTheme] = useState<"light" | "dark">(systemTheme);
   const [identityStates, setIdentityStates] = useState<Record<DemoIdentity, IdentityState>>(initialIdentityStates);
+  const [announcementItems, setAnnouncementItems] = useState<AnnouncementMock[]>(() => cloneFixture(announcementFixture));
   const activeIdentityRef = useRef<DemoIdentity>(role);
 
   useEffect(() => {
@@ -277,6 +304,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       canSetOrgSchedule: DEMO_MODE && role === "hr",
       canManageLeaveBalance: DEMO_MODE && role === "hr",
       canViewOrgAttendance: DEMO_MODE && role === "hr",
+      canManageDirectory: DEMO_MODE && role === "hr",
+      canManageHolidays: DEMO_MODE && role === "hr",
+      canSendAnnouncements: DEMO_MODE && role === "hr",
     }),
     [role],
   );
@@ -370,6 +400,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, 150);
     return { ok: true };
   }, [capabilities.canManageLeaveBalance, role]);
+
+  /**
+   * Announce to a demo audience. The record always starts PENDING — this is
+   * an in-memory stand-in for a real dispatch, never a synchronous success
+   * and no real mail/notification API is touched. The screen settles the
+   * record via settleAnnouncement.
+   */
+  const sendAnnouncement = useCallback((input: { subject: string; body: string; channel: AnnouncementChannel; audience: "ALL" | "SELECTED"; recipientIds: string[] }): AttendanceMutationResult<AnnouncementMock> => {
+    if (!capabilities.canSendAnnouncements) return { ok: false, code: "CAPABILITY_DENIED" };
+    const invalidAudience = input.audience === "SELECTED" && input.recipientIds.length === 0;
+    if (!input.subject.trim() || invalidAudience) return { ok: false, code: "INVALID_INPUT" };
+    const pending = createAnnouncementFixture({ subject: input.subject, body: input.body, channel: input.channel, audience: input.audience, recipient_ids: input.recipientIds, created_by: identityEmployeeId(role) });
+    window.setTimeout(() => setAnnouncementItems((current) => [cloneFixture(pending), ...current]), 150);
+    return { ok: true, value: cloneFixture(pending) };
+  }, [capabilities.canSendAnnouncements, role]);
+
+  /** Settle a pending announcement (CONFIRMED / UNKNOWN / CONFLICT); HR-only. */
+  const settleAnnouncement = useCallback((announcementId: string, status: Exclude<AnnouncementStatus, "PENDING">): AttendanceMutationResult<AnnouncementMock> => {
+    if (!capabilities.canSendAnnouncements) return { ok: false, code: "CAPABILITY_DENIED" };
+    let settled: AnnouncementMock | undefined;
+    setAnnouncementItems((current) => current.map((announcement) => {
+      if (announcement.id !== announcementId || announcement.status !== "PENDING") return announcement;
+      settled = { ...announcement, status };
+      return settled;
+    }));
+    return settled ? { ok: true, value: settled } : { ok: false, code: "MISSING_RECORD" };
+  }, [capabilities.canSendAnnouncements]);
 
   const resolveScheduleFor = useCallback((employee: string, date: string) => resolveScheduleFixture(employee, date, activeState.schedules), [activeState.schedules]);
   const leaveBalanceSummary = useCallback((balance: LeaveBalance) => deriveLeaveBalanceSummary(balance), []);
@@ -582,6 +639,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     attendanceDays: activeState.attendanceDays,
     schedules: activeState.schedules,
     leaveBalances: activeState.leaveBalances,
+    employeeDirectory,
+    visibleEmployeeFile: visibleEmployeeFile as typeof visibleEmployeeFile,
+    publicHolidays,
+    isPublicHoliday,
+    publicHolidaysInRange,
+    directoryLeaveBalances: directoryLeaveBalances("2026"),
+    announcementItems,
+    sendAnnouncement,
+    settleAnnouncement,
     clockIn,
     clockOut,
     submitAttendanceCorrection,
@@ -601,6 +667,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isDemoMode: DEMO_MODE,
   }), [
     activeState,
+    announcementItems,
     appearance,
     capabilities,
     decideDemoRequest,
@@ -624,6 +691,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setWorkSchedule,
     submitAttendanceCorrection,
     setRole,
+    sendAnnouncement,
+    settleAnnouncement,
     submitDemoTimesheet,
   ]);
 
