@@ -332,6 +332,21 @@ button { cursor: pointer; }
 .summary-item { display: grid; gap: var(--sp-1); }
 .summary-value { font-size: var(--font-size-2xl); line-height: var(--line-height-tight); font-weight: 700; font-variant-numeric: tabular-nums; }
 .summary-label, .muted { color: var(--text-muted); font-size: var(--font-size-sm); }
+
+/* §1.4 — the disabled-by-design "AI: set holiday dates" control.
+   Native disabled (removed from tab order, announced as dimmed by SRs);
+   deliberately no accent, no hover/focus affordance, cursor: default —
+   `not-allowed` would imply an error state is coming. */
+.holiday-soon-wrap { display: inline-flex; align-items: center; }
+.btn-holiday-soon { gap: var(--sp-2); background: var(--neutral-soft); color: var(--neutral-strong); border-color: var(--neutral-border); cursor: default; }
+.btn.btn-holiday-soon:disabled { cursor: default; opacity: 1; box-shadow: none; }
+.btn.btn-holiday-soon:disabled:hover { background: var(--neutral-soft); color: var(--neutral-strong); }
+.holiday-soon-note { display: none; margin-block: var(--sp-2) var(--sp-4); color: var(--text-muted); font-size: var(--font-size-sm); }
+@media (max-width: 639px) { .holiday-soon-note { display: block; } }
+/* §1.1 paired time inputs sit in one row inside the form-grid fragment */
+.pair-row { min-width: 0; }
+/* §1.1 the 7-day working-week checkbox group (fieldset.quiet-inset) */
+.admin-weekday { display: inline-flex; align-items: center; gap: var(--sp-2); margin-inline-end: var(--sp-3); min-height: var(--control-min-h); }
 .summary-context { color: var(--text-subtle); font-size: var(--font-size-xs); }
 .week-card { display: grid; gap: var(--sp-4); }
 .week-progress { display: grid; gap: var(--sp-2); }
