@@ -167,7 +167,7 @@ export default function AppShell() {
       ? [{ label: locale === "ar" ? "عمل المراجعة" : "Review work", items: [{ to: "/reviews", label: t("navTeamReviews"), icon: ActivityIcon }] }]
       : []),
     ...(capabilities.canSetOrgSchedule && capabilities.canManageLeaveBalance && capabilities.canViewOrgAttendance
-      ? [{ label: t("adminTitle"), items: [{ to: "/admin", label: t("adminTitle"), icon: GlobeIcon }] }]
+      ? [{ label: locale === "ar" ? "الإدارة" : "Administration", items: [{ to: "/admin", label: t("navAdmin"), icon: GlobeIcon }] }]
       : []),
   ];
   const matchedCurrentItem = navGroups
