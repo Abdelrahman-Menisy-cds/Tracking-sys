@@ -48,7 +48,6 @@ export type Appearance = "system" | "light" | "dark";
 
 const LOCALE_STORAGE_KEY = "tracking-sys.locale";
 const APPEARANCE_STORAGE_KEY = "tracking-sys.appearance";
-const ROLE_STORAGE_KEY = "tracking-sys.role";
 
 function readStoredLocale(): Locale {
   if (typeof window === "undefined") return "ar";
@@ -67,21 +66,6 @@ function readStoredAppearance(): Appearance {
     return value === "system" || value === "light" || value === "dark" ? value : "system";
   } catch {
     return "system";
-  }
-}
-
-/**
- * The fixture role survives a reload, so a deep link such as /admin is not bounced back to "/"
- * just because the page was loaded fresh. This is still a presentation fixture, never
- * authentication — the value is only a hint and every capability is re-derived from it below.
- */
-function readStoredRole(): DemoIdentity {
-  if (typeof window === "undefined") return "employee";
-  try {
-    const value = window.localStorage.getItem(ROLE_STORAGE_KEY);
-    return value === "employee" || value === "manager" || value === "hr" ? value : "employee";
-  } catch {
-    return "employee";
   }
 }
 
@@ -246,7 +230,7 @@ function eventFor(
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(readStoredLocale);
-  const [role, setRoleState] = useState<DemoIdentity>(readStoredRole);
+  const [role, setRoleState] = useState<DemoIdentity>("employee");
   const [appearance, setAppearanceState] = useState<Appearance>(readStoredAppearance);
   const [osTheme, setOsTheme] = useState<"light" | "dark">(systemTheme);
   const [identityStates, setIdentityStates] = useState<Record<DemoIdentity, IdentityState>>(initialIdentityStates);
@@ -280,7 +264,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!DEMO_MODE) return;
     activeIdentityRef.current = nextRole;
     setRoleState(nextRole);
-    storePreference(ROLE_STORAGE_KEY, nextRole);
     stateDemoControl.fixture = "ready";
   }, []);
   const capabilities = useMemo<DemoCapabilities>(
