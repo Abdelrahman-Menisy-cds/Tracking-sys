@@ -16,7 +16,7 @@ import ProfilePage from "./screens/ProfilePage";
 import AttendancePage, { AttendanceCorrectionsPage, AttendanceHistoryPage } from "./screens/AttendancePage";
 import AdminOverviewPage from "./screens/admin/AdminOverviewPage";
 import AdminSettingsPage from "./screens/admin/AdminSettingsPage";
-import AdminPeoplePage from "./screens/admin/AdminPeoplePage";
+import AdminPeoplePage, { AdminPeopleDetailPage } from "./screens/admin/AdminPeoplePage";
 import AdminAnnouncementsPage from "./screens/admin/AdminAnnouncementsPage";
 
 createRoot(document.getElementById("root")!).render(
@@ -43,6 +43,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/admin" element={<AdminOverviewPage />} />
             <Route path="/admin/settings" element={<AdminSettingsPage />} />
             <Route path="/admin/people" element={<AdminPeoplePage />} />
+            <Route path="/admin/people/:employeeId" element={<AdminPeopleDetailPage />} />
             <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
           </Route>
         </Routes>
