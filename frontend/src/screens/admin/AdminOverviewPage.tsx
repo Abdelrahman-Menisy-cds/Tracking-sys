@@ -14,7 +14,7 @@ import {
   type DemoIdentity,
   type LeaveBalance,
 } from "../../mock/attendance";
-import { demoUser, employeeDirectory } from "../../mock/data";
+import { demoUser, employeeDirectory, findDirectoryEntry } from "../../mock/data";
 
 type DictKey = keyof import("../../i18n/dict").Dict;
 
@@ -55,6 +55,8 @@ type EventPair = { kind: "CLOCK_IN" | "CLOCK_OUT"; note?: string; occurred_at: s
 type DayRow = {
   identity: DemoIdentity;
   employee: string;
+  /** Directory name (demoUser[identity] only matches the three fixture ids). */
+  name: { ar: string; en: string };
   day: Pick<AttendanceDay, "first_in_at" | "last_out_at" | "worked_minutes" | "status" | "exception">;
 };
 
@@ -64,7 +66,12 @@ function todayRowFor(employee: string, events: EventPair[], today: string): DayR
   const dayEvents = events.filter((event) => event.occurred_at.slice(0, 10) === today);
   if (!dayEvents.length) return null;
   const ordered = [...dayEvents].sort((l, r) => l.occurred_at.localeCompare(r.occurred_at));
-  const open = ordered.reduce<EventPair | null>((prev, e) => (e.kind === "CLOCK_IN" ? e : prev), null);
+  // Walk the ordered events: IN opens a pair, OUT closes it — so a lone CLOCK_IN
+  // at the end of the day is the only thing that leaves `open` set.
+  const open = ordered.reduce<EventPair | null>((prev, e) => {
+    if (e.kind === "CLOCK_IN") return e;
+    return e.kind === "CLOCK_OUT" ? null : prev;
+  }, null);
   let worked = 0;
   let openPair: string | null = null;
   ordered.forEach((event) => {
@@ -82,6 +89,7 @@ function todayRowFor(employee: string, events: EventPair[], today: string): DayR
   return {
     identity,
     employee,
+    name: findDirectoryEntry(employee)?.name ?? demoUser[identity].name,
     day: {
       first_in_at: ordered.find((e) => e.kind === "CLOCK_IN")?.occurred_at ?? null,
       last_out_at: [...ordered].reverse().find((e) => e.kind === "CLOCK_OUT")?.occurred_at ?? null,
@@ -103,9 +111,12 @@ function todayRows(
 ): DayRow[] {
   return employeeDirectory.flatMap((entry) => {
     const row = todayRowFor(entry.id, eventsByEmployee[entry.id] ?? [], today);
-    return row ? [row] : [{
-      identity: entry.id === "e1" ? "employee" : entry.id === "m1" ? "manager" : "hr",
+    const identity: DemoIdentity = entry.id === "e1" ? "employee" : entry.id === "m1" ? "manager" : "hr";
+    if (row) return [{ ...row, name: entry.name }];
+    return [{
+      identity,
       employee: entry.id,
+      name: entry.name,
       day: { first_in_at: null, last_out_at: null, worked_minutes: 0, status: "OPEN" as AttendanceDayStatus, exception: "NONE" },
     }];
   });
@@ -200,7 +211,7 @@ function OverviewBody({
     {
       key: "employee",
       label: t("employee"),
-      render: (entry) => <bdi>{demoUser[entry.identity].name[locale]} ({entry.employee})</bdi>,
+      render: (entry) => <bdi>{entry.name[locale]} ({entry.employee})</bdi>,
     },
     {
       key: "worked",
