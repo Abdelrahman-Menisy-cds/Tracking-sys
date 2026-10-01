@@ -321,7 +321,7 @@ export { fixtureNames };
 
 /* ================== Public holidays register + hybrid-aware allocation ================== */
 
-import { employeeDirectory, type EmploymentType, type EmployeeDirectoryEntry } from "./data";
+import { employeeDirectory, type EmploymentType, type EmployeeDirectoryEntry } from "./data.ts";
 
 export interface PublicHoliday {
   id: string;
