@@ -40,21 +40,10 @@ const fullDate = (value: string, locale: Locale): string =>
 const weekDayOf = (value: string, locale: Locale): string =>
   dateIsValid(value) ? new Intl.DateTimeFormat(locale, { weekday: "long" }).format(new Date(`${value}T12:00:00Z`)) : "";
 
-const fmtDateTime = (value: string, locale: Locale): string =>
-  new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-
 const cairoDateLocal = (date: Date) => {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" })
     .formatToParts(date).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
   return `${parts.year}-${parts.month}-${parts.day}`;
-};
-
-/** Demo fixture ids → identity names for `recorded_by` on adjustments. */
-const recordedBy = (code: string, locale: Locale): string => {
-  const names: Record<string, string> = locale === "ar"
-    ? { e1: "كريم مصطفى", m1: "هالة عبد الرحمن", hr1: "منى شريف" }
-    : { e1: "Karim Mostafa", m1: "Hala Abdelrahman", hr1: "Mona Sherif" };
-  return names[code] ?? code;
 };
 
 type VersionState = "IN_FORCE" | "UPCOMING" | "SUPERSEDED";
@@ -298,7 +287,6 @@ function LeaveSection() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("ALL");
   const [periodFilter, setPeriodFilter] = useState("ALL");
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [adjustTarget, setAdjustTarget] = useState<{ employeeId: string; type: LeaveBalance["leave_type"] } | null>(null);
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState(0);
@@ -461,46 +449,6 @@ function LeaveSection() {
             columns={columns}
             records={filtered.map((row) => ({ ...row, id: `${row.employee}-${row.leave_type}-${row.period}` }))}
           />
-          <ul className="compact-list" style={{ marginBlockStart: "var(--sp-4)" }}>
-            {filtered.map((row) => {
-              const rowId = `${row.employee}-${row.leave_type}`;
-              const entry = findDirectoryEntry(row.employee);
-              const isOpen = expanded === rowId;
-              return (
-                <li key={rowId}>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-compact"
-                    aria-expanded={isOpen}
-                    aria-label={`${t("adminSettingsAdjustmentFor").replace("%s", `${entry?.name[locale] ?? row.employee} · ${t(leaveTypeKeys[row.leave_type])}`)}`}
-                    onClick={() => setExpanded(isOpen ? null : rowId)}
-                  >
-                    <ChevronDownIcon className={isOpen ? "is-open" : undefined} />
-                    {t("adminAdjustmentsHistory")} — {entry?.name[locale] ?? row.employee} · {t(leaveTypeKeys[row.leave_type])}
-                  </button>
-                  {isOpen ? (
-                    row.adjustments.length ? (
-                      <ul className="compact-list quiet-inset">
-                        {row.adjustments.map((adjustment) => (
-                          <li className="compact-row" key={adjustment.id}>
-                            <div>
-                              <bdi dir="ltr">{new Intl.NumberFormat(locale, { signDisplay: "exceptZero" }).format(adjustment.days)}</bdi>
-                              {" — "}{adjustment.reason}
-                              <div className="page-meta">
-                                {recordedBy(adjustment.recorded_by, locale)} · <bdi>{fmtDateTime(adjustment.created_at, locale)}</bdi>
-                              </div>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <EmptyState message={t("adminNoAdjustments")} />
-                    )
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
         </>
       )}
 
