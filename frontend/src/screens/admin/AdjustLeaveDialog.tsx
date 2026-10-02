@@ -57,7 +57,10 @@ export default function AdjustLeaveDialog({
   // Why the confirm button is off. A disabled button gives no feedback of its own,
   // so the dialog has to name the missing piece — otherwise the user just presses
   // a control that looks enabled and nothing happens.
-  const blockedBy: "days" | "reason" | null = !daysValid ? "days" : !reason.trim() ? "reason" : null;
+  // `balance === null` is excluded on purpose: that case already renders its own
+  // warning banner, and a second hint here would contradict it.
+  const blockedBy: "days" | "reason" | null =
+    !balance ? null : !daysValid ? "days" : !reason.trim() ? "reason" : null;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -142,12 +145,11 @@ export default function AdjustLeaveDialog({
             required
             value={reason}
             aria-required="true"
-            aria-invalid={daysValid && reason.trim() === "" ? "true" : undefined}
-            aria-describedby="adjust-reason-hint"
+            aria-invalid={balance !== null && daysValid && reason.trim() === "" ? "true" : undefined}
+            aria-describedby={blockedBy ? "adjust-blocked-hint" : undefined}
             onChange={(event) => setReason(event.target.value)}
             disabled={submitting}
           />
-          <span className="field-hint" id="adjust-reason-hint">{t("adminAdjustNeedReason")}</span>
         </label>
         {/* Preview of the resulting row (spec: "preview of the change row, confirm"). */}
         {summary && projectedRemaining !== null ? (
