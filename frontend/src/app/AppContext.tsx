@@ -275,8 +275,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [role, setRoleState] = useState<DemoIdentity>("employee");
   /** The server-side account, when there is a session. Null in the demo build. */
   const [serverAccount, setServerAccount] = useState<ServerIdentity | null>(null);
-  /** False until the boot-time session probe has answered, so guards don't guess. */
-  const [sessionChecked, setSessionChecked] = useState(DEMO_MODE);
+  /**
+   * False until the boot-time session probe has answered, so guards never guess.
+   *
+   * This used to start `true` in the demo, on the assumption that a demo build has
+   * no server to ask. Now that the demo is served BY Django, starting checked let
+   * an admin route evaluate its permission against the "employee" default and
+   * redirect before the real role arrived. Starting false costs one request; with
+   * no server at all that request fails fast and we keep the fixture identity.
+   */
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [appearance, setAppearanceState] = useState<Appearance>(readStoredAppearance);
   const [osTheme, setOsTheme] = useState<"light" | "dark">(systemTheme);
   const [identityStates, setIdentityStates] = useState<Record<DemoIdentity, IdentityState>>(initialIdentityStates);
@@ -338,8 +346,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Who are we, according to the server? Without this, a reload drops the session
   // and every server-backed screen has to fall back to fixtures.
+  //
+  // This used to bail out early in DEMO_MODE, on the assumption that a demo build
+  // has no server behind it. That assumption stopped being true when the demo
+  // started being served BY Django: a signed-in HR user then reloaded the page,
+  // was silently reset to the "employee" default role, and every admin route
+  // bounced them back to the home screen — with no error to explain it.
+  //
+  // Asking the server costs one request and is harmless when there is no server:
+  // the catch below leaves the fixture identity untouched.
   useEffect(() => {
-    if (DEMO_MODE) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -348,7 +364,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setServerAccount(me);
         setRole(roleFromServer(me.role));
       } catch {
-        /* No session: stay signed out. The guard sends them to /login. */
+        /* No session, or no server at all. Keep whatever identity we have: in the
+           demo that is the fixture role, and RequireSession does not gate there. */
       } finally {
         if (!cancelled) setSessionChecked(true);
       }

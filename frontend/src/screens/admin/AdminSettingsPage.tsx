@@ -185,9 +185,9 @@ function ScheduleCard({ today, t, locale, orgSchedules }: { today: string; t: (k
   }, [current, orgSchedules.length]);
 
   return (
-    <section className="work-surface section" aria-labelledby="settings-schedule">
+    <section className="work-surface section" aria-labelledby="settings-schedule-heading" id="settings-schedule">
       <div className="section-heading">
-        <h2 id="settings-schedule">{t("adminOrgScheduleTitle")}</h2>
+        <h2 id="settings-schedule-heading">{t("adminOrgScheduleTitle")}</h2>
         <span className="page-meta">{t("adminCurrentSchedule")}</span>
       </div>
 
@@ -390,9 +390,9 @@ function LeaveSection() {
   ];
 
   return (
-    <section className="work-surface section" aria-labelledby="settings-leave" id="settings-leave">
+    <section className="work-surface section" aria-labelledby="settings-leave-heading" id="settings-leave">
       <div className="section-heading">
-        <h2 id="settings-leave">{t("adminSettingsLeaveTitle")}</h2>
+        <h2 id="settings-leave-heading">{t("adminSettingsLeaveTitle")}</h2>
         <span className="page-meta">
           {new Intl.NumberFormat(locale).format(filtered.length)} · {t("adminAllEmployees")}
         </span>
@@ -597,9 +597,9 @@ function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; local
   };
 
   return (
-    <section className="work-surface section" aria-labelledby="settings-holidays" id="settings-holidays">
+    <section className="work-surface section" aria-labelledby="settings-holidays-heading" id="settings-holidays">
       <div className="section-heading">
-        <h2 id="settings-holidays">{t("hrHolidaysTitle")}</h2>
+        <h2 id="settings-holidays-heading">{t("hrHolidaysTitle")}</h2>
         <div className="row-actions">
           <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: "add", target: null })}>
             {t("adminSettingsHolidaysAdd")}

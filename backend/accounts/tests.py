@@ -73,11 +73,39 @@ def test_unknown_api_route_returns_not_found_envelope_with_request_id(anon_clien
     assert root_response.json()["error"]["code"] == "not_found"
 
 
-def test_non_api_unknown_route_remains_django_not_found(anon_client):
+def test_unknown_client_route_serves_the_spa_shell(anon_client):
+    """A non-API path belongs to the client router, not to Django.
+
+    This used to assert Django's 404, from when the API was the only thing this
+    server served. Now that the built SPA is served from the same origin, an
+    unknown client route must return the shell so the router can render its own
+    not-found page — a Django 404 here would break every deep link.
+    """
+    from config.spa import SPA_DIR
+
+    if not (SPA_DIR / "index.html").is_file():
+        pytest.skip("frontend/dist is not built; run `npm run build:demo`")
+
     response = anon_client.get("/not-a-route")
 
-    assert response.status_code == 404
+    assert response.status_code == 200
     assert response["Content-Type"].startswith("text/html")
+
+
+def test_api_paths_never_fall_through_to_the_spa(anon_client):
+    """The boundary that actually matters: /api/v1/* must never return the shell."""
+    for path in ("/api/v1/", "/api/v1/not-a-route", "/api/v1/holidays/nope"):
+        response = anon_client.get(path)
+        assert response.status_code == 404, path
+        assert response["Content-Type"].startswith("application/json"), path
+        assert response.json()["error"]["code"] == "not_found", path
+
+
+def test_spa_asset_path_traversal_is_refused(anon_client):
+    """`..` in a URL must not be able to read outside frontend/dist."""
+    response = anon_client.get("/assets/../manage.py")
+
+    assert response.status_code == 404
 
 
 def test_ssl_redirect_includes_request_id(settings, anon_client):

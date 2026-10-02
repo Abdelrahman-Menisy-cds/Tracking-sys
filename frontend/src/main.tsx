@@ -29,8 +29,12 @@ import AdminAnnouncementsPage from "./screens/admin/AdminAnnouncementsPage";
  */
 function RequireSession() {
   const { isDemoMode, sessionChecked, serverAccount } = useApp();
-  if (isDemoMode) return <AppShell />;
+  // Wait for the boot probe in BOTH modes. Rendering the demo immediately looked
+  // harmless, but it raced the probe: the admin route evaluated its permission
+  // against the "employee" default, redirected to /, and only then did the real
+  // role arrive — so a signed-in HR user could never open an admin page by URL.
   if (!sessionChecked) return null;
+  if (isDemoMode) return <AppShell />;
   if (!serverAccount) return <Navigate to="/login" replace />;
   return <AppShell />;
 }
