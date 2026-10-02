@@ -8,10 +8,17 @@ export default defineConfig({
     // The SPA now talks to Django. Proxying /api in dev means no CORS work at all:
     // the browser only ever sees this origin, and Django's session + CSRF cookies
     // work as first-party. (DJANGO_CSRF_TRUSTED_ORIGINS already lists :5173.)
+    //
+    // The timeouts matter: a holidays refresh drives Nager AND a reasoning LLM and
+    // can legitimately run for minutes. Left at the default, the proxy drops the
+    // connection mid-request and the UI reports "the server could not be reached",
+    // which is a lie — the server was working the whole time.
     proxy: {
       "/api": {
         target: "http://localhost:8000",
         changeOrigin: false,
+        timeout: 600_000, // the browser's socket to this proxy
+        proxyTimeout: 600_000, // this proxy's socket to Django
       },
     },
   },

@@ -730,6 +730,11 @@ function summariseRefresh(summary: RefreshSummary, locale: Locale, t: (key: Dict
     t("adminSettingsAiUpdated").replace("%s", n(summary.updated)),
     t("adminSettingsAiPreserved").replace("%s", n(summary.manual_preserved)),
   ];
+  // The AI's own contribution belongs in the summary: without it a run that added
+  // nothing official but proposed two Islamic holidays reads as "nothing happened".
+  if (summary.proposed_missing > 0) {
+    parts.push(t("adminSettingsAiProposedCount").replace("%s", n(summary.proposed_missing)));
+  }
   const line = `${t("adminSettingsAiDonePrefix")} ${parts.join(" · ")}`;
   // A dead LLM is a PARTIAL result: the official import landed, the Arabic/proposals did not.
   return summary.llm_available

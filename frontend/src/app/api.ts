@@ -115,10 +115,10 @@ export async function serverIsReachable(): Promise<boolean> {
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  // A refresh drives Nager AND the LLM, and the reasoning model can legitimately
-  // take minutes. A short default would abort a call that was going to succeed and
-  // report it as unreachable, which is a lie about what happened.
-  const { method = "GET", body, timeoutMs = 300000 } = options;
+  // A cold refresh drives Nager AND two reasoning-LLM calls, measured at ~348s
+  // end to end. A short timeout aborts a call that was going to succeed and
+  // reports it as unreachable, which is a lie about what happened.
+  const { method = "GET", body, timeoutMs = 600000 } = options;
   const headers: Record<string, string> = { Accept: "application/json" };
 
   if (body !== undefined) headers["Content-Type"] = "application/json";
