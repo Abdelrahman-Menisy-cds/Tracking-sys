@@ -386,6 +386,9 @@ export const dict = {
     adminAdjustPreview: "الصف الناتج بعد التعديل",
     adminAdjustNoBalance: "لا يوجد صف رصيد لنوع الإجازة المختار في البيانات الحالية.",
     adminAdjustResultingRemaining: "المتبقي بعد التعديل",
+    adminRequiredMark: "إلزامي",
+    adminAdjustNeedReason: "اكتب ملاحظة القرار لتفعيل زر التأكيد.",
+    adminAdjustNeedDays: "أدخل عدد أيام صحيحًا — سالب أو موجب، وليس صفرًا.",
     // admin suite — placeholders (honest, replaced by later stages)
     // admin suite — §1 settings page (schedule, leave table, holidays, AI control) — one contiguous block
     adminSettingsVersionsShow: "عرض إصدارات الجدول (%s)",
@@ -923,6 +926,9 @@ export const dict = {
     adminAdjustPreview: "Resulting row after the adjustment",
     adminAdjustNoBalance: "No balance row exists for the selected leave type in the current data.",
     adminAdjustResultingRemaining: "Remaining after the adjustment",
+    adminRequiredMark: "Required",
+    adminAdjustNeedReason: "Enter a decision note to enable the confirm button.",
+    adminAdjustNeedDays: "Enter a valid day count — negative or positive, never zero.",
     // admin suite — placeholders (honest, replaced by later stages)
     // admin suite — §1 settings page (schedule, leave table, holidays, AI control) — one contiguous block
     adminSettingsVersionsShow: "Show schedule versions (%s)",

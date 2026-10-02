@@ -426,7 +426,7 @@ html[dir="rtl"] .profile-menu-item { justify-content: flex-start; }
 .btn-danger-quiet:hover:not(:disabled), .btn-danger-quiet:active:not(:disabled), .btn-danger-quiet:focus-visible { background: var(--danger-soft); color: var(--danger-strong); border-color: var(--danger); }
 .btn-danger-quiet:focus-visible { box-shadow: var(--elevation-focus); }
 .btn:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
-.btn:disabled { cursor: not-allowed; opacity: .68; }
+.btn:disabled { cursor: not-allowed; opacity: .55; }
 
 .pill { display: inline-flex; align-items: center; gap: var(--sp-1); width: fit-content; padding: var(--space-1) var(--sp-3); border: var(--timeline-width) solid currentColor; border-radius: var(--radius-pill); font-size: var(--font-size-sm); font-weight: 700; white-space: normal; }
 .pill svg { width: var(--icon-size-sm); height: var(--icon-size-sm); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -445,6 +445,17 @@ html[dir="rtl"] .profile-menu-item { justify-content: flex-start; }
 .field { display: block; margin-block-end: var(--sp-6); }
 .field-label { display: flex; align-items: center; gap: var(--sp-2); margin-block-end: var(--sp-2); font-weight: 700; }
 .field-hint { display: block; margin-block-start: var(--sp-2); color: var(--text-muted); font-size: var(--font-size-sm); }
+.field-required { font-weight: 500; font-size: var(--font-size-sm); color: var(--danger-strong); }
+/* A disabled button cannot explain itself — the dialog says what is missing. */
+.dialog-blocked-hint {
+  margin-block: var(--sp-4) 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-surface);
+  background: var(--danger-soft);
+  color: var(--danger-strong);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
 .field-error { display: block; margin-block-start: var(--sp-2); color: var(--danger-strong); font-weight: 700; }
 .input, .select, .textarea { width: 100%; min-height: var(--control-min-h); padding: var(--sp-2) var(--sp-3); border: var(--timeline-width) solid var(--border-control); border-radius: var(--radius-surface); background: var(--surface); color: var(--text); }
 .input:focus, .select:focus, .textarea:focus { border-color: var(--accent); outline: var(--space-1) solid var(--focus-ring); outline-offset: var(--space-1); }

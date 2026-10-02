@@ -54,6 +54,10 @@ export default function AdjustLeaveDialog({
     const text = new Intl.NumberFormat(locale, { signDisplay: "exceptZero" }).format(value);
     return text;
   };
+  // Why the confirm button is off. A disabled button gives no feedback of its own,
+  // so the dialog has to name the missing piece — otherwise the user just presses
+  // a control that looks enabled and nothing happens.
+  const blockedBy: "days" | "reason" | null = !daysValid ? "days" : !reason.trim() ? "reason" : null;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -128,16 +132,22 @@ export default function AdjustLeaveDialog({
           <span className="field-hint" id="adjust-days-hint">{t("adminDaysHint")}</span>
         </label>
         <label className="field">
-          <span className="field-label">{t("decisionComment")}</span>
+          <span className="field-label">
+            {t("decisionComment")}
+            <span className="field-required">{t("adminRequiredMark")}</span>
+          </span>
           <input
             className="input"
             type="text"
             required
             value={reason}
             aria-required="true"
+            aria-invalid={daysValid && reason.trim() === "" ? "true" : undefined}
+            aria-describedby="adjust-reason-hint"
             onChange={(event) => setReason(event.target.value)}
             disabled={submitting}
           />
+          <span className="field-hint" id="adjust-reason-hint">{t("adminAdjustNeedReason")}</span>
         </label>
         {/* Preview of the resulting row (spec: "preview of the change row, confirm"). */}
         {summary && projectedRemaining !== null ? (
@@ -162,11 +172,21 @@ export default function AdjustLeaveDialog({
         ) : balance === null ? (
           <Banner tone="warning">{t("adminAdjustNoBalance")}</Banner>
         ) : null}
+        {blockedBy && !submitting ? (
+          <p className="dialog-blocked-hint" id="adjust-blocked-hint" role="status">
+            {t(blockedBy === "days" ? "adminAdjustNeedDays" : "adminAdjustNeedReason")}
+          </p>
+        ) : null}
         <div className="dialog-actions">
           <button type="button" className="btn btn-secondary" onClick={() => onClose({ ok: false, code: "CANCELLED" })} disabled={submitting}>
             {t("cancel")}
           </button>
-          <button type="submit" className="btn btn-primary" disabled={submitting || !daysValid || !reason.trim() || !balance}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={submitting || !daysValid || !reason.trim() || !balance}
+            aria-describedby={blockedBy ? "adjust-blocked-hint" : undefined}
+          >
             {submitting ? <><span className="spinner" aria-hidden="true" />{t("adminAdjustPending")}</> : t("confirm")}
           </button>
         </div>
