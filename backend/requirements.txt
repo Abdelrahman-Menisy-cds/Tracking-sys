@@ -3,6 +3,10 @@ Django==5.2.6
 djangorestframework==3.18.1
 python-dotenv==1.2.3
 psycopg==3.3.5
+# OpenAPI schema generation dependencies (DRF's openapi module asserts on
+# these; backend/.venv was missing them for the schema endpoint tests).
+uritemplate
+inflection
 
 # Test tooling
 pytest==9.1.1

@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "reqs",
     "timesheets",
     "review",
+    "holidays",
 ]
 
 # The Django admin is deliberately not installed for Story 1.1 (HR is an

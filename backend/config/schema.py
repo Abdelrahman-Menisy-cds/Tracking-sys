@@ -228,6 +228,16 @@ class _ViewSchema(AutoSchema):
     def get_request_serializer(self, path, method):
         return None  # bodies are provided directly via request_bodies
 
+    def get_operation_id(self, path, method):
+        # Explicit ids: DRF's default camel-cased ids need the `inflection`
+        # package (not a repo dependency) and are otherwise identity-quality.
+        view_name = self.view.__class__.__name__
+        if view_name.endswith("APIView"):
+            view_name = view_name[: -len("APIView")]
+        if view_name.endswith("View"):
+            view_name = view_name[: -len("View")]
+        return f"{view_name}_{method.lower()}"
+
     def get_request_body(self, path, method):
         return self.request_bodies.get(method.lower(), {})
 
@@ -624,6 +634,91 @@ class TimesheetReviewDetailSchema(_ViewSchema):
     }
 
 
+# Stage H1: public-holidays register (Nager-authoritative, LLM-assisted).
+HOLIDAY = {
+    "title": "PublicHoliday",
+    "type": "object",
+    "properties": {
+        "id": {"type": "string", "format": "uuid"},
+        "country_code": {"type": "string"},
+        "date": {"type": "string", "format": "date"},
+        "name": {"type": "string"},
+        "name_local": {"type": "string"},
+        "source": {"type": "string", "enum": ["NAGER", "LLM", "MANUAL"]},
+        "is_manual_override": {"type": "boolean"},
+        "needs_confirmation": {"type": "boolean"},
+        "is_recurring": {"type": "boolean"},
+        "external_id": {"type": "string", "nullable": True},
+        "year": {"type": "integer"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"},
+    },
+    "required": [
+        "id", "country_code", "date", "name", "name_local", "source",
+        "is_manual_override", "needs_confirmation", "is_recurring",
+        "external_id", "year", "created_at", "updated_at",
+    ],
+}
+
+HOLIDAY_REFRESH_REQUEST = {
+    "title": "HolidayRefreshRequest",
+    "type": "object",
+    "properties": {
+        "year": {"type": "integer", "minimum": 1974, "maximum": 2100,
+                 "description": "Defaults to the current year."},
+        "country": {"type": "string", "minLength": 2, "maxLength": 2,
+                    "description": "ISO 3166-1 alpha-2 code. Defaults to EG."},
+    },
+}
+
+HOLIDAY_REFRESH_SUMMARY = {
+    "title": "HolidayRefreshSummary",
+    "type": "object",
+    "properties": {
+        "year": {"type": "integer"},
+        "country": {"type": "string"},
+        "added": {"type": "integer"},
+        "updated": {"type": "integer"},
+        "unchanged": {"type": "integer"},
+        "manual_preserved": {"type": "integer",
+                             "description": "Rows HR edited by hand and the refresh left untouched."},
+        "proposed_missing": {"type": "integer",
+                             "description": "LLM-proposed rows stored source=LLM / needs_confirmation=True."},
+        "llm_available": {"type": "boolean"},
+        "warnings": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["year", "country", "added", "updated", "unchanged",
+                 "manual_preserved", "proposed_missing", "llm_available", "warnings"],
+}
+
+
+class HolidayListSchema(_ViewSchema):
+    responses = {
+        # HolidayListView.get: {"data": [PublicHoliday]} (register for year+country).
+        "get": {
+            **_json_response("200", "The public-holidays register for a country and year.", _data_envelope({"type": "array", "items": _object_ref("PublicHoliday")})),
+            **_error_response("422", "Invalid year or country query parameter."),
+            **_error_response("404", "Non-HR callers receive the uniform 404 (no existence disclosure)."),
+        },
+    }
+
+
+class HolidayRefreshSchema(_ViewSchema):
+    request_bodies = {
+        "post": _body(_object_ref("HolidayRefreshRequest")),
+    }
+    responses = {
+        # HolidayRefreshView.post: {"data": summary}; Nager down -> 503,
+        # nothing written; LLM down -> 200 with llm_available=False + warnings.
+        "post": {
+            **_json_response("200", "Refresh summary (idempotent: a second run adds nothing).", _data_envelope(_object_ref("HolidayRefreshSummary"))),
+            **_error_response("503", "Nager.Date unreachable; nothing was written."),
+            **_error_response("422", "Invalid year/country body."),
+            **_error_response("404", "Non-HR callers receive the uniform 404 (no existence disclosure)."),
+        },
+    }
+
+
 def _report_meta():
     """meta keys returned by review.reports.resolve_report (read verbatim)."""
     return {
@@ -819,6 +914,11 @@ def _wire_schemas():
     _attach_schema(report_views.ReportDashboardView, ReportDashboardSchema)
     _attach_schema(report_views.ReportCsvView, ReportCsvSchema)
 
+    from holidays import views as holiday_views
+
+    _attach_schema(holiday_views.HolidayListView, HolidayListSchema)
+    _attach_schema(holiday_views.HolidayRefreshView, HolidayRefreshSchema)
+
 
 class TrackingSchemaGenerator(SchemaGenerator):
     """SchemaGenerator over the real URLconf with per-view status mapping.
@@ -964,6 +1064,9 @@ COMPONENT_SCHEMAS = {
     "ReviewRequest": _component(ReviewRequestSerializer(), "ReviewRequest"),
     "ReviewTimesheetSummary": _component(ReviewTimesheetSummarySerializer(), "ReviewTimesheetSummary"),
     "ReviewTimesheet": _component(ReviewTimesheetSerializer(), "ReviewTimesheet"),
+    "PublicHoliday": HOLIDAY,
+    "HolidayRefreshRequest": HOLIDAY_REFRESH_REQUEST,
+    "HolidayRefreshSummary": HOLIDAY_REFRESH_SUMMARY,
 }
 
 
