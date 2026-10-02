@@ -338,6 +338,15 @@ export interface PublicHoliday {
   name: { ar: string; en: string };
   /** Repeats every year on the same month/day while true. */
   recurring?: boolean;
+  /**
+   * Provenance, present only on rows that came from the server. The demo fixtures
+   * leave these undefined. `needsConfirmation` marks an LLM *proposal* (Ramadan,
+   * Eid Al-Fitr) that HR has not confirmed — it must never render as an official
+   * holiday, because it is not one.
+   */
+  source?: "NAGER" | "LLM" | "MANUAL";
+  isManualOverride?: boolean;
+  needsConfirmation?: boolean;
 }
 
 /** ~7 plausible Egyptian public holidays across the current year (2026). */

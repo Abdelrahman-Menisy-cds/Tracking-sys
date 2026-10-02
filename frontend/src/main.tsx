@@ -1,9 +1,9 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./styles/tokens.css";
 import "./styles/global.css";
-import { AppProvider } from "./app/AppContext";
+import { AppProvider, useApp } from "./app/AppContext";
 import AppShell from "./app/AppShell";
 import LoginPage from "./screens/LoginPage";
 import HomePage from "./screens/HomePage";
@@ -19,13 +19,29 @@ import AdminSettingsPage from "./screens/admin/AdminSettingsPage";
 import AdminPeoplePage, { AdminPeopleDetailPage } from "./screens/admin/AdminPeoplePage";
 import AdminAnnouncementsPage from "./screens/admin/AdminAnnouncementsPage";
 
+/**
+ * The app screens need a session.
+ *
+ * In the demo build the role picker is the session, so nothing is gated. Otherwise
+ * we wait for the boot-time probe to answer before deciding, so a reload with a
+ * live cookie does not flash the login screen, and a stale one does not flash the
+ * app with an empty role.
+ */
+function RequireSession() {
+  const { isDemoMode, sessionChecked, serverAccount } = useApp();
+  if (isDemoMode) return <AppShell />;
+  if (!sessionChecked) return null;
+  if (!serverAccount) return <Navigate to="/login" replace />;
+  return <AppShell />;
+}
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AppProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          <Route element={<AppShell />}>
+          <Route element={<RequireSession />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/requests" element={<MyRequestsPage />} />
             <Route path="/requests/new" element={<NewRequestPage />} />

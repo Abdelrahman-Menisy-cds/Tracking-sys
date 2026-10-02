@@ -10,6 +10,7 @@ import {
 } from "react";
 import type { Locale, Role } from "../i18n/dict";
 import { dict, type Dict } from "../i18n/dict";
+import { getIdentity, type ServerIdentity } from "./api";
 import {
   demoUser,
   myRequests,
@@ -101,6 +102,14 @@ export type DemoMutationIssue = "conflict" | "unknown" | "missing";
  */
 export const DEMO_MODE = import.meta.env.MODE === "demo";
 
+/** The server's role string -> the app's role. The server is authoritative. */
+function roleFromServer(role: string): DemoIdentity {
+  const normalised = role.trim().toLowerCase();
+  if (normalised === "hr") return "hr";
+  if (normalised === "manager") return "manager";
+  return "employee";
+}
+
 export interface DemoCapabilities {
   canReview: boolean;
   canClock: boolean;
@@ -124,6 +133,12 @@ interface AppState {
   /** Fixture identity only; never authentication or authorization. */
   role: DemoIdentity;
   setRole: (role: DemoIdentity) => void;
+  /** The server-side account when there is a session; null in the demo build. */
+  serverAccount: ServerIdentity | null;
+  /** False until the boot-time session probe has answered. Guards must wait on it. */
+  sessionChecked: boolean;
+  /** Adopt a signed-in session (role + account). Used by the login screen. */
+  adoptSession: (identity: ServerIdentity) => void;
   /** Fixture capabilities stand in for a server response only in demo mode. */
   capabilities: DemoCapabilities;
   appearance: Appearance;
@@ -258,6 +273,10 @@ function eventFor(
 export function AppProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(readStoredLocale);
   const [role, setRoleState] = useState<DemoIdentity>("employee");
+  /** The server-side account, when there is a session. Null in the demo build. */
+  const [serverAccount, setServerAccount] = useState<ServerIdentity | null>(null);
+  /** False until the boot-time session probe has answered, so guards don't guess. */
+  const [sessionChecked, setSessionChecked] = useState(DEMO_MODE);
   const [appearance, setAppearanceState] = useState<Appearance>(readStoredAppearance);
   const [osTheme, setOsTheme] = useState<"light" | "dark">(systemTheme);
   const [identityStates, setIdentityStates] = useState<Record<DemoIdentity, IdentityState>>(initialIdentityStates);
@@ -288,26 +307,78 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAppearanceState(nextAppearance);
     storePreference(APPEARANCE_STORAGE_KEY, nextAppearance);
   }, []);
+  /**
+   * Adopt a role.
+   *
+   * This used to be a no-op outside the demo build, which left every non-demo
+   * sign-in without a role and bounced the user straight back to /login. The role
+   * is legitimate in both modes: in the demo it comes from the picker, otherwise
+   * from the server (see the session bootstrap below).
+   */
   const setRole = useCallback((nextRole: DemoIdentity) => {
-    if (!DEMO_MODE) return;
     activeIdentityRef.current = nextRole;
     setRoleState(nextRole);
-    stateDemoControl.fixture = "ready";
+    if (DEMO_MODE) stateDemoControl.fixture = "ready";
   }, []);
+
+  /**
+   * Adopt a signed-in session: the role AND the server account together.
+   *
+   * The guard reads `serverAccount`, so a sign-in that only set the role would be
+   * bounced straight back to /login.
+   */
+  const adoptSession = useCallback(
+    (identity: ServerIdentity) => {
+      setServerAccount(identity);
+      setSessionChecked(true);
+      setRole(roleFromServer(identity.role));
+    },
+    [setRole],
+  );
+
+  // Who are we, according to the server? Without this, a reload drops the session
+  // and every server-backed screen has to fall back to fixtures.
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const me = await getIdentity();
+        if (cancelled) return;
+        setServerAccount(me);
+        setRole(roleFromServer(me.role));
+      } catch {
+        /* No session: stay signed out. The guard sends them to /login. */
+      } finally {
+        if (!cancelled) setSessionChecked(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [setRole]);
+
+  /**
+   * What this role may do.
+   *
+   * Capability follows the ROLE, in both modes — it used to be ANDed with
+   * DEMO_MODE, so outside the demo every capability was false and the admin
+   * screens were unreachable even for a signed-in HR account.
+   */
   const capabilities = useMemo<DemoCapabilities>(
     () => ({
-      canReview: DEMO_MODE && (role === "manager" || role === "hr"),
+      canReview: role === "manager" || role === "hr",
       canClock: DEMO_MODE,
-      canViewTeamAttendance: DEMO_MODE && (role === "manager" || role === "hr"),
-      canResolveExceptions: DEMO_MODE && (role === "manager" || role === "hr"),
-      canApproveCorrections: DEMO_MODE && (role === "manager" || role === "hr"),
-      canSetScheduleForReports: DEMO_MODE && (role === "manager" || role === "hr"),
-      canSetOrgSchedule: DEMO_MODE && role === "hr",
-      canManageLeaveBalance: DEMO_MODE && role === "hr",
-      canViewOrgAttendance: DEMO_MODE && role === "hr",
-      canManageDirectory: DEMO_MODE && role === "hr",
-      canManageHolidays: DEMO_MODE && role === "hr",
-      canSendAnnouncements: DEMO_MODE && role === "hr",
+      canViewTeamAttendance: role === "manager" || role === "hr",
+      canResolveExceptions: role === "manager" || role === "hr",
+      canApproveCorrections: role === "manager" || role === "hr",
+      canSetScheduleForReports: role === "manager" || role === "hr",
+      canSetOrgSchedule: role === "hr",
+      canManageLeaveBalance: role === "hr",
+      canViewOrgAttendance: role === "hr",
+      canManageDirectory: role === "hr",
+      canManageHolidays: role === "hr",
+      canSendAnnouncements: role === "hr",
     }),
     [role],
   );
@@ -627,6 +698,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     dir: locale === "ar" ? "rtl" : "ltr",
     role,
     setRole,
+    serverAccount,
+    sessionChecked,
+    adoptSession,
     capabilities,
     appearance,
     setAppearance,
@@ -668,6 +742,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isDemoMode: DEMO_MODE,
   }), [
     activeState,
+    adoptSession,
     announcementItems,
     appearance,
     capabilities,
@@ -680,6 +755,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     resolvedTheme,
     role,
     saveDemoRequest,
+    serverAccount,
+    sessionChecked,
     setAppearance,
     setDemoFixture,
     setLocale,

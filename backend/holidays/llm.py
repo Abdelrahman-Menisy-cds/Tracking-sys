@@ -33,13 +33,25 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_BASE_URL = "https://opencode.ai/zen/go/v1"
 DEFAULT_MODEL = "glm-5.3-flash"
-DEFAULT_TIMEOUT_SECONDS = 60
 # The provider's edge (Cloudflare) rejects the DEFAULT Python-urllib UA with
 # 403 error 1010 (TLS/UA bot rule); any explicit UA passes. Verified live:
 # default UA -> 403/1010, explicit UA -> 200. This UA names the app honestly.
 _LLM_USER_AGENT = "heya-fawda-tracking/1.0"
-MIN_TOKEN_BUDGET = 1500
-RETRY_TOKEN_BUDGET = 4000
+
+# Budgets and timeout, measured against the live provider — not guessed.
+#
+# glm-5.3-flash reasons before it answers, and the reasoning tokens come out of
+# max_tokens. Measured on the Islamic-holiday proposal prompt (2026/EG):
+#   1500 / 4000 -> content=null, "reasoning budget exhausted" (the old values)
+#   8000        -> a full, correct answer in ~152s
+# So the first attempt gets 8000 and the retry gets double that as headroom.
+#
+# The read timeout has to clear that ~152s, which the old 60s never could: the
+# request was aborted mid-answer and reported as "the provider is unavailable",
+# which was really "we hung up on it".
+MIN_TOKEN_BUDGET = int(os.getenv("OPENCODE_GO_MIN_TOKENS", "8000"))
+RETRY_TOKEN_BUDGET = int(os.getenv("OPENCODE_GO_RETRY_TOKENS", "16000"))
+DEFAULT_TIMEOUT_SECONDS = int(os.getenv("OPENCODE_GO_TIMEOUT_SECONDS", "300"))
 
 # The only holiday names the proposal job may return; anything else the
 # model produces is dropped here so only the requested Islamic holidays can

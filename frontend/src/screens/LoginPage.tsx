@@ -1,9 +1,10 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp, usePageTitle, type Appearance } from "../app/AppContext";
+import { ApiError, login } from "../app/api";
 import BrandLockup from "../components/brand/BrandLockup";
 import { GlobeIcon, MoonIcon, SunIcon } from "../components/icons";
-import type { Role } from "../i18n/dict";
+import type { Locale, Role } from "../i18n/dict";
 
 const ROLE_OPTIONS: Role[] = ["employee", "manager", "hr"];
 
@@ -20,6 +21,30 @@ function roleFromEmail(email: string): Role {
   if (tokens.some((token) => MANAGER_EMAIL_TOKENS.includes(token))) return "manager";
   if (tokens.some((token) => HR_EMAIL_TOKENS.includes(token))) return "hr";
   return "employee";
+}
+
+/**
+ * Why the server refused the sign-in.
+ *
+ * The backend deliberately does not enumerate accounts, so a 401/403 gets one
+ * neutral line. Anything the server spells out is passed through rather than
+ * replaced with an invented reason.
+ */
+function describeLoginFailure(failure: unknown, locale: Locale): string {
+  const ar = locale === "ar";
+  if (failure instanceof ApiError) {
+    if (failure.kind === "unauthenticated" || failure.kind === "forbidden") {
+      return ar ? "البريد الإلكتروني أو كلمة المرور غير صحيحة." : "Incorrect email or password.";
+    }
+    if (failure.kind === "server") {
+      return ar ? "خطأ من الخادم. حاول تاني." : "The server returned an error. Try again.";
+    }
+    if (failure.kind === "unreachable") {
+      return ar ? "تعذّر الوصول إلى الخادم." : "The server could not be reached.";
+    }
+    if (failure.message) return failure.message;
+  }
+  return ar ? "تعذّر تسجيل الدخول." : "Could not sign in.";
 }
 
 /** Opt-in dev affordance: `?dev=1` or `?dev=True` reveals the role switcher. */
@@ -52,6 +77,7 @@ export default function LoginPage() {
     locale,
     setLocale,
     setRole,
+    adoptSession,
     isDemoMode,
     setAppearance,
     resolvedTheme,
@@ -80,7 +106,7 @@ export default function LoginPage() {
   const targetTheme: Exclude<Appearance, "system"> = resolvedTheme === "light" ? "dark" : "light";
   const ThemeIcon = resolvedTheme === "light" ? SunIcon : MoonIcon;
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!identifier.trim()) {
       setError(locale === "ar" ? "أدخل البريد الإلكتروني." : "Enter your email.");
@@ -94,11 +120,23 @@ export default function LoginPage() {
     }
     setBusy(true);
     setError(null);
-    window.setTimeout(() => {
-      setBusy(false);
-      setRole(effectiveRole);
+    try {
+      // The server decides the role. Deriving it from the email locally would leave
+      // no session behind, and every server-backed action would 401.
+      const me = await login(identifier.trim(), password);
+      adoptSession(me);
       navigate("/");
-    }, 500);
+    } catch (failure) {
+      if (failure instanceof ApiError && failure.kind === "unreachable") {
+        // No backend behind this build: the demo path, unchanged. The screens that
+        // read server data say so on their own rather than pretending here.
+        setRole(effectiveRole);
+        navigate("/");
+        return;
+      }
+      setBusy(false);
+      setError(describeLoginFailure(failure, locale));
+    }
   };
 
   return (
