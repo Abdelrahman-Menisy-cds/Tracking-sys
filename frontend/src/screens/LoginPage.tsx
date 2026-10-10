@@ -1,12 +1,29 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp, usePageTitle, type Appearance } from "../app/AppContext";
+import { DEMO_MODE, useApp, usePageTitle, type Appearance } from "../app/AppContext";
 import { ApiError, login } from "../app/api";
 import BrandLockup from "../components/brand/BrandLockup";
 import { MoonIcon, SunIcon } from "../components/icons";
 import type { Locale, Role } from "../i18n/dict";
 
 const ROLE_OPTIONS: Role[] = ["employee", "manager", "hr"];
+
+/**
+ * The demo accounts, one per role (created by `manage.py seed_demo_accounts`).
+ *
+ * The picker does not grant a role — the server still derives it from the
+ * account, so picking a role and typing that role's email by hand land in
+ * exactly the same place. All it chooses is WHICH account you sign in as.
+ *
+ * The shared password is in the bundle on purpose, and only in the demo build:
+ * DEMO_MODE is a compile-time constant, so a real build drops this whole map
+ * rather than merely hiding it.
+ */
+const DEMO_ACCOUNTS: Record<Role, { email: string; password: string }> = {
+  employee: { email: "employee@demo.local", password: "demo1234" },
+  manager: { email: "manager@demo.local", password: "demo1234" },
+  hr: { email: "hr@demo.local", password: "demo1234" },
+};
 
 const MANAGER_EMAIL_TOKENS = ["manager", "mgr", "admin"];
 const HR_EMAIL_TOKENS = ["hr", "people", "humanresources"];
@@ -97,7 +114,7 @@ export default function LoginPage() {
   const targetLocale = locale === "ar" ? "en" : "ar";
   const languageLabel = targetLocale === "ar" ? t("switchToArabic") : t("switchToEnglish");
 
-  const devToolsEnabled = devQueryEnabled();
+  const devToolsEnabled = devQueryEnabled() || DEMO_MODE;
   const effectiveRole = devRole ?? roleFromEmail(identifier);
   const roleLabel = (value: Role) =>
     value === "employee" ? t("roleEmployee") : value === "manager" ? t("roleManager") : t("roleHr");
@@ -189,7 +206,12 @@ export default function LoginPage() {
               autoComplete="username"
               spellCheck={false}
               value={identifier}
-              onChange={(event) => setIdentifier(event.target.value)}
+              onChange={(event) => {
+                setIdentifier(event.target.value);
+                // Typing means you are naming the account yourself, so stop letting a
+                // previous pick speak for the role — the readout follows the email again.
+                setDevRole(null);
+              }}
             />
           </label>
           <label className="field">
@@ -227,7 +249,16 @@ export default function LoginPage() {
                         type="button"
                         className={`role-segmented-option${effectiveRole === option ? " is-selected" : ""}`}
                         aria-pressed={effectiveRole === option}
-                        onClick={() => setDevRole(option)}
+                        onClick={() => {
+                          setDevRole(option);
+                          // In the demo build the picker fills the account too, so one
+                          // tap really does sign you in as that role. The server still
+                          // decides the role — this only names the account.
+                          if (DEMO_MODE) {
+                            setIdentifier(DEMO_ACCOUNTS[option].email);
+                            setPassword(DEMO_ACCOUNTS[option].password);
+                          }
+                        }}
                       >
                         {roleLabel(option)}
                       </button>
