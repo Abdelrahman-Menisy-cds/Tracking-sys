@@ -59,6 +59,16 @@ import {
   type LeaveBalance,
   type WorkSchedule,
 } from "../mock/attendance";
+import {
+  DEFAULT_TASK_CAPABILITY,
+  demoTasks,
+  taskCapabilitiesById,
+  type TaskCapability,
+  type TaskEventMock,
+  type TaskMock,
+  type TaskMutationResult,
+  type TaskPriority,
+} from "../mock/tasks";
 
 export type Appearance = "system" | "light" | "dark";
 
@@ -224,6 +234,16 @@ interface AppState {
   submitDemoTimesheet: (timesheetId: string, entries: TimeEntryMock[]) => Promise<TimesheetMock>;
   decideDemoRequest: (requestId: string, decision: ReviewDecision, comment: string, expectedVersion: number) => Promise<RequestMock>;
   decideDemoTimesheet: (timesheetId: string, decision: ReviewDecision, comment: string, expectedVersion: number) => Promise<TimesheetMock>;
+  /* ===== Brief C — tasks cycle (create / assign / route-to-manager) ===== */
+  /** Every task the demo knows; screens scope it by identity. */
+  tasks: TaskMock[];
+  /** Per-employee task flags (overlays fold in); the single read path. */
+  taskCapabilityFor: (employeeId: string) => TaskCapability;
+  /** Manager/HR write of the two flags — capability-checked like the rest. */
+  setTaskCapabilities: (employeeId: string, flags: Partial<TaskCapability>) => TaskMutationResult;
+  createTask: (input: { title: string; description: string; priority: TaskPriority; dueDate: string | null; assignee: string | null; routeTo: string | null }) => TaskMutationResult<TaskMock>;
+  /** Set (or clear) the assignee; every change appends to the trail. */
+  assignTask: (taskId: string, to: string | null) => TaskMutationResult<TaskMock>;
   setDemoFixture: (fixture: DemoFixture) => void;
   isDemoMode: boolean;
 }
@@ -347,6 +367,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
    * durable, nothing in localStorage.
    */
   const [fileOverrides, setFileOverrides] = useState<Record<string, EmployeeFilePatch>>(readFileOverrides);
+  /**
+   * Brief C — the demo's tasks and the per-employee capability overlays. Both
+   * are plain in-memory state (the demo layer never persists anywhere): tasks
+   * mutate only through createTask/assignTask below so the trail stays
+   * append-only, and the flags fold into taskCapabilityFor as an overlay the
+   * same way fileOverrides folds into the directory.
+   */
+  const [tasks, setTasks] = useState<TaskMock[]>(() => cloneFixture(demoTasks));
+  const [taskCapabilityOverrides, setTaskCapabilityOverrides] = useState<Record<string, TaskCapability>>({});
   const [announcementItems, setAnnouncementItems] = useState<AnnouncementMock[]>(() => cloneFixture(announcementFixture));
   const activeIdentityRef = useRef<DemoIdentity>(role);
 
@@ -630,6 +659,109 @@ export function AppProvider({ children }: { children: ReactNode }) {
       { ...(fileOverrides[employeeId] ?? {}), ...patch },
     ) };
   }, [capabilities.canManageDirectory, fileOverrides]);
+
+  /* ===== Brief C — the tasks cycle, next to the other mutations ===== */
+
+  /** Who is signed in, as a directory id — the creator and actor of record. */
+  const myEmployeeId = identityEmployeeId(role);
+
+  /** One read path for the flags: overlay first, then the fixture table. */
+  const taskCapabilityFor = useCallback(
+    (employeeId: string): TaskCapability =>
+      taskCapabilityOverrides[employeeId] ?? taskCapabilitiesById[employeeId] ?? DEFAULT_TASK_CAPABILITY,
+    [taskCapabilityOverrides],
+  );
+
+  /**
+   * Who may write the flags. The brief names manager AND HR; the role matrix
+   * above resolves "manager or HR" through canSetScheduleForReports-style
+   * pairs, so the tasks flags ride canManageDirectory (HR) plus the manager's
+   * report-level acts. Anything narrower would invent a rule the UI mirrors.
+   */
+  const canSetTaskCapabilities = role === "manager" || role === "hr";
+
+  const setTaskCapabilities = useCallback((employeeId: string, flags: Partial<TaskCapability>): TaskMutationResult => {
+    if (!canSetTaskCapabilities) return { ok: false, code: "CAPABILITY_DENIED" };
+    if (!employeeDirectoryFixture.some((entry) => entry.id === employeeId)) return { ok: false, code: "MISSING_RECORD" };
+    const merged: TaskCapability = {
+      can_create_tasks: flags.can_create_tasks ?? taskCapabilityFor(employeeId).can_create_tasks,
+      can_assign_tasks: flags.can_assign_tasks ?? taskCapabilityFor(employeeId).can_assign_tasks,
+    };
+    setTaskCapabilityOverrides((current) => ({ ...current, [employeeId]: merged }));
+    return { ok: true };
+  }, [canSetTaskCapabilities, taskCapabilityFor]);
+
+  /**
+   * Create a task. The refusal table mirrors the brief verbatim, checked HERE
+   * (the context) rather than in the UI: no create flag → CAPABILITY_DENIED;
+   * direct-assign creators need an assignee in the directory; creators without
+   * the assign flag need a real manager to route to — the picker being empty
+   * is INVALID_INPUT, never a fake success.
+   */
+  const createTaskTask = useCallback((input: { title: string; description: string; priority: TaskPriority; dueDate: string | null; assignee: string | null; routeTo: string | null }): TaskMutationResult<TaskMock> => {
+    const creatorCapability = taskCapabilityFor(myEmployeeId);
+    if (!creatorCapability.can_create_tasks) return { ok: false, code: "CAPABILITY_DENIED" };
+    if (!input.title.trim()) return { ok: false, code: "INVALID_INPUT" };
+    const directAssign = creatorCapability.can_assign_tasks;
+    if (directAssign) {
+      if (!input.assignee || !employeeDirectoryFixture.some((entry) => entry.id === input.assignee)) return { ok: false, code: "INVALID_INPUT" };
+    } else {
+      if (!input.routeTo || !employeeDirectoryFixture.some((entry) => entry.id === input.routeTo)) return { ok: false, code: "INVALID_INPUT" };
+    }
+    const now = new Date().toISOString();
+    const events: TaskEventMock[] = [
+      { id: `demo-task-ev-${Date.now()}`, action: "CREATE", actor: myEmployeeId, comment: "", created_at: now },
+    ];
+    if (directAssign) {
+      events.push({ id: `demo-task-ev-${Date.now()}-a`, action: "ASSIGN", actor: myEmployeeId, assigned: input.assignee!, comment: "", created_at: now });
+    } else {
+      events.push({ id: `demo-task-ev-${Date.now()}-a`, action: "ROUTE_TO_MANAGER", actor: myEmployeeId, routed_to: input.routeTo!, comment: "", created_at: now });
+    }
+    const task: TaskMock = {
+      id: `demo-task-${Date.now()}`,
+      title: input.title.trim(),
+      description: input.description.trim(),
+      created_by: myEmployeeId,
+      assignee: directAssign ? input.assignee : null,
+      routed_to_manager: directAssign ? null : input.routeTo,
+      status: "OPEN",
+      priority: input.priority,
+      ...(input.dueDate ? { due_date: input.dueDate } : {}),
+      created_at: now,
+      events,
+    };
+    setTasks((current) => [task, ...current]);
+    return { ok: true, value: task };
+  }, [myEmployeeId, taskCapabilityFor]);
+
+  /**
+   * Put an assignee on a task — or reassign it. Only a can_assign_tasks holder
+   * gets past the gate (CAPABILITY_DENIED otherwise); every change appends an
+   * ASSIGN or REASSIGN event carrying what it replaced, so the trail shows who
+   * routed the task and who assigned it, in order, with nothing overwritten.
+   */
+  const assignTask = useCallback((taskId: string, to: string | null): TaskMutationResult<TaskMock> => {
+    const actorCapability = taskCapabilityFor(myEmployeeId);
+    if (!actorCapability.can_assign_tasks) return { ok: false, code: "CAPABILITY_DENIED" };
+    const task = tasks.find((candidate) => candidate.id === taskId);
+    if (!task) return { ok: false, code: "MISSING_RECORD" };
+    if (to !== null && !employeeDirectoryFixture.some((entry) => entry.id === to)) return { ok: false, code: "INVALID_INPUT" };
+    if (task.assignee === to) return { ok: true, value: task };
+    const now = new Date().toISOString();
+    const event: TaskEventMock = {
+      id: `demo-task-ev-${Date.now()}`,
+      action: task.assignee !== null ? "REASSIGN" : "ASSIGN",
+      actor: myEmployeeId,
+      ...(to !== null ? { assigned: to } : {}),
+      ...(task.assignee !== null ? { replaces: task.assignee } : {}),
+      comment: "",
+      created_at: now,
+    };
+    const updated: TaskMock = { ...task, assignee: to, events: [...task.events, event] };
+    setTasks((current) => current.map((candidate) => (candidate.id === taskId ? updated : candidate)));
+    return { ok: true, value: updated };
+  }, [myEmployeeId, tasks, taskCapabilityFor]);
+
   // Kept verbatim from before the saveEmployeeFile insert above.
   const resolveScheduleFor = useCallback((employee: string, date: string) => resolveScheduleFixture(employee, date, activeState.schedules), [activeState.schedules]);
   const leaveBalanceSummary = useCallback((balance: LeaveBalance) => deriveLeaveBalanceSummary(balance), []);
@@ -844,6 +976,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [directoryBalances, role],
   );
 
+  // Brief C demo affordance: the verification harness needs to call the real
+  // context mutations for actors other than the ones the UI will render (a
+  // non-creator has no create button to click). DEMO_MODE is a compile-time
+  // constant, so a real build tree-shakes this whole window pollution away.
+  useEffect(() => {
+    if (!DEMO_MODE) return;
+    (window as unknown as Record<string, unknown>).__taskVerify = {
+      taskCapabilityFor,
+      setTaskCapabilities,
+      createTask: createTaskTask,
+      assignTask,
+    };
+    return () => { delete (window as unknown as Record<string, unknown>).__taskVerify; };
+  }, [taskCapabilityFor, setTaskCapabilities, createTaskTask, assignTask]);
+
   /**
    * The directory as every screen should see it: fixture + HR's file edit
    * overlay. Reading happens HERE —mirroring the directoryBalances pattern—
@@ -907,6 +1054,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     submitDemoTimesheet,
     decideDemoRequest,
     decideDemoTimesheet,
+    tasks,
+    taskCapabilityFor,
+    setTaskCapabilities,
+    createTask: createTaskTask,
+    assignTask,
     setDemoFixture,
     isDemoMode: DEMO_MODE,
   }), [
@@ -946,6 +1098,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     sendAnnouncement,
     settleAnnouncement,
     submitDemoTimesheet,
+    tasks,
+    taskCapabilityFor,
+    setTaskCapabilities,
+    createTaskTask,
+    assignTask,
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
