@@ -64,7 +64,7 @@ const scheduleText = (schedule: WorkSchedule, locale: Locale): string =>
 
 export default function AdminPeopleDetailPage() {
   const { employeeId } = useParams<{ employeeId: string }>();
-  const { t, locale, role, capabilities, schedules, resolveScheduleFor, setWorkSchedule, visibleEmployeeFile, leaveBalances, directoryLeaveBalances, leaveBalanceSummary } = useApp();
+  const { t, locale, role, capabilities, schedules, resolveScheduleFor, setWorkSchedule, removeWorkSchedule, visibleEmployeeFile, leaveBalances, directoryLeaveBalances, leaveBalanceSummary } = useApp();
   usePageTitle(t("adminPeopleTitle"));
 
   const base = employeeId ? employeeDirectory.find((candidate) => candidate.id === employeeId) : undefined;
@@ -86,6 +86,14 @@ export default function AdminPeopleDetailPage() {
   );
   const effective = employeeId ? resolveScheduleFor(employeeId, today) : null;
   const hasException = Boolean(inForceOwn) && effective !== null && orgSchedule !== null && effective.id !== orgSchedule.id;
+  /** Part-time starts at half the organization's day — see chooseType below. */
+  const halfOrgMinutes = Math.round((orgSchedule?.expected_daily_minutes ?? 480) / 2);
+  /** "09:00" + 240 → "13:00". The editor dialog does the same for typed times. */
+  const endAfterMinutes = (start: string, minutes: number): string => {
+    const [hours, mins] = start.split(":").map(Number);
+    const total = hours * 60 + mins + minutes;
+    return `${String(Math.floor((total % 1440) / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  };
 
   // ── Draft state (§2.2 item 6: one draft, one save bar). Selecting never saves. ──
   const [draftType, setDraftType] = useState<EmploymentTypeCode>(entry?.employment_type ?? "FULL");
@@ -108,6 +116,14 @@ export default function AdminPeopleDetailPage() {
   // The saved employment type for the session (the directory fixture has no
   // employment mutation; the demo boundary copy says so on save).
   const [savedType, setSavedType] = useState<EmploymentTypeCode>(entry?.employment_type ?? "FULL");
+  /**
+   * The part-time day, as a draft like everything else on this screen.
+   *
+   * It seeds from the schedule actually in force, so an employee who already works
+   * 360 minutes sees 360 rather than a number invented here. Signing a type only
+   * fills this; Save is what writes the schedule.
+   */
+  const [draftMinutes, setDraftMinutes] = useState<string>(String(effective?.expected_daily_minutes ?? halfOrgMinutes));
 
   useEffect(() => {
     // Reset the draft when navigating between employees.
@@ -117,6 +133,7 @@ export default function AdminPeopleDetailPage() {
     setDraftFixedDays(entry?.hybrid_policy?.mode === "FIXED_DAYS" ? [...entry.hybrid_policy.office_weekdays] : [0, 2]);
     setDraftMinDays(entry?.hybrid_policy?.mode === "FLEXIBLE_QUOTA" ? String(entry.hybrid_policy.min_office_days) : "2");
     setDraftPeriodDays(entry?.hybrid_policy?.mode === "FLEXIBLE_QUOTA" ? String(entry.hybrid_policy.period_days) : "7");
+    setDraftMinutes(String(resolveScheduleFor(entry?.id ?? "", today)?.expected_daily_minutes ?? halfOrgMinutes));
     setDirty(false);
     setFeedback(null);
   }, [entry?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -126,12 +143,53 @@ export default function AdminPeopleDetailPage() {
 
   const discard = () => {
     setDraftType(savedType);
+    setDraftMinutes(String(effective?.expected_daily_minutes ?? halfOrgMinutes));
     setDirty(false);
     setFeedback(null);
   };
 
+  /**
+   * Choosing a type only fills the draft (§2.2 item 6: selecting never saves).
+   *
+   * Part-time is the one choice with a number attached, so it seeds the field with
+   * half the organization's day. That seeding happens only on a real change of type:
+   * re-clicking PART after editing the minutes must not throw the edit away.
+   */
+  const chooseType = (code: EmploymentTypeCode) => {
+    if (code === "PART" && draftType !== "PART") setDraftMinutes(String(halfOrgMinutes));
+    setDraftType(code);
+    setDirty(true);
+  };
+
+  const minutesValue = Number.parseInt(draftMinutes, 10);
+  const minutesValid = Number.isFinite(minutesValue) && minutesValue > 0;
+
   const save = () => {
     setSaving(true);
+    // The schedule is the one real mutation here (the directory fixture has no
+    // employment-type write), so it rides the same Save as the rest of the draft.
+    if (employeeId && orgSchedule) {
+      const start = inForceOwn?.expected_start ?? orgSchedule.expected_start;
+      if (draftType === "PART" && minutesValid) {
+        setWorkSchedule({
+          // Reuse the live exception's id when there is one: setWorkSchedule replaces
+          // by id, and a second id would stack two schedules on the same person.
+          id: inForceOwn?.id ?? `schedule-${employeeId}-part`,
+          scope: "EMPLOYEE",
+          target: employeeId,
+          working_weekdays: [...(inForceOwn?.working_weekdays ?? orgSchedule.working_weekdays)],
+          expected_start: start,
+          expected_end: endAfterMinutes(start, minutesValue),
+          expected_daily_minutes: minutesValue,
+          grace_minutes: inForceOwn?.grace_minutes ?? orgSchedule.grace_minutes,
+          effective_from: today,
+        });
+      } else if (draftType === "FULL" && hasException && inForceOwn) {
+        // Full-time means the organization's schedule, so the exception goes away
+        // rather than being rewritten with the same numbers under a new id.
+        removeWorkSchedule(inForceOwn.id);
+      }
+    }
     window.setTimeout(() => {
       setSavedType(draftType);
       setSaving(false);
@@ -181,7 +239,7 @@ export default function AdminPeopleDetailPage() {
                 role="radio"
                 aria-checked={draftType === code}
                 className={`role-segmented-option${draftType === code ? " is-selected" : ""}`}
-                onClick={() => { setDraftType(code); setDirty(true); }}
+                onClick={() => chooseType(code)}
                 onKeyDown={(event) => {
                   const codes = Object.keys(employmentTypeKeys) as EmploymentTypeCode[];
                   const index = codes.indexOf(draftType);
@@ -189,8 +247,7 @@ export default function AdminPeopleDetailPage() {
                   if (!delta) return;
                   event.preventDefault();
                   const next = codes[Math.min(codes.length - 1, Math.max(0, index + delta))];
-                  setDraftType(next);
-                  setDirty(true);
+                  chooseType(next);
                 }}
               >
                 <span>{t(employmentTypeKeys[code])}</span>
@@ -198,6 +255,28 @@ export default function AdminPeopleDetailPage() {
               </button>
             ))}
           </div>
+
+          {/* Part-time is the one choice with a number attached, so it gets a field it
+              can be edited in. It is seeded with half the organization's day (see
+              chooseType) and left alone after that. */}
+          {draftType === "PART" ? (
+            <label className="field" style={{ marginBlockStart: "var(--sp-4)", maxInlineSize: "22rem" }}>
+              <span className="field-label">{t("adminExpectedDailyMinutes")}</span>
+              <input
+                className="input"
+                type="number"
+                min="1"
+                step="5"
+                value={draftMinutes}
+                onChange={(event) => { setDraftMinutes(event.target.value); setDirty(true); }}
+                aria-describedby={minutesValid ? "people-part-minutes-hint" : "people-part-minutes-error"}
+              />
+              {!minutesValid ? (
+                <span className="field-error" id="people-part-minutes-error" role="alert">{t("adminErrorMinutes")}</span>
+              ) : null}
+              <span className="field-hint" id="people-part-minutes-hint">{t("adminPeoplePartMinutesHint")}</span>
+            </label>
+          ) : null}
 
           {draftType === "HYBRID" ? (
             <>

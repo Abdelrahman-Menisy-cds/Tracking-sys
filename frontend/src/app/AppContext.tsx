@@ -169,6 +169,13 @@ interface AppState {
   submitAttendanceCorrection: (input: { workDate: string; inAt: string; outAt?: string; reason: string }) => AttendanceMutationResult;
   resolveAttendanceException: (workDate: string, status: AttendanceDay["status"], reason: string) => AttendanceMutationResult;
   setWorkSchedule: (schedule: WorkSchedule) => AttendanceMutationResult;
+  /**
+   * Drop a schedule so the layer beneath it applies again (EMPLOYEE → TEAM →
+   * ORGANIZATION). Removal is the only way back: rewriting an exception with the
+   * organization's own numbers would leave it an exception — a different id —
+   * and the employee would still be marked as overridden.
+   */
+  removeWorkSchedule: (scheduleId: string) => AttendanceMutationResult;
   /** Adjust ONE employee's balance — the employee the dialog was opened for. */
   adjustLeaveBalance: (employee: string, leaveType: LeaveBalance["leave_type"], days: number, reason: string) => AttendanceMutationResult;
   resolveScheduleFor: (employee: string, date: string) => WorkSchedule | null;
@@ -486,6 +493,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, [capabilities.canSetOrgSchedule, capabilities.canSetScheduleForReports, role]);
 
+  const removeWorkSchedule = useCallback((scheduleId: string): AttendanceMutationResult => {
+    // The scope of the schedule being removed decides the capability, the same way
+    // setWorkSchedule decides by the scope it is writing: deleting an exception from
+    // a report's file is a report-level act, not an organization-wide one.
+    const found = activeState.schedules.find((item) => item.id === scheduleId);
+    if (!found) return { ok: false, code: "INVALID_INPUT" };
+    const allowed = found.scope === "ORGANIZATION" ? capabilities.canSetOrgSchedule : capabilities.canSetScheduleForReports;
+    if (!allowed) return { ok: false, code: "CAPABILITY_DENIED" };
+    const commandIdentity = role;
+    window.setTimeout(() => {
+      if (activeIdentityRef.current !== commandIdentity) return;
+      setIdentityStates((current) => ({
+        ...current,
+        [commandIdentity]: {
+          ...current[commandIdentity],
+          schedules: current[commandIdentity].schedules.filter((item) => item.id !== scheduleId),
+        },
+      }));
+    }, 150);
+    return { ok: true };
+  }, [activeState.schedules, capabilities.canSetOrgSchedule, capabilities.canSetScheduleForReports, role]);
+
   /**
    * Record an adjustment against ONE named employee.
    *
@@ -793,6 +822,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     submitAttendanceCorrection,
     resolveAttendanceException,
     setWorkSchedule,
+    removeWorkSchedule,
     adjustLeaveBalance,
     resolveScheduleFor,
     leaveBalanceSummary,
@@ -816,6 +846,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     locale,
     markNotificationRead,
     removeNotification,
+    removeWorkSchedule,
     clearNotifications,
     resolvedTheme,
     role,
