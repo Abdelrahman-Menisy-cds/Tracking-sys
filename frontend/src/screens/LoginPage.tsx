@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useApp, usePageTitle, type Appearance } from "../app/AppContext";
 import { ApiError, login } from "../app/api";
 import BrandLockup from "../components/brand/BrandLockup";
-import { GlobeIcon, MoonIcon, SunIcon } from "../components/icons";
+import { MoonIcon, SunIcon } from "../components/icons";
 import type { Locale, Role } from "../i18n/dict";
 
 const ROLE_OPTIONS: Role[] = ["employee", "manager", "hr"];
@@ -150,11 +150,12 @@ export default function LoginPage() {
           <div className="login-preferences-header">
             <button
               type="button"
-              className="btn btn-secondary icon-only language-toggle-header"
+              className="btn btn-secondary language-toggle-header"
+              aria-pressed={locale === "en"}
               aria-label={languageLabel}
               onClick={() => setLocale(targetLocale)}
             >
-              <GlobeIcon />
+              {targetLocale.toUpperCase()}
             </button>
             <button
               type="button"
