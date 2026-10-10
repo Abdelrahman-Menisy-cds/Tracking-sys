@@ -10,9 +10,11 @@ import AdminNav from "./AdminNav";
 import type { LeaveBalance, WorkSchedule } from "../../mock/attendance";
 import {
   employeeDirectory,
-  findDirectoryEntry,
   type EmployeeDirectoryEntry,
   type EmployeeHrOnlyFile,
+  type EmployeeFilePatch,
+  type EmployeeContractMock,
+  type ReligionCode,
 } from "../../mock/data";
 import type { Dict, Locale } from "../../i18n/dict";
 
@@ -35,10 +37,6 @@ const weekdayLabel = (weekday: number, locale: Locale): string =>
   new Intl.DateTimeFormat(locale, { weekday: "long" }).format(new Date(Date.UTC(2023, 0, 1 + weekday)));
 
 const fmt = (value: number, locale: Locale): string => new Intl.NumberFormat(locale).format(value);
-const mediumDate = (value: string, locale: Locale): string =>
-  /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(`${value}T12:00:00Z`))
-    : value;
 const fmtDateTime = (value: string, locale: Locale): string =>
   new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 
@@ -62,9 +60,149 @@ const scheduleText = (schedule: WorkSchedule, locale: Locale): string =>
   `${schedule.working_weekdays.map((weekday) => weekdayLabel(weekday, locale)).join(locale === "ar" ? "، " : ", ")}`
   + ` · ${schedule.expected_start}–${schedule.expected_end} · ${fmt(schedule.expected_daily_minutes, locale)} ${locale === "ar" ? "دقيقة/يوم" : "min/day"}`;
 
+// ── File-draft validation (§2.3 shared + HR-only fields) ──
+// Same ids/render pattern as ScheduleEditorDialog: errors[key] feeds
+// aria-invalid + aria-describedby + a field-error span with role=alert.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^\+?[\d\s-]{7,20}$/;
+const NATIONAL_ID_RE = /^\d{14}$/;
+
+/**
+ * Every editable fact, keyed for validation and error-message ids.
+ * Declared with a fixed key list so the type and value stay in sync.
+ */
+type FactFieldKey =
+  | "nameAr" | "nameEn"
+  | "departmentAr" | "departmentEn"
+  | "jobTitleAr" | "jobTitleEn"
+  | "directManager" | "email" | "phone" | "joinDate"
+  | "salaryAmount" | "nationalId"
+  | "bankNameAr" | "bankNameEn" | "iban"
+  | "religion" | "religionOther";
+
+const FACT_FIELD_IDS: Record<FactFieldKey, string> = {
+  nameAr: "people-fact-name-ar",
+  nameEn: "people-fact-name-en",
+  departmentAr: "people-fact-department-ar",
+  departmentEn: "people-fact-department-en",
+  jobTitleAr: "people-fact-job-title-ar",
+  jobTitleEn: "people-fact-job-title-en",
+  directManager: "people-fact-direct-manager",
+  email: "people-fact-email",
+  phone: "people-fact-phone",
+  joinDate: "people-fact-join-date",
+  salaryAmount: "people-hr-salary",
+  nationalId: "people-hr-national-id",
+  bankNameAr: "people-hr-bank-name-ar",
+  bankNameEn: "people-hr-bank-name-en",
+  iban: "people-hr-iban",
+  religion: "people-hr-religion",
+  religionOther: "people-hr-religion-other",
+};
+
+type ErrorMap = Partial<Record<FactFieldKey, DictKey>>;
+
+/**
+ * One draft covering both panels (the page's contract: one draft, one save
+ * bar; selecting never saves). Contracts are edited in place — adding or
+ * removing them is out of scope for this pass.
+ */
+interface FileDraft {
+  nameAr: string;
+  nameEn: string;
+  departmentAr: string;
+  departmentEn: string;
+  jobTitleAr: string;
+  jobTitleEn: string;
+  directManager: string;
+  email: string;
+  phone: string;
+  joinDate: string;
+  salaryAmount: string;
+  nationalId: string;
+  bankNameAr: string;
+  bankNameEn: string;
+  iban: string;
+  religion: ReligionCode;
+  religionOther: string;
+  contracts: EmployeeContractMock[];
+}
+
+const seedFileDraft = (entry: EmployeeDirectoryEntry): FileDraft => {
+  const hr = entry.hr_file;
+  return {
+    nameAr: entry.name.ar,
+    nameEn: entry.name.en,
+    departmentAr: entry.department.ar,
+    departmentEn: entry.department.en,
+    jobTitleAr: entry.job_title.ar,
+    jobTitleEn: entry.job_title.en,
+    directManager: entry.direct_manager ?? "",
+    email: entry.email,
+    phone: entry.phone,
+    joinDate: entry.join_date,
+    salaryAmount: hr ? String(hr.salary.amount) : "",
+    nationalId: hr?.national_id ?? "",
+    bankNameAr: hr?.bank_account.bank_name.ar ?? "",
+    bankNameEn: hr?.bank_account.bank_name.en ?? "",
+    iban: hr?.bank_account.iban ?? "",
+    religion: hr?.religion ?? "MUSLIM",
+    // «آخر» carries a free-text detail; seed it whenever the fixture has one
+    // so switching to OTHER shows what was there rather than an empty box.
+    religionOther: hr?.religion_other ?? "",
+    contracts: hr ? hr.contracts.map((contract) => ({ ...contract })) : [],
+  };
+};
+
+const validateFileDraft = (draft: FileDraft): ErrorMap => {
+  const errors: ErrorMap = {};
+  if (!draft.nameAr.trim()) errors.nameAr = "adminErrorRequired";
+  if (!draft.nameEn.trim()) errors.nameEn = "adminErrorRequired";
+  if (!draft.departmentAr.trim()) errors.departmentAr = "adminErrorRequired";
+  if (!draft.departmentEn.trim()) errors.departmentEn = "adminErrorRequired";
+  if (!draft.jobTitleAr.trim()) errors.jobTitleAr = "adminErrorRequired";
+  if (!draft.jobTitleEn.trim()) errors.jobTitleEn = "adminErrorRequired";
+  if (!EMAIL_RE.test(draft.email.trim())) errors.email = "adminErrorEmail";
+  if (!PHONE_RE.test(draft.phone.trim())) errors.phone = "adminErrorPhone";
+  if (!draft.joinDate) errors.joinDate = "adminErrorRequired";
+  if (!draft.salaryAmount.trim() || !Number.isFinite(Number(draft.salaryAmount)) || Number(draft.salaryAmount) <= 0) errors.salaryAmount = "adminErrorSalary";
+  if (!NATIONAL_ID_RE.test(draft.nationalId.trim())) errors.nationalId = "adminErrorNationalId";
+  if (!draft.bankNameAr.trim()) errors.bankNameAr = "adminErrorRequired";
+  if (!draft.bankNameEn.trim()) errors.bankNameEn = "adminErrorRequired";
+  if (!draft.iban.trim()) errors.iban = "adminErrorIban";
+  // «آخر» is only valid with a non-empty detail (§2.3 -- own-religion data).
+  if (draft.religion === "OTHER" && !draft.religionOther.trim()) errors.religionOther = "adminErrorReligionDetail";
+  return errors;
+};
+
+/**
+ * The patch passed to saveEmployeeFile. Because the merge rule replaces the
+ * WHOLE hr_file slice, this always builds a complete EmployeeHrOnlyFile from
+ * the draft — a partial object would silently blank fields.
+ */
+const filePatchFromDraft = (draft: FileDraft): EmployeeFilePatch => ({
+  name: { ar: draft.nameAr, en: draft.nameEn },
+  department: { ar: draft.departmentAr, en: draft.departmentEn },
+  job_title: { ar: draft.jobTitleAr, en: draft.jobTitleEn },
+  direct_manager: draft.directManager || null,
+  email: draft.email,
+  phone: draft.phone,
+  join_date: draft.joinDate,
+  hr_file: {
+    hr_only: true,
+    salary: { amount: Number(draft.salaryAmount), currency: "EGP", payroll_cycle: "MONTHLY" },
+    national_id: draft.nationalId,
+    bank_account: { bank_name: { ar: draft.bankNameAr, en: draft.bankNameEn }, iban: draft.iban },
+    contracts: draft.contracts,
+    evaluations: [],
+    religion: draft.religion,
+    ...(draft.religion === "OTHER" && draft.religionOther ? { religion_other: draft.religionOther } : {}),
+  },
+});
+
 export default function AdminPeopleDetailPage() {
   const { employeeId } = useParams<{ employeeId: string }>();
-  const { t, locale, role, capabilities, schedules, resolveScheduleFor, setWorkSchedule, removeWorkSchedule, visibleEmployeeFile, leaveBalances, directoryLeaveBalances, leaveBalanceSummary } = useApp();
+  const { t, locale, role, capabilities, schedules, resolveScheduleFor, setWorkSchedule, removeWorkSchedule, visibleEmployeeFile, leaveBalances, directoryLeaveBalances, leaveBalanceSummary, saveEmployeeFile } = useApp();
   usePageTitle(t("adminPeopleTitle"));
 
   const base = employeeId ? employeeDirectory.find((candidate) => candidate.id === employeeId) : undefined;
@@ -101,7 +239,7 @@ export default function AdminPeopleDetailPage() {
     entry?.hybrid_policy?.mode === "FLEXIBLE_QUOTA" ? "FLEXIBLE_QUOTA" : "FIXED_DAYS",
   );
   const [draftFixedDays, setDraftFixedDays] = useState<number[]>(
-    entry?.hybrid_policy?.mode === "FIXED_DAYS" ? [...entry.hybrid_policy.office_weekdays] : [0, 2],
+    entry?.hybrid_policy?.mode === "FIXED_DAYS" && entry?.hybrid_policy ? [...entry.hybrid_policy.office_weekdays] : [0, 2],
   );
   const [draftMinDays, setDraftMinDays] = useState<string>(
     entry?.hybrid_policy?.mode === "FLEXIBLE_QUOTA" ? String(entry.hybrid_policy.min_office_days) : "2",
@@ -109,6 +247,7 @@ export default function AdminPeopleDetailPage() {
   const [draftPeriodDays, setDraftPeriodDays] = useState<string>(
     entry?.hybrid_policy?.mode === "FLEXIBLE_QUOTA" ? String(entry.hybrid_policy.period_days) : "7",
   );
+  const [draftMinutes, setDraftMinutes] = useState<string>(String(effective?.expected_daily_minutes ?? halfOrgMinutes));
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
@@ -117,23 +256,30 @@ export default function AdminPeopleDetailPage() {
   // employment mutation; the demo boundary copy says so on save).
   const [savedType, setSavedType] = useState<EmploymentTypeCode>(entry?.employment_type ?? "FULL");
   /**
-   * The part-time day, as a draft like everything else on this screen.
-   *
-   * It seeds from the schedule actually in force, so an employee who already works
-   * 360 minutes sees 360 rather than a number invented here. Signing a type only
-   * fills this; Save is what writes the schedule.
+   * File-facts draft (shared + HR-only panels): seeded from the entry as it is
+   * now — which already includes any saved overlay, because the directory read
+   * of the context is employeeDirectoryWithOverrides. Save writes the whole
+   * EmployeeFilePatch at once through saveEmployeeFile.
    */
-  const [draftMinutes, setDraftMinutes] = useState<string>(String(effective?.expected_daily_minutes ?? halfOrgMinutes));
+  const [fileDraft, setFileDraft] = useState<FileDraft>(() => seedFileDraft(entry ?? employeeDirectory[0]));
+  const [fileErrors, setFileErrors] = useState<ErrorMap>({});
+  const [savingFile, setSavingFile] = useState(false);
+  // The manager select offers the whole directory (current entry included);
+  // names come from the overridden directory view, so a renamed manager
+  // shows the new name here too.
+  const managerOptions = useMemo(() => employeeDirectory.map((candidate) => ({ id: candidate.id, name: candidate.name })), []);
 
   useEffect(() => {
-    // Reset the draft when navigating between employees.
+    // Reset BOTH drafts when navigating between employees.
     setDraftType(entry?.employment_type ?? "FULL");
     setSavedType(entry?.employment_type ?? "FULL");
     setDraftPolicyMode(entry?.hybrid_policy?.mode === "FLEXIBLE_QUOTA" ? "FLEXIBLE_QUOTA" : "FIXED_DAYS");
-    setDraftFixedDays(entry?.hybrid_policy?.mode === "FIXED_DAYS" ? [...entry.hybrid_policy.office_weekdays] : [0, 2]);
+    setDraftFixedDays(entry?.hybrid_policy?.mode === "FIXED_DAYS" && entry?.hybrid_policy ? [...entry.hybrid_policy.office_weekdays] : [0, 2]);
     setDraftMinDays(entry?.hybrid_policy?.mode === "FLEXIBLE_QUOTA" ? String(entry.hybrid_policy.min_office_days) : "2");
     setDraftPeriodDays(entry?.hybrid_policy?.mode === "FLEXIBLE_QUOTA" ? String(entry.hybrid_policy.period_days) : "7");
     setDraftMinutes(String(resolveScheduleFor(entry?.id ?? "", today)?.expected_daily_minutes ?? halfOrgMinutes));
+    setFileDraft(seedFileDraft(entry ?? employeeDirectory[0]));
+    setFileErrors({});
     setDirty(false);
     setFeedback(null);
   }, [entry?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -144,8 +290,33 @@ export default function AdminPeopleDetailPage() {
   const discard = () => {
     setDraftType(savedType);
     setDraftMinutes(String(effective?.expected_daily_minutes ?? halfOrgMinutes));
+    setFileDraft(seedFileDraft(entry));
+    setFileErrors({});
     setDirty(false);
     setFeedback(null);
+  };
+
+  /** Every change goes through here so dirty stays in lockstep with the draft. */
+  const patchDraft = (changes: Partial<FileDraft>) => {
+    setFileDraft((current) => ({ ...current, ...changes }));
+    setDirty(true);
+  };
+  const patchContract = (id: string, field: "type_ar" | "type_en" | "start_date" | "end_date", value: string) => {
+    setFileDraft((current) => ({
+      ...current,
+      contracts: current.contracts.map((contract) =>
+        contract.id !== id
+          ? contract
+          : {
+              ...contract,
+              ...(field === "type_ar" ? { type: { ...contract.type, ar: value } } : {}),
+              ...(field === "type_en" ? { type: { ...contract.type, en: value } } : {}),
+              ...(field === "start_date" ? { start_date: value } : {}),
+              ...(field === "end_date" ? { end_date: value || null } : {}),
+            },
+      ),
+    }));
+    setDirty(true);
   };
 
   /**
@@ -198,7 +369,33 @@ export default function AdminPeopleDetailPage() {
     }, 200);
   };
 
-  const managerName = entry.direct_manager ? findDirectoryEntry(entry.direct_manager)?.name[locale] ?? entry.direct_manager : null;
+  /**
+   * The file fields share the page's single sticky Save — validation runs
+   * before anything is written; a refusal sets field-level errors and a
+   * page-level Banner and keeps the draft dirty.
+   */
+  const saveFile = (): boolean => {
+    const errors = validateFileDraft(fileDraft);
+    setFileErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      setFeedback({ tone: "error", text: t("adminMutationInvalid") });
+      return false;
+    }
+    setSavingFile(true);
+    const outcome = saveEmployeeFile(employeeId, filePatchFromDraft(fileDraft));
+    window.setTimeout(() => {
+      setSavingFile(false);
+      if (!outcome.ok) {
+        // CAPABILITY_DENIED / MISSING_RECORD are surfaced honestly, not faked.
+        setFeedback({ tone: "error", text: t("adminMutationDenied") });
+      } else {
+        setFeedback({ tone: "success", text: `${t("adminPeopleFileSaved")} ${t("adminDemoBoundary")}` });
+      }
+    }, 150);
+    return outcome.ok;
+  };
+
+  const anySaving = saving || savingFile;
 
   return (
     <div className="page">
@@ -296,7 +493,7 @@ export default function AdminPeopleDetailPage() {
                           <input
                             type="checkbox"
                             checked={draftPolicyMode === "FIXED_DAYS" && draftFixedDays.includes(weekday)}
-                            disabled={saving}
+                            disabled={anySaving}
                             onChange={() => {
                               setDraftPolicyMode("FIXED_DAYS");
                               setDraftFixedDays((current) =>
@@ -311,16 +508,14 @@ export default function AdminPeopleDetailPage() {
                       ))}
                     </div>
                     <span className="field-hint">
-                      {t("adminPeopleHybridFixedSentence").replace(
-                        "%s",
-                        draftFixedDays.map((weekday) => weekdayLabel(weekday, locale)).join(locale === "ar" ? "، " : ", ") || "—",
-                      )}
+                      {t("adminPeopleHybridFixedSentence")
+                        .replace("%s", draftFixedDays.map((weekday) => weekdayLabel(weekday, locale)).join(locale === "ar" ? "، " : ", ") || "—")}
                     </span>
                   </fieldset>
                   <button
                     type="button"
                     className={`btn ${draftPolicyMode === "FIXED_DAYS" ? "btn-primary" : "btn-secondary"}`}
-                    disabled={saving}
+                    disabled={anySaving}
                     onClick={() => { setDraftPolicyMode("FIXED_DAYS"); setDirty(true); }}
                   >
                     {draftPolicyMode === "FIXED_DAYS" ? t("adminPeopleExceptionInForce") : t("adminPeopleEditException")}
@@ -344,7 +539,7 @@ export default function AdminPeopleDetailPage() {
                         inputMode="numeric"
                         style={{ fontSize: "var(--font-size-2xl)", width: "6ch" }}
                         value={draftMinDays}
-                        disabled={saving}
+                        disabled={anySaving}
                         onChange={(event) => { setDraftPolicyMode("FLEXIBLE_QUOTA"); setDraftMinDays(event.target.value); setDirty(true); }}
                       />
                     </label>
@@ -353,7 +548,7 @@ export default function AdminPeopleDetailPage() {
                       <select
                         className="select"
                         value={draftPeriodDays}
-                        disabled={saving}
+                        disabled={anySaving}
                         onChange={(event) => { setDraftPolicyMode("FLEXIBLE_QUOTA"); setDraftPeriodDays(event.target.value); setDirty(true); }}
                       >
                         <option value="7">{t("adminPeoplePeriodWeek")}</option>
@@ -370,7 +565,7 @@ export default function AdminPeopleDetailPage() {
                   <button
                     type="button"
                     className={`btn ${draftPolicyMode === "FLEXIBLE_QUOTA" ? "btn-primary" : "btn-secondary"}`}
-                    disabled={saving}
+                    disabled={anySaving}
                     onClick={() => { setDraftPolicyMode("FLEXIBLE_QUOTA"); setDirty(true); }}
                   >
                     {draftPolicyMode === "FLEXIBLE_QUOTA" ? t("adminPeopleExceptionInForce") : t("adminPeopleEditException")}
@@ -444,26 +639,52 @@ export default function AdminPeopleDetailPage() {
 
       {feedback ? <Banner tone={feedback.tone} role={feedback.tone === "error" ? "alert" : "status"}>{feedback.text}</Banner> : null}
 
-      {/* 6 · Single sticky save bar for the whole draft (§2.2 item 6) */}
+      {/* 6 · Single sticky save bar for the whole draft (§2.2 item 6). The file
+          panels validate on the same Save — one draft, one save bar; selecting
+          never saves. A refused save keeps the draft dirty. */}
       <div className="form-actions" style={{ position: "sticky", bottom: 0, zIndex: 2, background: "var(--surface)", borderTop: "var(--timeline-width) solid var(--border-subtle)", paddingBlock: "var(--sp-3)" }}>
         {dirty ? <span className="field-hint" role="status">{t("adminPeopleDirtyWarning")}</span> : null}
-        <button type="button" className="btn btn-secondary" onClick={discard} disabled={!dirty || saving}>
+        <button type="button" className="btn btn-secondary" onClick={discard} disabled={!dirty || anySaving}>
           {t("adminPeopleDiscard")}
         </button>
-        <button type="button" className="btn btn-primary" onClick={save} disabled={!dirty || saving} aria-busy={saving}>
-          {saving ? <><span className="spinner" aria-hidden="true" />{t("adminPeopleSavingEmployment")}</> : t("adminPeopleSaveEmployment")}
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={!dirty || anySaving}
+          aria-busy={anySaving}
+          onClick={() => {
+            // One Save, both drafts — but nothing writes while the file draft
+            // is invalid: an anonymous success would lie. saveFile keeps the
+            // draft dirty and explains per-field; save() only runs on a pass.
+            if (saveFile()) save();
+          }}
+        >
+          {anySaving ? <><span className="spinner" aria-hidden="true" />{t("adminPeopleSavingEmployment")}</> : t("adminPeopleSaveEmployment")}
         </button>
         <span className="field-hint">
           {t("adminPeopleLastSaved").replace("%s", fmtDateTime(new Date().toISOString(), locale)).replace("%s", "Mona Sherif")}
         </span>
       </div>
 
-      {/* ── §2.3 Two-tier file: shared first; two separate <form> elements ── */}
+      {/* ── §2.3 Two-tier file: everything editable for HR now. The panels
+              render inside the page-level draft (one draft, one save bar); the
+              <form> wrappers keep the panels' landmark/spec shape, not
+              separate submission units. Employment type is NOT duplicated
+              here — it stays on the segmented control above. ── */}
       <section className="work-surface section" aria-labelledby="people-file-shared">
         <div className="section-heading">
           <h2 id="people-file-shared">{t("adminPeopleFileSharedHeading")}</h2>
         </div>
-        <SharedFileFacts entry={entry as EmployeeDirectoryEntry} manager={managerName} employmentType={savedType} />
+        <SharedFileFacts
+          draft={fileDraft}
+          errors={fileErrors}
+          disabled={anySaving}
+          employmentType={savedType}
+          directory={managerOptions}
+          t={t as (key: DictKey) => string}
+          locale={locale}
+          patchDraft={patchDraft}
+        />
       </section>
 
       <hr style={{ border: 0, borderTop: "var(--timeline-width) solid var(--border-subtle)", marginBlock: "var(--sp-6)" }} />
@@ -476,59 +697,297 @@ export default function AdminPeopleDetailPage() {
             </h2>
           </div>
           <p className="page-meta">{t("adminPeopleFileHrOnlySentence")}</p>
-          <HrOnlyFileFacts hrFile={entry.hr_file} />
+          <HrOnlyFileFacts
+            draft={fileDraft}
+            errors={fileErrors}
+            disabled={anySaving}
+            hrFile={entry.hr_file}
+            t={t as (key: DictKey) => string}
+            locale={locale}
+            patchDraft={patchDraft}
+            patchContract={patchContract}
+          />
         </section>
       ) : null}
     </div>
   );
 }
 
-function SharedFileFacts({ entry, manager, employmentType }: { entry: EmployeeDirectoryEntry; manager: string | null; employmentType: EmploymentTypeCode }) {
-  const { t, locale } = useApp();
+function SharedFileFacts({
+  draft,
+  errors,
+  disabled,
+  employmentType,
+  directory,
+  t,
+  locale,
+  patchDraft,
+}: {
+  draft: FileDraft;
+  errors: ErrorMap;
+  disabled: boolean;
+  employmentType: EmploymentTypeCode;
+  directory: { id: string; name: { ar: string; en: string } }[];
+  t: (key: DictKey) => string;
+  locale: Locale;
+  patchDraft: (changes: Partial<FileDraft>) => void;
+}) {
+  const fieldError = (key: FactFieldKey) =>
+    errors[key] ? (
+      <span className="field-error" id={`${FACT_FIELD_IDS[key]}-error`} role="alert">{t(errors[key]!)}</span>
+    ) : null;
+  const describedBy = (key: FactFieldKey) => (errors[key] ? `${FACT_FIELD_IDS[key]}-error` : undefined);
+  const arabic = locale === "ar" ? "بالعربية" : "Arabic";
+  const english = locale === "ar" ? "بالإنجليزية" : "English";
+
   return (
     <form className="quiet-inset" onSubmit={(event) => event.preventDefault()}>
-      <dl className="decision-facts">
-        <div><dt>{t("adminPeopleFactName")}</dt><dd><bdi>{entry.name[locale]}</bdi></dd></div>
-        <div><dt>{t("adminPeopleFactDepartment")}</dt><dd>{entry.department[locale]}</dd></div>
-        <div><dt>{t("adminPeopleFactJobTitle")}</dt><dd>{entry.job_title[locale]}</dd></div>
-        <div><dt>{t("adminPeopleFactManager")}</dt><dd>{manager ?? "—"}</dd></div>
-        <div><dt>{t("adminPeopleFactEmail")}</dt><dd><a href={`mailto:${entry.email}`}><bdi dir="ltr">{entry.email}</bdi></a></dd></div>
-        <div><dt>{t("adminPeopleFactPhone")}</dt><dd><bdi dir="ltr">{entry.phone}</bdi></dd></div>
-        <div><dt>{t("adminPeopleFactJoinDate")}</dt><dd><bdi dir="ltr">{mediumDate(entry.join_date, locale)}</bdi></dd></div>
-        <div><dt>{t("adminPeopleFactEmploymentType")}</dt><dd><StatusPill tone="neutral" label={t(employmentTypeKeys[employmentType])} /></dd></div>
-      </dl>
+      <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactName")} · <bdi>{arabic}</bdi></span>
+          <input className="input" value={draft.nameAr} disabled={disabled} id={FACT_FIELD_IDS.nameAr}
+            aria-invalid={errors.nameAr ? "true" : undefined}
+            aria-describedby={describedBy("nameAr")}
+            onChange={(event) => patchDraft({ nameAr: event.target.value })} />
+          {fieldError("nameAr")}
+        </label>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactName")} · <bdi>{english}</bdi></span>
+          <input className="input" dir="ltr" value={draft.nameEn} disabled={disabled} id={FACT_FIELD_IDS.nameEn}
+            aria-invalid={errors.nameEn ? "true" : undefined}
+            aria-describedby={describedBy("nameEn")}
+            onChange={(event) => patchDraft({ nameEn: event.target.value })} />
+          {fieldError("nameEn")}
+        </label>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactDepartment")} · <bdi>{arabic}</bdi></span>
+          <input className="input" value={draft.departmentAr} disabled={disabled} id={FACT_FIELD_IDS.departmentAr}
+            aria-invalid={errors.departmentAr ? "true" : undefined}
+            aria-describedby={describedBy("departmentAr")}
+            onChange={(event) => patchDraft({ departmentAr: event.target.value })} />
+          {fieldError("departmentAr")}
+        </label>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactDepartment")} · <bdi>{english}</bdi></span>
+          <input className="input" dir="ltr" value={draft.departmentEn} disabled={disabled} id={FACT_FIELD_IDS.departmentEn}
+            aria-invalid={errors.departmentEn ? "true" : undefined}
+            aria-describedby={describedBy("departmentEn")}
+            onChange={(event) => patchDraft({ departmentEn: event.target.value })} />
+          {fieldError("departmentEn")}
+        </label>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactJobTitle")} · <bdi>{arabic}</bdi></span>
+          <input className="input" value={draft.jobTitleAr} disabled={disabled} id={FACT_FIELD_IDS.jobTitleAr}
+            aria-invalid={errors.jobTitleAr ? "true" : undefined}
+            aria-describedby={describedBy("jobTitleAr")}
+            onChange={(event) => patchDraft({ jobTitleAr: event.target.value })} />
+          {fieldError("jobTitleAr")}
+        </label>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactJobTitle")} · <bdi>{english}</bdi></span>
+          <input className="input" dir="ltr" value={draft.jobTitleEn} disabled={disabled} id={FACT_FIELD_IDS.jobTitleEn}
+            aria-invalid={errors.jobTitleEn ? "true" : undefined}
+            aria-describedby={describedBy("jobTitleEn")}
+            onChange={(event) => patchDraft({ jobTitleEn: event.target.value })} />
+          {fieldError("jobTitleEn")}
+        </label>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactManager")}</span>
+          <select
+            className="select"
+            id={FACT_FIELD_IDS.directManager}
+            disabled={disabled}
+            value={draft.directManager}
+            onChange={(event) => { patchDraft({ directManager: event.target.value }); }}
+          >
+            <option value="">—</option>
+            {directory.map((candidate) => (
+              <option key={candidate.id} value={candidate.id}>{candidate.name[locale]}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactEmail")}</span>
+          <input className="input" dir="ltr" type="email" value={draft.email} disabled={disabled} id={FACT_FIELD_IDS.email}
+            aria-invalid={errors.email ? "true" : undefined}
+            aria-describedby={describedBy("email")}
+            onChange={(event) => patchDraft({ email: event.target.value })} />
+          {fieldError("email")}
+        </label>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactPhone")}</span>
+          <input className="input" dir="ltr" type="tel" value={draft.phone} disabled={disabled} id={FACT_FIELD_IDS.phone}
+            aria-invalid={errors.phone ? "true" : undefined}
+            aria-describedby={describedBy("phone")}
+            onChange={(event) => patchDraft({ phone: event.target.value })} />
+          {fieldError("phone")}
+        </label>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactJoinDate")}</span>
+          <input className="input" dir="ltr" type="date" value={draft.joinDate} disabled={disabled} id={FACT_FIELD_IDS.joinDate}
+            aria-invalid={errors.joinDate ? "true" : undefined}
+            aria-describedby={describedBy("joinDate")}
+            onChange={(event) => patchDraft({ joinDate: event.target.value })} />
+          {fieldError("joinDate")}
+        </label>
+        {/* Not editable here: employment type lives in the segmented control above. */}
+        <div className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactEmploymentType")}</span>
+          <StatusPill tone="neutral" label={t(employmentTypeKeys[employmentType])} />
+        </div>
+      </div>
     </form>
   );
 }
 
-function HrOnlyFileFacts({ hrFile }: { hrFile: EmployeeHrOnlyFile }) {
-  const { t, locale } = useApp();
+function HrOnlyFileFacts({
+  draft,
+  errors,
+  disabled,
+  hrFile,
+  t,
+  locale,
+  patchDraft,
+  patchContract,
+}: {
+  draft: FileDraft;
+  errors: ErrorMap;
+  disabled: boolean;
+  hrFile: EmployeeHrOnlyFile;
+  t: (key: DictKey) => string;
+  locale: Locale;
+  patchDraft: (changes: Partial<FileDraft>) => void;
+  patchContract: (id: string, field: "type_ar" | "type_en" | "start_date" | "end_date", value: string) => void;
+}) {
+  const fieldError = (key: FactFieldKey) =>
+    errors[key] ? (
+      <span className="field-error" id={`${FACT_FIELD_IDS[key]}-error`} role="alert">{t(errors[key]!)}</span>
+    ) : null;
+  const describedBy = (key: FactFieldKey) => (errors[key] ? `${FACT_FIELD_IDS[key]}-error` : undefined);
+  const arabic = locale === "ar" ? "بالعربية" : "Arabic";
+  const english = locale === "ar" ? "بالإنجليزية" : "English";
+
   return (
     <form className="quiet-inset" onSubmit={(event) => event.preventDefault()}>
-      <dl className="decision-facts">
-        <div>
-          <dt>{t("adminPeopleFactSalary")}</dt>
-          <dd>
-            {fmt(hrFile.salary.amount, locale)} {hrFile.salary.currency} · <span className="page-meta">{hrFile.salary.payroll_cycle === "MONTHLY" ? (locale === "ar" ? "شهري" : "monthly") : hrFile.salary.payroll_cycle}</span>
-          </dd>
-        </div>
-        <div><dt>{t("adminPeopleFactNationalId")}</dt><dd><bdi dir="ltr">{hrFile.national_id}</bdi></dd></div>
-        <div><dt>{t("adminPeopleFactBank")}</dt><dd>{hrFile.bank_account.bank_name[locale]}</dd></div>
-        <div><dt>{t("adminPeopleFactIban")}</dt><dd><bdi dir="ltr">{hrFile.bank_account.iban}</bdi></dd></div>
-      </dl>
-      <h3>{t("adminPeopleFactContracts")}</h3>
+      <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">
+            {t("adminPeopleFactSalary")} — <bdi dir="ltr">{hrFile.salary.currency}</bdi> · {locale === "ar" ? "شهري" : "monthly"}
+          </span>
+          <input
+            className="input" dir="ltr" type="number" min="0" step="50"
+            value={draft.salaryAmount} disabled={disabled} id={FACT_FIELD_IDS.salaryAmount}
+            aria-invalid={errors.salaryAmount ? "true" : undefined}
+            aria-describedby={describedBy("salaryAmount")}
+            onChange={(event) => patchDraft({ salaryAmount: event.target.value })}
+          />
+          {fieldError("salaryAmount")}
+        </label>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactNationalId")}</span>
+          <input
+            className="input" dir="ltr" inputMode="numeric" maxLength={14}
+            value={draft.nationalId} disabled={disabled} id={FACT_FIELD_IDS.nationalId}
+            aria-invalid={errors.nationalId ? "true" : undefined}
+            aria-describedby={describedBy("nationalId")}
+            onChange={(event) => patchDraft({ nationalId: event.target.value })}
+          />
+          {fieldError("nationalId")}
+          <span className="field-hint">{locale === "ar" ? "14 رقمًا." : "14 digits."}</span>
+        </label>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactBank")} · <bdi>{arabic}</bdi></span>
+          <input className="input" value={draft.bankNameAr} disabled={disabled} id={FACT_FIELD_IDS.bankNameAr}
+            aria-invalid={errors.bankNameAr ? "true" : undefined}
+            aria-describedby={describedBy("bankNameAr")}
+            onChange={(event) => patchDraft({ bankNameAr: event.target.value })} />
+          {fieldError("bankNameAr")}
+        </label>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactBank")} · <bdi>{english}</bdi></span>
+          <input className="input" dir="ltr" value={draft.bankNameEn} disabled={disabled} id={FACT_FIELD_IDS.bankNameEn}
+            aria-invalid={errors.bankNameEn ? "true" : undefined}
+            aria-describedby={describedBy("bankNameEn")}
+            onChange={(event) => patchDraft({ bankNameEn: event.target.value })} />
+          {fieldError("bankNameEn")}
+        </label>
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminPeopleFactIban")}</span>
+          <input
+            className="input" dir="ltr"
+            value={draft.iban} disabled={disabled} id={FACT_FIELD_IDS.iban}
+            aria-invalid={errors.iban ? "true" : undefined}
+            aria-describedby={describedBy("iban")}
+            onChange={(event) => patchDraft({ iban: event.target.value })}
+          />
+          {fieldError("iban")}
+        </label>
+      </div>
+
+      {/* Own-religion data stays HR-only: a select of exactly the three codes;
+          «آخر» reveals a free-text detail in place, and saving OTHER with an
+          empty detail is refused (see validateFileDraft). */}
+      <label className="field" style={{ marginBlockEnd: "var(--sp-4)", maxInlineSize: "22rem" }}>
+        <span className="field-label">{t("adminPeopleReligion")}</span>
+        <select
+          className="select"
+          id={FACT_FIELD_IDS.religion}
+          disabled={disabled}
+          value={draft.religion}
+          onChange={(event) => {
+            const next = event.target.value as ReligionCode;
+            patchDraft({ religion: next });
+          }}
+        >
+          <option value="MUSLIM">{t("religionMuslim")}</option>
+          <option value="CHRISTIAN">{t("religionChristian")}</option>
+          <option value="OTHER">{t("religionOther")}</option>
+        </select>
+      </label>
+      {draft.religion === "OTHER" ? (
+        <label className="field" style={{ marginBlockEnd: "var(--sp-4)", maxInlineSize: "22rem" }}>
+          <span className="field-label">{t("adminPeopleReligionOtherDetail")}</span>
+          <input
+            className="input"
+            id={FACT_FIELD_IDS.religionOther}
+            disabled={disabled}
+            value={draft.religionOther}
+            aria-invalid={errors.religionOther ? "true" : undefined}
+            aria-describedby={describedBy("religionOther")}
+            onChange={(event) => patchDraft({ religionOther: event.target.value })}
+          />
+          {fieldError("religionOther")}
+        </label>
+      ) : null}
+
+      <h3 style={{ marginBlockStart: "var(--sp-5)" }}>{t("adminPeopleFactContracts")}</h3>
+      {/* Contracts are edited in place only: adding/removing them is out of
+          scope for this pass (no add/remove affordance is built or faked). */}
       <ul className="attachment-list">
-        {hrFile.contracts.map((contract) => (
+        {draft.contracts.map((contract) => (
           <li className="attachment-row" key={contract.id}>
-            <div>
-              <strong>{contract.type[locale]}</strong>
-              <div className="page-meta">
-                <bdi dir="ltr">{mediumDate(contract.start_date, locale)}</bdi>
-                {" → "}
-                {contract.end_date ? <bdi dir="ltr">{mediumDate(contract.end_date, locale)}</bdi> : "—"}
-              </div>
+            <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", flex: 1 }}>
+              <label className="field" style={{ marginBlockEnd: "var(--sp-2)" }}>
+                <span className="field-label"><bdi>{arabic}</bdi></span>
+                <input className="input" value={contract.type.ar} disabled={disabled}
+                  onChange={(event) => patchContract(contract.id, "type_ar", event.target.value)} />
+              </label>
+              <label className="field" style={{ marginBlockEnd: "var(--sp-2)" }}>
+                <span className="field-label"><bdi>{english}</bdi></span>
+                <input className="input" dir="ltr" value={contract.type.en} disabled={disabled}
+                  onChange={(event) => patchContract(contract.id, "type_en", event.target.value)} />
+              </label>
+              <label className="field" style={{ marginBlockEnd: "var(--sp-2)" }}>
+                <span className="field-label">{t("adminContractStart")}</span>
+                <input className="input" dir="ltr" type="date" value={contract.start_date} disabled={disabled}
+                  onChange={(event) => patchContract(contract.id, "start_date", event.target.value)} />
+              </label>
+              <label className="field" style={{ marginBlockEnd: "var(--sp-2)" }}>
+                <span className="field-label">{t("adminContractEnd")}</span>
+                <input className="input" dir="ltr" type="date" value={contract.end_date ?? ""} disabled={disabled}
+                  onChange={(event) => patchContract(contract.id, "end_date", event.target.value)} />
+              </label>
             </div>
-            <button type="button" className="btn btn-ghost btn-compact">{t("adminPeopleDownload")}</button>
           </li>
         ))}
       </ul>
