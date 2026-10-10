@@ -36,15 +36,22 @@ export default function AdjustLeaveDialog({
   availableTypes: LeaveBalance["leave_type"][];
   onClose: (outcome: AdjustLeaveOutcome) => void;
 }) {
-  const { t, locale, leaveBalances, leaveBalanceSummary, adjustLeaveBalance } = useApp();
+  const { t, locale, directoryLeaveBalances, leaveBalanceSummary, adjustLeaveBalance } = useApp();
   const [leaveType, setLeaveType] = useState<LeaveBalance["leave_type"]>(initialLeaveType);
   const [daysText, setDaysText] = useState("");
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  /**
+   * The row for the employee this dialog was opened for — NOT the signed-in one.
+   *
+   * Reading `leaveBalances` here showed whoever was signed in: an HR user
+   * adjusting e1 saw hr1's entitlement, used and pending, and the preview
+   * promised a number that had nothing to do with the row being edited.
+   */
   const balance = useMemo(
-    () => leaveBalances.find((row) => row.leave_type === leaveType) ?? null,
-    [leaveBalances, leaveType],
+    () => directoryLeaveBalances.find((row) => row.employee === employeeId && row.leave_type === leaveType) ?? null,
+    [directoryLeaveBalances, employeeId, leaveType],
   );
   const summary = balance ? leaveBalanceSummary(balance) : null;
   const parsedDays = /^-?\d+$/.test(daysText.trim()) ? Number(daysText.trim()) : Number.NaN;
@@ -70,7 +77,7 @@ export default function AdjustLeaveDialog({
     // The context mutation applies asynchronously (demo layer); give it a
     // beat so the pending state is honest, then resolve.
     window.setTimeout(() => {
-      const result = adjustLeaveBalance(leaveType, parsedDays, reason.trim());
+      const result = adjustLeaveBalance(employeeId, leaveType, parsedDays, reason.trim());
       if (result.ok) {
         onClose({ ok: true });
         return;

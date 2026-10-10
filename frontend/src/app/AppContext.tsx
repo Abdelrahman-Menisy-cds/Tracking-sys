@@ -44,13 +44,13 @@ import {
   fixtureAttendanceDays,
   identityEmployeeId,
   isPublicHoliday,
-  leaveBalancesByIdentity,
   leaveBalanceSummary as deriveLeaveBalanceSummary,
   mergeAttendanceDays,
   publicHolidays,
   publicHolidaysInRange,
   resolveScheduleFixture,
   type AttendanceDay,
+  type LeaveAdjustment,
   type AttendanceEvent,
   type AttendanceEventKind,
   type AttendanceMutationResult,
@@ -169,7 +169,8 @@ interface AppState {
   submitAttendanceCorrection: (input: { workDate: string; inAt: string; outAt?: string; reason: string }) => AttendanceMutationResult;
   resolveAttendanceException: (workDate: string, status: AttendanceDay["status"], reason: string) => AttendanceMutationResult;
   setWorkSchedule: (schedule: WorkSchedule) => AttendanceMutationResult;
-  adjustLeaveBalance: (leaveType: LeaveBalance["leave_type"], days: number, reason: string) => AttendanceMutationResult;
+  /** Adjust ONE employee's balance — the employee the dialog was opened for. */
+  adjustLeaveBalance: (employee: string, leaveType: LeaveBalance["leave_type"], days: number, reason: string) => AttendanceMutationResult;
   resolveScheduleFor: (employee: string, date: string) => WorkSchedule | null;
   leaveBalanceSummary: (balance: LeaveBalance) => ReturnType<typeof deriveLeaveBalanceSummary>;
   markNotificationRead: (notificationId: string) => void;
@@ -192,7 +193,6 @@ type IdentityState = {
   attendanceEvents: AttendanceEvent[];
   attendanceDays: AttendanceDay[];
   schedules: WorkSchedule[];
-  leaveBalances: LeaveBalance[];
 };
 
 const AppContext = createContext<AppState | null>(null);
@@ -230,7 +230,6 @@ function initialIdentityState(identity: DemoIdentity): IdentityState {
     attendanceEvents: [...cloneFixture(attendanceEventsByIdentity[identity]), ...cloneFixture(directoryEventsByIdentity[identity])],
     attendanceDays: cloneFixture(fixtureAttendanceDays(identity)),
     schedules: cloneFixture(attendanceSchedules),
-    leaveBalances: cloneFixture(leaveBalancesByIdentity[identity]),
   };
 }
 
@@ -288,6 +287,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [appearance, setAppearanceState] = useState<Appearance>(readStoredAppearance);
   const [osTheme, setOsTheme] = useState<"light" | "dark">(systemTheme);
   const [identityStates, setIdentityStates] = useState<Record<DemoIdentity, IdentityState>>(initialIdentityStates);
+  /**
+   * Leave adjustments recorded through the admin dialog, keyed `${employee}|${leave_type}`.
+   *
+   * They cannot live on an identity's state: the dialog adjusts whoever it was
+   * opened for, so an HR user fixing e1's balance must not write to hr1's rows —
+   * and most directory employees have no identity state to write to at all.
+   */
+  const [leaveAdjustments, setLeaveAdjustments] = useState<Record<string, LeaveAdjustment[]>>({});
   const [announcementItems, setAnnouncementItems] = useState<AnnouncementMock[]>(() => cloneFixture(announcementFixture));
   const activeIdentityRef = useRef<DemoIdentity>(role);
 
@@ -479,13 +486,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, [capabilities.canSetOrgSchedule, capabilities.canSetScheduleForReports, role]);
 
-  const adjustLeaveBalance = useCallback((leaveType: LeaveBalance["leave_type"], days: number, reason: string): AttendanceMutationResult => {
+  /**
+   * Record an adjustment against ONE named employee.
+   *
+   * This used to write to `commandIdentity` — whoever was signed in — while the
+   * dialog was opened for a specific employee, so an HR user fixing e1's balance
+   * actually changed hr1's and the dialog previewed hr1's numbers under e1's
+   * name. It now takes the employee, so what the dialog shows and what it saves
+   * are the same person.
+   *
+   * No mid-flight identity guard is needed any more: the write no longer depends
+   * on who is signed in, only on who was chosen.
+   */
+  const adjustLeaveBalance = useCallback((employee: string, leaveType: LeaveBalance["leave_type"], days: number, reason: string): AttendanceMutationResult => {
     if (!capabilities.canManageLeaveBalance) return { ok: false, code: "CAPABILITY_DENIED" };
     if (!reason.trim()) return { ok: false, code: "INVALID_INPUT" };
-    const commandIdentity = role;
+    const recordedBy = identityEmployeeId(role);
+    const key = `${employee}|${leaveType}`;
     window.setTimeout(() => {
-      if (activeIdentityRef.current !== commandIdentity) return;
-      setIdentityStates((current) => ({ ...current, [commandIdentity]: { ...current[commandIdentity], leaveBalances: current[commandIdentity].leaveBalances.map((balance) => balance.leave_type === leaveType ? { ...balance, adjustments: [...balance.adjustments, { id: `adj-${Date.now()}`, days, reason, created_at: new Date().toISOString(), recorded_by: identityEmployeeId(commandIdentity) }] } : balance) } }));
+      setLeaveAdjustments((current) => ({
+        ...current,
+        [key]: [
+          ...(current[key] ?? []),
+          { id: `adj-${Date.now()}`, days, reason: reason.trim(), created_at: new Date().toISOString(), recorded_by: recordedBy },
+        ],
+      }));
     }, 150);
     return { ok: true };
   }, [capabilities.canManageLeaveBalance, role]);
@@ -708,6 +733,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * The directory's balances with this session's adjustments folded in.
+   *
+   * Both the admin table and the adjust dialog read from here, which is what
+   * makes them agree: previously the table read the pristine fixture while the
+   * dialog read the signed-in identity's rows, so a saved adjustment changed a
+   * number nobody was looking at.
+   */
+  const directoryBalances = useMemo(
+    () =>
+      directoryLeaveBalances("2026").map((row) => {
+        const recorded = leaveAdjustments[`${row.employee}|${row.leave_type}`];
+        return recorded ? { ...row, adjustments: [...row.adjustments, ...recorded] } : row;
+      }),
+    [leaveAdjustments],
+  );
+
+  /** The signed-in employee's own rows, from the same merged source. */
+  const activeLeaveBalances = useMemo(
+    () => directoryBalances.filter((row) => row.employee === identityEmployeeId(role)),
+    [directoryBalances, role],
+  );
+
   const value = useMemo<AppState>(() => ({
     locale,
     setLocale,
@@ -730,13 +778,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     attendanceEvents: activeState.attendanceEvents,
     attendanceDays: activeState.attendanceDays,
     schedules: activeState.schedules,
-    leaveBalances: activeState.leaveBalances,
+    leaveBalances: activeLeaveBalances,
     employeeDirectory,
     visibleEmployeeFile: visibleEmployeeFile as typeof visibleEmployeeFile,
     publicHolidays,
     isPublicHoliday,
     publicHolidaysInRange,
-    directoryLeaveBalances: directoryLeaveBalances("2026"),
+    directoryLeaveBalances: directoryBalances,
     announcementItems,
     sendAnnouncement,
     settleAnnouncement,
@@ -777,6 +825,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAppearance,
     setDemoFixture,
     setLocale,
+    activeLeaveBalances,
+    directoryBalances,
     adjustLeaveBalance,
     clockIn,
     clockOut,
