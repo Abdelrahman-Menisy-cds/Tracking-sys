@@ -92,29 +92,58 @@ export function nextPrayerTrigger(
 }
 
 /**
- * Next hourly dhikr boundary at/after `nowMs`. Fires at wall-clock top of
- * hour per the local clock. `indexWithinHour` picks which dhikr (stable
- * rotation by hour).
+ * Draw a dhikr index at random. `excludeIndex` (the dhikr shown immediately
+ * before, tracked per person per session) is removed from the pool so a
+ * repeat never follows itself — the owner reads a repeat as "not random".
+ * `random` is injectable so the gate can drive the draw with a fixed
+ * sequence; defaults to Math.random.
  */
-export function nextHourlyDhikrTrigger(nowMs: number, dhikrCount: number): Trigger | null {
+export function drawDhikrIndex(
+  dhikrCount: number,
+  excludeIndex: number | null,
+  random: () => number = Math.random,
+): number | null {
   if (dhikrCount <= 0) return null;
-  const hourStart = Math.ceil((nowMs + 1) / 3_600_000) * 3_600_000;
-  const hourIndex = Math.floor(hourStart / 3_600_000) % Math.max(1, dhikrCount);
-  return {
-    atMs: hourStart,
-    kind: "dhikr",
-    dhikrIndex: hourIndex % dhikrCount,
-  };
+  if (dhikrCount === 1) return 0; // pool of one, nothing to vary
+  const candidates: number[] = [];
+  for (let i = 0; i < dhikrCount; i++) {
+    if (i !== excludeIndex) candidates.push(i);
+  }
+  return candidates[Math.min(candidates.length - 1, Math.floor(random() * candidates.length))];
 }
 
 /**
- * Which dhikr shows "immediately upon enabling": rotate from the hour index
- * so an enable at 10:xx doesn't always show dhikr #0.
+ * Next hourly dhikr boundary at/after `nowMs`. Fires at wall-clock top of
+ * hour per the local clock. WHICH dhikr is drawn at random (per employee,
+ * never the immediately previous one) — the clock only sets the boundary,
+ * it no longer selects the content (the old `floor(hour) % count` rotation
+ * made every employee see the same dhikr in the same hour).
  */
-export function immediateDhikrTrigger(nowMs: number, dhikrCount: number): Trigger | null {
-  if (dhikrCount <= 0) return null;
-  const hourIndex = Math.floor(nowMs / 3_600_000) % dhikrCount;
-  return { atMs: nowMs, kind: "dhikr", dhikrIndex: hourIndex };
+export function nextHourlyDhikrTrigger(
+  nowMs: number,
+  dhikrCount: number,
+  options?: { excludeIndex?: number | null; random?: () => number },
+): Trigger | null {
+  const index = drawDhikrIndex(dhikrCount, options?.excludeIndex ?? null, options?.random);
+  if (index === null) return null;
+  const hourStart = Math.ceil((nowMs + 1) / 3_600_000) * 3_600_000;
+  return { atMs: hourStart, kind: "dhikr", dhikrIndex: index };
+}
+
+/**
+ * Which dhikr shows "immediately upon enabling": a fresh random draw, per
+ * person, excluding the last one shown — NOT a rotation (the old version
+ * derived the pick from the epoch hour, so every toggle inside one hour
+ * showed the same card and two employees matched each other).
+ */
+export function immediateDhikrTrigger(
+  nowMs: number,
+  dhikrCount: number,
+  options?: { excludeIndex?: number | null; random?: () => number },
+): Trigger | null {
+  const index = drawDhikrIndex(dhikrCount, options?.excludeIndex ?? null, options?.random);
+  if (index === null) return null;
+  return { atMs: nowMs, kind: "dhikr", dhikrIndex: index };
 }
 
 export interface TriggerLoopOptions {

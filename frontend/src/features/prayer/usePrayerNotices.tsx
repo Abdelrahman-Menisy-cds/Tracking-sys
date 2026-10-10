@@ -114,6 +114,13 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
    * inside this session fires the "show one dhikr after enabling" feedback.
    */
   const prevHourlyDhikrRef = useRef(prefs.hourlyDhikr);
+  /**
+   * Last dhikr index shown FOR THIS EMPLOYEE in this session (NOT stored —
+   * a durable "last dhikr" would be a preference, and the brief forbids
+   * promoting it). Every draw — enable feedback and top-of-hour alike —
+   * excludes it, so the same card never follows itself for the same person.
+   */
+  const lastDhikrIndexRef = useRef<number | null>(null);
 
   // The location the browser actually reports:
   const today = useMemo(() => {
@@ -128,6 +135,13 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
 
   // Re-arm whenever an enabling changes the trigger surface.
   useEffect(() => {
+    // Track the hourlyDhikr preference across effect runs BEFORE any early
+    // return: the all-off branch below exits without reaching the sync at
+    // the bottom, and an unsynced ref hid every OFF→ON transition that
+    // followed an OFF (turn the switch off, then on → no enable-feedback
+    // dhikr at all; the browser run exposed it as round-2 silence).
+    const transitionedOn = prefs.hourlyDhikr && !prevHourlyDhikrRef.current;
+    prevHourlyDhikrRef.current = prefs.hourlyDhikr;
     if (!prefs.prayerTimes && !prefs.hourlyDhikr && !prefs.preReminder) {
       loopRef.current?.stop();
       loopRef.current = null;
@@ -165,6 +179,9 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
         ]);
       } else if (trigger.kind === "dhikr") {
         const dhikr = ADHKAR[trigger.dhikrIndex ?? 0] ?? ADHKAR[0];
+        // Record what this person just saw, so the next draw (enable
+        // feedback or hourly) excludes it — a repeat reads as "not random".
+        if (typeof trigger.dhikrIndex === "number") lastDhikrIndexRef.current = trigger.dhikrIndex;
         setNotices((current) => [
           ...current,
           {
@@ -212,7 +229,7 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
           }
         }
         if (currentPrefs.hourlyDhikr) {
-          const d = nextHourlyDhikrTrigger(now, ADHKAR.length);
+          const d = nextHourlyDhikrTrigger(now, ADHKAR.length, { excludeIndex: lastDhikrIndexRef.current });
           if (d) candidates.push(d);
         }
         candidates.sort((a, b) => a.atMs - b.atMs);
@@ -221,16 +238,13 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
       { pollMs: 500, onTrigger },
     );
     loopRef.current = loop;
-    // Was the preference OFF when this effect last ran, and is it ON now?
-    // Only that OFF→ON transition fires the "enable feedback" dhikr. A page
-    // that loads with the preference already on (reload/session restore)
-    // runs this effect with prev === current, so nothing fires: the earlier
-    // defect showed a dhikr card on every reload, which no one had asked
-    // for, exactly what the brief's double-mount check is about.
-    const transitionedOn = prefs.hourlyDhikr && !prevHourlyDhikrRef.current;
-    prevHourlyDhikrRef.current = prefs.hourlyDhikr;
+    // Runs with the transition flag computed above:
     if (transitionedOn) {
-      const immediate = immediateDhikrTrigger(Date.now(), ADHKAR.length);
+      // Fresh random draw for this person, excluding the dhikr shown
+      // immediately before (per-session ref — see the ref's comment):
+      const immediate = immediateDhikrTrigger(Date.now(), ADHKAR.length, {
+        excludeIndex: lastDhikrIndexRef.current,
+      });
       if (immediate) {
         onTrigger(immediate);
       }
@@ -278,8 +292,16 @@ const PRAYER_AR: Record<string, string> = {
 
 /** Stage-boundary escapes for tests to force certain paths: */
 export const __testHooks = {
-  fireImmediateDhikr: (nowMs: number, count: number) => immediateDhikrTrigger(nowMs, count),
-  nextDhikrBoundary: (nowMs: number, count: number) => nextHourlyDhikrTrigger(nowMs, count),
+  fireImmediateDhikr: (
+    nowMs: number,
+    count: number,
+    opts?: { excludeIndex?: number | null; random?: () => number },
+  ) => immediateDhikrTrigger(nowMs, count, opts),
+  nextDhikrBoundary: (
+    nowMs: number,
+    count: number,
+    opts?: { excludeIndex?: number | null; random?: () => number },
+  ) => nextHourlyDhikrTrigger(nowMs, count, opts),
   nextPrayer: nextPrayerTrigger,
 };
 
