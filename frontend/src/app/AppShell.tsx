@@ -190,7 +190,10 @@ export default function AppShell() {
   ];
   const targetLocale: Locale = locale === "en" ? "ar" : "en";
   const targetTheme: Exclude<Appearance, "system"> = resolvedTheme === "light" ? "dark" : "light";
-  const ThemeIcon = resolvedTheme === "light" ? SunIcon : MoonIcon;
+  // The icon names the theme you would get, not the one you are in — the same
+  // convention as the language button beside it (which shows "AR"/"EN" for the
+  // target) and the same thing the aria-label says.
+  const ThemeIcon = resolvedTheme === "light" ? MoonIcon : SunIcon;
   const activeUser = demoUser[role];
   const localizedName = activeUser.name[locale as Locale];
   const localizedRole = roleOptions.find((option) => option.value === role)?.label ?? t("roleEmployee");

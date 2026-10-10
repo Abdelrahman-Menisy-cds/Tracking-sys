@@ -104,7 +104,10 @@ export default function LoginPage() {
   const showRoleBlock = devToolsEnabled || (identifier.trim().length > 0 && effectiveRole !== "employee");
 
   const targetTheme: Exclude<Appearance, "system"> = resolvedTheme === "light" ? "dark" : "light";
-  const ThemeIcon = resolvedTheme === "light" ? SunIcon : MoonIcon;
+  // The icon names the theme you would get, not the one you are in — the same
+  // convention as the language button beside it (which shows "AR"/"EN" for the
+  // target) and the same thing the aria-label says.
+  const ThemeIcon = resolvedTheme === "light" ? MoonIcon : SunIcon;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
