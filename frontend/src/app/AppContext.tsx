@@ -109,6 +109,92 @@ function storeFileOverrides(overrides: Record<string, EmployeeFilePatch>): void 
   }
 }
 
+/**
+ * Brief E — the per-employee task capability flags mirror to session storage
+ * the same way. The demos advertises "tasks live in session memory" on the
+ * page; the flags must not silently contradict that by resetting to fixture
+ * values on a reload while the tasks themselves survive, so the overlay
+ *outlives it too — same mechanism, same scope, nothing in localStorage.
+ */
+const TASK_CAPABILITY_SESSION_KEY = "tracking-sys.task-capabilities";
+
+function readTaskCapabilityOverrides(): Record<string, TaskCapability> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.sessionStorage.getItem(TASK_CAPABILITY_SESSION_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as Record<string, TaskCapability>;
+  } catch {
+    return {};
+  }
+}
+
+function storeTaskCapabilityOverrides(overrides: Record<string, TaskCapability>): void {
+  try {
+    window.sessionStorage.setItem(TASK_CAPABILITY_SESSION_KEY, JSON.stringify(overrides));
+  } catch {
+    // Same contract as the file overlay: this session keeps the values either way.
+  }
+}
+
+/**
+ * Brief E — the tasks themselves mirror to session storage too. The demo
+ * banner already PROMISES «تُحفظ في ذاكرة الجلسة فقط وتُستعاد عند إعادة
+ * التحميل» ("kept in session memory, restored on reload"), and the
+ * route-to-manager cycle is multi-identity: an employee creates, a manager
+ * then signs in to assign. Between those two sign-ins the app reloads The
+ * page — without this mirror the promise is false and the routed task never
+ * reaches the manager's queue. Same mechanism, same session scope as the
+ * flag and file overlays; nothing durable, nothing in localStorage.
+ */
+const TASKS_SESSION_KEY = "tracking-sys.tasks";
+
+function isTaskLike(value: unknown): value is TaskMock {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return typeof candidate.id === "string"
+    && typeof candidate.title === "string"
+    && typeof candidate.created_by === "string"
+    && Array.isArray(candidate.events);
+}
+
+function readSessionTasks(): TaskMock[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.sessionStorage.getItem(TASKS_SESSION_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    // A stale or hand-edited entry must never crash the app: keep only rows
+    // shaped like a task, and silently ignore the rest.
+    return parsed.filter(isTaskLike);
+  } catch {
+    return [];
+  }
+}
+
+function storeSessionTasks(tasks: TaskMock[]): void {
+  try {
+    window.sessionStorage.setItem(TASKS_SESSION_KEY, JSON.stringify(tasks));
+  } catch {
+    // The session keeps the tasks either way; only the reload path loses them.
+  }
+}
+
+/**
+ * The seed on first load of a session: the fixture tasks PLUS anything the
+ * session already created (so a reload in the same tab keeps the report).
+ * A new session starts clean from the fixtures, which is the "session
+ * memory" contract the banner describes.
+ */
+function initialSessionTasks(): TaskMock[] {
+  const sessionExtras = readSessionTasks();
+  const fixtureIds = new Set(demoTasks.map((task) => task.id));
+  return [...cloneFixture(demoTasks), ...sessionExtras.filter((task) => !fixtureIds.has(task.id))];
+}
+
 function readStoredLocale(): Locale {
   if (typeof window === "undefined") return "ar";
   try {
@@ -374,8 +460,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
    * append-only, and the flags fold into taskCapabilityFor as an overlay the
    * same way fileOverrides folds into the directory.
    */
-  const [tasks, setTasks] = useState<TaskMock[]>(() => cloneFixture(demoTasks));
-  const [taskCapabilityOverrides, setTaskCapabilityOverrides] = useState<Record<string, TaskCapability>>({});
+  const [tasks, setTasks] = useState<TaskMock[]>(initialSessionTasks);
+  const [taskCapabilityOverrides, setTaskCapabilityOverrides] =
+    useState<Record<string, TaskCapability>>(readTaskCapabilityOverrides);
   const [announcementItems, setAnnouncementItems] = useState<AnnouncementMock[]>(() => cloneFixture(announcementFixture));
   const activeIdentityRef = useRef<DemoIdentity>(role);
 
@@ -687,7 +774,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       can_create_tasks: flags.can_create_tasks ?? taskCapabilityFor(employeeId).can_create_tasks,
       can_assign_tasks: flags.can_assign_tasks ?? taskCapabilityFor(employeeId).can_assign_tasks,
     };
-    setTaskCapabilityOverrides((current) => ({ ...current, [employeeId]: merged }));
+    setTaskCapabilityOverrides((current) => {
+      const next = { ...current, [employeeId]: merged };
+      storeTaskCapabilityOverrides(next);
+      return next;
+    });
     return { ok: true };
   }, [canSetTaskCapabilities, taskCapabilityFor]);
 
@@ -730,7 +821,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       created_at: now,
       events,
     };
-    setTasks((current) => [task, ...current]);
+    setTasks((current) => {
+      const next = [task, ...current];
+      storeSessionTasks(next);
+      return next;
+    });
     return { ok: true, value: task };
   }, [myEmployeeId, taskCapabilityFor]);
 
@@ -758,7 +853,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       created_at: now,
     };
     const updated: TaskMock = { ...task, assignee: to, events: [...task.events, event] };
-    setTasks((current) => current.map((candidate) => (candidate.id === taskId ? updated : candidate)));
+    setTasks((current) => {
+      const next = current.map((candidate) => (candidate.id === taskId ? updated : candidate));
+      storeSessionTasks(next);
+      return next;
+    });
     return { ok: true, value: updated };
   }, [myEmployeeId, tasks, taskCapabilityFor]);
 
