@@ -548,10 +548,16 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .decision-choices { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
 
 .login-page { min-height: 100vh; display: grid; place-items: center; padding: var(--sp-6) var(--sp-4); background: var(--page-bg); }
-.login-panel { position: relative; z-index: 1; overflow: hidden; width: min(520px, 100%); padding: var(--sp-8); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--elevation-2); }
+/* The panel is deliberately see-through: the oversized brand watermark sits
+   behind it and should read as if it passes under the card. Both numbers matter
+   — the panel's alpha and the watermark's opacity multiply, so raising only one
+   leaves the mark invisible.
+   No backdrop blur: it reads as `none` in every environment we can measure, so
+   shipping it would be a declaration with no verified effect. */
+.login-panel { position: relative; z-index: 1; overflow: hidden; width: min(520px, 100%); padding: var(--sp-8); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: color-mix(in srgb, var(--surface) 68%, transparent); box-shadow: var(--elevation-2); }
 .login-brand-watermark { position: fixed; inset: 0; z-index: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
-.login-brand-watermark img { width: min(72vw, 1000px); max-width: 100%; max-height: 90vh; object-fit: contain; opacity: 0.07; }
-:root[data-theme="dark"] .login-brand-watermark img { opacity: 0.09; }
+.login-brand-watermark img { width: min(72vw, 1000px); max-width: 100%; max-height: 90vh; object-fit: contain; opacity: 0.18; }
+:root[data-theme="dark"] .login-brand-watermark img { opacity: 0.22; }
 .login-header-row { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); margin-block-end: var(--sp-6); }
 .login-panel .login-header-row .brand-lockup { margin-block-end: var(--space-0); }
 .login-role-block { display: grid; gap: var(--sp-2); }
