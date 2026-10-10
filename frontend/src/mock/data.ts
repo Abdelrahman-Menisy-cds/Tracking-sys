@@ -505,6 +505,9 @@ export interface EmployeeEvaluationMock {
   note: { ar: string; en: string };
 }
 
+/** The religion field the HR-only file records; «آخر» carries a free-text detail. */
+export type ReligionCode = "MUSLIM" | "CHRISTIAN" | "OTHER";
+
 /**
  * HR-only field group, explicitly marked on the data: no screen may render
  * these without going through `visibleEmployeeFile` with an HR viewer.
@@ -518,6 +521,31 @@ export interface EmployeeHrOnlyFile {
   bank_account: { bank_name: { ar: string; en: string }; iban: string };
   contracts: EmployeeContractMock[];
   evaluations: EmployeeEvaluationMock[];
+  /** Own-religion data: HR edits it; the employee sees only their own value. */
+  religion: ReligionCode;
+  /** Non-empty exactly when religion is OTHER (or the OTHER path is invalid). */
+  religion_other?: string;
+}
+
+/**
+ * One full-file write from the HR screens: the shared facts plus the whole
+ * HR-only slice (rather than per-field mutations). The context stores these
+ * as an overlay keyed by employee id; `mergeEmployeeFilePatch` is the single
+ * merge rule — a provided `hr_file` replaces the entry's whole HR slice, so a
+ * cleared `religion_other` really disappears instead of surviving the merge.
+ */
+export interface EmployeeFilePatch
+  extends Pick<EmployeeDirectoryEntry, "name" | "department" | "job_title" | "direct_manager" | "email" | "phone" | "join_date"> {
+  hr_file?: EmployeeHrOnlyFile;
+}
+
+/** The context's overlay rule: replace the fields the patch carries. */
+export function mergeEmployeeFilePatch(entry: EmployeeDirectoryEntry, patch: EmployeeFilePatch): EmployeeDirectoryEntry {
+  return {
+    ...entry,
+    ...patch,
+    ...(patch.hr_file ? { hr_file: patch.hr_file } : {}),
+  };
 }
 
 export interface EmployeeDirectoryEntry {
@@ -552,6 +580,8 @@ const hrFile = (
   contractStart: string,
   contractEnd: string | null,
   evaluations: EmployeeEvaluationMock[],
+  religion: ReligionCode = "MUSLIM",
+  religionOther?: string,
 ): EmployeeHrOnlyFile => ({
   hr_only: true,
   salary: { amount, currency: "EGP", payroll_cycle: "MONTHLY" },
@@ -559,6 +589,8 @@ const hrFile = (
   bank_account: { bank_name: { ar: bankAr, en: bankEn }, iban },
   contracts: [{ id: `contract-${id}`, type: contractType, start_date: contractStart, end_date: contractEnd }],
   evaluations,
+  religion,
+  ...(religion === "OTHER" && religionOther !== undefined ? { religion_other: religionOther } : {}),
 });
 
 /**
@@ -793,6 +825,7 @@ export const employeeDirectory: EmployeeDirectoryEntry[] = [
       "2021-07-04",
       null,
       [{ id: "eval-emp2003-1", period: "2025-H2", rating: 4, note: { ar: "إقفال مالي دقيق وموثوق.", en: "Accurate and reliable financial close." } }],
+      "CHRISTIAN",
     ),
   },
   {
@@ -818,6 +851,8 @@ export const employeeDirectory: EmployeeDirectoryEntry[] = [
       "2025-06-01",
       "2026-12-31",
       [],
+      "OTHER",
+      "معتنقة للمسيحية إثر زواجها", // AR tail reaches the OTHER path in fixtures
     ),
   },
   {

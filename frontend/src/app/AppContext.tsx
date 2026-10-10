@@ -20,13 +20,15 @@ import {
   teamRequests,
   teamTimesheets,
   createAnnouncementFixture,
-  employeeDirectory,
+  employeeDirectory as employeeDirectoryFixture,
+  mergeEmployeeFilePatch,
   visibleEmployeeFile,
   announcements as announcementFixture,
   type AnnouncementMock,
   type AnnouncementChannel,
   type AnnouncementStatus,
   type EmployeeDirectoryEntry,
+  type EmployeeFilePatch,
   type NotificationMock,
   type RequestEventMock,
   type RequestMock,
@@ -62,6 +64,40 @@ export type Appearance = "system" | "light" | "dark";
 
 const LOCALE_STORAGE_KEY = "tracking-sys.locale";
 const APPEARANCE_STORAGE_KEY = "tracking-sys.appearance";
+/**
+ * HR's employee-file edits (piece 1 of the brief) — an in-browser OVERLAY over
+ * the read-only directory fixture, keyed by employee id.
+ *
+ * Storage contract, exactly as the brief draws it: directory data is not a
+ * device preference, so `localStorage` is never touched. Edits live in React
+ * state, and are MIRRORED to `sessionStorage` only so a mid-session reload
+ * keeps showing what HR saved — they still die when the browser session ends,
+ * which is what "in-session override" means here and the demo boundary copy
+ * says so on the page itself.
+ */
+const FILE_OVERRIDES_SESSION_KEY = "tracking-sys.file-overrides";
+
+function readFileOverrides(): Record<string, EmployeeFilePatch> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.sessionStorage.getItem(FILE_OVERRIDES_SESSION_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as Record<string, EmployeeFilePatch>;
+  } catch {
+    return {};
+  }
+}
+
+function storeFileOverrides(overrides: Record<string, EmployeeFilePatch>): void {
+  try {
+    window.sessionStorage.setItem(FILE_OVERRIDES_SESSION_KEY, JSON.stringify(overrides));
+  } catch {
+    // The override keeps working for this session when storage is unavailable;
+    // it just will not survive a reload, which the demo boundary copy states.
+  }
+}
 
 function readStoredLocale(): Locale {
   if (typeof window === "undefined") return "ar";
@@ -153,8 +189,9 @@ interface AppState {
   attendanceDays: AttendanceDay[];
   leaveBalances: LeaveBalance[];
   schedules: WorkSchedule[];
-  /** Full fixture directory (HR-only fields intact; gate via canManageDirectory). */
+  /** Full directory with the OVERLAY applied (HR file edits keyed by id). */
   employeeDirectory: EmployeeDirectoryEntry[];
+  saveEmployeeFile: (employeeId: string, patch: EmployeeFilePatch) => AttendanceMutationResult<EmployeeDirectoryEntry>;
   /** View-filtered copy of a file (HR-only fields removed for non-HR). */
   visibleEmployeeFile: typeof import("../mock/data").visibleEmployeeFile;
   publicHolidays: typeof import("../mock/attendance").publicHolidays;
@@ -302,6 +339,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
    * and most directory employees have no identity state to write to at all.
    */
   const [leaveAdjustments, setLeaveAdjustments] = useState<Record<string, LeaveAdjustment[]>>({});
+  /**
+   * HR's file edits (brief piece 1), keyed by employee id — the sibling of
+   * leaveAdjustments above: the fixture cannot be written, so the edit is an
+   * overlay applied wherever the directory is read. Mirrored to sessionStorage
+   * (see readFileOverrides) so a mid-session reload keeps HR's values; nothing
+   * durable, nothing in localStorage.
+   */
+  const [fileOverrides, setFileOverrides] = useState<Record<string, EmployeeFilePatch>>(readFileOverrides);
   const [announcementItems, setAnnouncementItems] = useState<AnnouncementMock[]>(() => cloneFixture(announcementFixture));
   const activeIdentityRef = useRef<DemoIdentity>(role);
 
@@ -571,9 +616,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return settled ? { ok: true, value: settled } : { ok: false, code: "MISSING_RECORD" };
   }, [capabilities.canSendAnnouncements]);
 
+  const saveEmployeeFile = useCallback((employeeId: string, patch: EmployeeFilePatch): AttendanceMutationResult<EmployeeDirectoryEntry> => {
+    if (!capabilities.canManageDirectory) return { ok: false, code: "CAPABILITY_DENIED" };
+    if (!employeeDirectoryFixture.some((entry) => entry.id === employeeId)) return { ok: false, code: "MISSING_RECORD" };
+    const savedAt = new Date().toISOString();
+    setFileOverrides((current) => {
+      const next = { ...current, [employeeId]: { ...(current[employeeId] ?? {}), ...patch, saved_at: savedAt } as EmployeeFilePatch & { saved_at?: string } };
+      storeFileOverrides(next as Record<string, EmployeeFilePatch>);
+      return next;
+    });
+    return { ok: true, value: mergeEmployeeFilePatch(
+      employeeDirectoryFixture.find((entry) => entry.id === employeeId)!,
+      { ...(fileOverrides[employeeId] ?? {}), ...patch },
+    ) };
+  }, [capabilities.canManageDirectory, fileOverrides]);
+  // Kept verbatim from before the saveEmployeeFile insert above.
   const resolveScheduleFor = useCallback((employee: string, date: string) => resolveScheduleFixture(employee, date, activeState.schedules), [activeState.schedules]);
   const leaveBalanceSummary = useCallback((balance: LeaveBalance) => deriveLeaveBalanceSummary(balance), []);
-
   const clockIn = useCallback((occurredAt?: string, note?: string) => clockMutation("CLOCK_IN", occurredAt, note), [clockMutation]);
   const clockOut = useCallback((occurredAt?: string, note?: string) => clockMutation("CLOCK_OUT", occurredAt, note), [clockMutation]);
 
@@ -785,6 +844,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [directoryBalances, role],
   );
 
+  /**
+   * The directory as every screen should see it: fixture + HR's file edit
+   * overlay. Reading happens HERE —mirroring the directoryBalances pattern—
+   * so a renamed employee shows the new name on the roster, the Overview,
+   * announcements pickers and everywhere else that reads the context.
+   */
+  const employeeDirectoryWithOverrides = useMemo(
+    () => employeeDirectoryFixture.map((entry) => {
+      const patch = fileOverrides[entry.id];
+      return patch ? mergeEmployeeFilePatch(entry, patch) : entry;
+    }),
+    [fileOverrides],
+  );
+
   const value = useMemo<AppState>(() => ({
     locale,
     setLocale,
@@ -808,7 +881,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     attendanceDays: activeState.attendanceDays,
     schedules: activeState.schedules,
     leaveBalances: activeLeaveBalances,
-    employeeDirectory,
+    employeeDirectory: employeeDirectoryWithOverrides,
+    saveEmployeeFile,
     visibleEmployeeFile: visibleEmployeeFile as typeof visibleEmployeeFile,
     publicHolidays,
     isPublicHoliday,
@@ -858,6 +932,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setLocale,
     activeLeaveBalances,
     directoryBalances,
+    employeeDirectoryWithOverrides,
+    saveEmployeeFile,
     adjustLeaveBalance,
     clockIn,
     clockOut,
