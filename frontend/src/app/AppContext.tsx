@@ -68,7 +68,20 @@ import {
   type TaskMock,
   type TaskMutationResult,
   type TaskPriority,
+  type TaskStatus,
 } from "../mock/tasks";
+/* ===== Brief H1 — task time tracking; one contiguous block below the tasks cycle ===== */
+import {
+  elapsedSeconds as elapsedSecondsOf,
+  formatElapsed as formatElapsedOf,
+  readTaskTimeEntries,
+  runningEntryFor,
+  startTimerEntry,
+  stopRunningEntry,
+  storeTaskTimeEntries,
+  totalSecondsFor,
+  type TaskTimeEntry,
+} from "../mock/taskTime";
 
 export type Appearance = "system" | "light" | "dark";
 
@@ -330,6 +343,23 @@ interface AppState {
   createTask: (input: { title: string; description: string; priority: TaskPriority; dueDate: string | null; assignee: string | null; routeTo: string | null }) => TaskMutationResult<TaskMock>;
   /** Set (or clear) the assignee; every change appends to the trail. */
   assignTask: (taskId: string, to: string | null) => TaskMutationResult<TaskMock>;
+  /* ===== Brief H1 — status control + per-task work timer ===== */
+  /** Append a STATUS_CHANGE trail event; assignee and creator/manager only. */
+  changeTaskStatus: (taskId: string, to: TaskStatus) => TaskMutationResult<TaskMock>;
+  /** The signed-in employee's work intervals, running one included (ended_at: ""). */
+  taskTimeEntries: TaskTimeEntry[];
+  /** Start this task's timer for the signed-in employee; closes any running one first. */
+  startTaskTimer: (taskId: string) => TaskMutationResult<{ started: TaskTimeEntry; closedFirst: TaskTimeEntry | null }>;
+  /** Stop the signed-in employee's running timer and save its minutes. */
+  stopTaskTimer: () => TaskMutationResult<TaskTimeEntry>;
+  /** Sum of an employee's SAVED intervals on a task (running one excluded). */
+  taskTimeTotalSeconds: (taskId: string, employeeId: string) => number;
+  /** Live elapsed seconds for an employee's running timer, from the wall clock. */
+  taskTimeElapsedSeconds: (employeeId: string, now: number) => number;
+  /** The running interval for an employee, if any. */
+  taskTimeRunningFor: (employeeId: string) => TaskTimeEntry | null;
+  /** h:mm:ss formatting shared by the screen and any later timesheet view. */
+  taskTimeFormatElapsed: (totalSeconds: number) => string;
   setDemoFixture: (fixture: DemoFixture) => void;
   isDemoMode: boolean;
 }
@@ -463,6 +493,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<TaskMock[]>(initialSessionTasks);
   const [taskCapabilityOverrides, setTaskCapabilityOverrides] =
     useState<Record<string, TaskCapability>>(readTaskCapabilityOverrides);
+  /**
+   * Brief H1 — the work intervals, session-scoped per the app's overlay
+   * pattern (`tracking-sys.task-time`): a running interval keeps only its
+   * `started_at` here, so the elapsed display derives from the wall clock and
+   * a reload (or a throttled tab) neither loses nor drifts the time. Every
+   * entry carries task_id / employee_id / started_at / ended_at / minutes
+   * top-level, because the later timesheet view must filter on all three.
+   */
+  const [taskTimeEntries, setTaskTimeEntries] = useState<TaskTimeEntry[]>(readTaskTimeEntries);
   const [announcementItems, setAnnouncementItems] = useState<AnnouncementMock[]>(() => cloneFixture(announcementFixture));
   const activeIdentityRef = useRef<DemoIdentity>(role);
 
@@ -861,6 +900,100 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { ok: true, value: updated };
   }, [myEmployeeId, tasks, taskCapabilityFor]);
 
+  /* ===== Brief H1 — status control + per-task work timer ===== */
+
+  /**
+   * Change the task's status. Who may: the assignee (they do the work) or the
+   * creator; a manager may move their team's work too. Everyone else gets the
+   * honest CAPABILITY_DENIED, and the UI renders no control for them. Every
+   * accepted change appends exactly one STATUS_CHANGE event carrying the
+   * from → to pair — the trail is never rewritten and the from values make
+   * each row self-describing.
+   */
+  const changeTaskStatus = useCallback((taskId: string, to: TaskStatus): TaskMutationResult<TaskMock> => {
+    const task = tasks.find((candidate) => candidate.id === taskId);
+    if (!task) return { ok: false, code: "MISSING_RECORD" };
+    const isAssignee = task.assignee === myEmployeeId;
+    const isCreator = task.created_by === myEmployeeId;
+    const isManager = employeeDirectoryFixture.some((entry) => entry.id === myEmployeeId && ["m1", "emp-2001", "emp-2002", "emp-2003"].includes(entry.id));
+    if (!isAssignee && !isCreator && !isManager) return { ok: false, code: "CAPABILITY_DENIED" };
+    if (task.status === to) return { ok: true, value: task };
+    if (!["OPEN", "IN_PROGRESS", "DONE", "CANCELLED"].includes(to)) return { ok: false, code: "INVALID_INPUT" };
+    const event: TaskEventMock = {
+      id: `demo-task-ev-${Date.now()}`,
+      action: "STATUS_CHANGE",
+      actor: myEmployeeId,
+      from_status: task.status,
+      to_status: to,
+      comment: "",
+      created_at: new Date().toISOString(),
+    };
+    const updated: TaskMock = { ...task, status: to, events: [...task.events, event] };
+    setTasks((current) => {
+      const next = current.map((candidate) => (candidate.id === taskId ? updated : candidate));
+      storeSessionTasks(next);
+      return next;
+    });
+    return { ok: true, value: updated };
+  }, [myEmployeeId, tasks]);
+
+  /**
+   * Start the signed-in employee's timer on a task. Only the assignee may run
+   * it — a start on someone else's task is CAPABILITY_DENIED, not a polite
+   * no-op — and a second start closes the first interval and returns it so the
+   * screen can SAY the switch happened instead of silently double-counting.
+   */
+  const startTaskTimer = useCallback((taskId: string): TaskMutationResult<{ started: TaskTimeEntry; closedFirst: TaskTimeEntry | null }> => {
+    const task = tasks.find((candidate) => candidate.id === taskId);
+    if (!task) return { ok: false, code: "MISSING_RECORD" };
+    if (task.assignee !== myEmployeeId) return { ok: false, code: "CAPABILITY_DENIED" };
+    const result = startTimerEntry(taskTimeEntries, { taskId, employeeId: myEmployeeId, now: Date.now() });
+    if (!result.ok) return result;
+    setTaskTimeEntries((current) => {
+      // Re-derive inside the updater: stopTaskTimer uses the same rule, so
+      // the mirror written here is the one storage and the screen agree on.
+      const settled = startTimerEntry(current, { taskId, employeeId: myEmployeeId, now: Date.now() });
+      if (!settled.ok) return current;
+      storeTaskTimeEntries(settled.entries);
+      return settled.entries;
+    });
+    return { ok: true, value: { started: result.started, closedFirst: result.closedFirst } };
+  }, [myEmployeeId, tasks, taskTimeEntries]);
+
+  /**
+   * Stop and save. The minutes come from the REAL wall clock spanning the
+   * interval, so an interval that started before a reload records its full
+   * duration, and a zero-length start→stop is simply 0 — never negative.
+   */
+  const stopTaskTimer = useCallback((): TaskMutationResult<TaskTimeEntry> => {
+    const result = stopRunningEntry(taskTimeEntries, myEmployeeId, Date.now());
+    if (!result.ok) return result;
+    setTaskTimeEntries((current) => {
+      const settled = stopRunningEntry(current, myEmployeeId, Date.now());
+      if (!settled.ok) return current;
+      storeTaskTimeEntries(settled.remaining);
+      return settled.remaining;
+    });
+    return { ok: true, value: result.entry };
+  }, [myEmployeeId, taskTimeEntries]);
+
+  const taskTimeTotalSeconds = useCallback(
+    (taskId: string, employeeId: string) => totalSecondsFor(taskTimeEntries, taskId, employeeId),
+    [taskTimeEntries],
+  );
+  const taskTimeElapsedSeconds = useCallback(
+    (employeeId: string, now: number) => {
+      const running = runningEntryFor(taskTimeEntries, employeeId);
+      return running ? elapsedSecondsOf(running, now) : 0;
+    },
+    [taskTimeEntries],
+  );
+  const taskTimeRunningFor = useCallback(
+    (employeeId: string) => runningEntryFor(taskTimeEntries, employeeId),
+    [taskTimeEntries],
+  );
+  const taskTimeFormatElapsed = useCallback((totalSeconds: number) => formatElapsedOf(totalSeconds), []);
+
   // Kept verbatim from before the saveEmployeeFile insert above.
   const resolveScheduleFor = useCallback((employee: string, date: string) => resolveScheduleFixture(employee, date, activeState.schedules), [activeState.schedules]);
   const leaveBalanceSummary = useCallback((balance: LeaveBalance) => deriveLeaveBalanceSummary(balance), []);
@@ -1086,9 +1219,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTaskCapabilities,
       createTask: createTaskTask,
       assignTask,
+      changeTaskStatus,
+      startTaskTimer,
+      stopTaskTimer,
+      taskTimeEntries,
+      taskTimeRunningFor,
+      taskTimeTotalSeconds,
+      taskTimeElapsedSeconds,
     };
     return () => { delete (window as unknown as Record<string, unknown>).__taskVerify; };
-  }, [taskCapabilityFor, setTaskCapabilities, createTaskTask, assignTask]);
+  }, [taskCapabilityFor, setTaskCapabilities, createTaskTask, assignTask, changeTaskStatus, startTaskTimer, stopTaskTimer, taskTimeEntries, taskTimeRunningFor, taskTimeTotalSeconds, taskTimeElapsedSeconds]);
 
   /**
    * The directory as every screen should see it: fixture + HR's file edit
@@ -1158,6 +1298,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTaskCapabilities,
     createTask: createTaskTask,
     assignTask,
+    changeTaskStatus,
+    taskTimeEntries,
+    startTaskTimer,
+    stopTaskTimer,
+    taskTimeTotalSeconds,
+    taskTimeElapsedSeconds,
+    taskTimeRunningFor,
+    taskTimeFormatElapsed,
     setDemoFixture,
     isDemoMode: DEMO_MODE,
   }), [
@@ -1202,6 +1350,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTaskCapabilities,
     createTaskTask,
     assignTask,
+    changeTaskStatus,
+    taskTimeEntries,
+    startTaskTimer,
+    stopTaskTimer,
+    taskTimeTotalSeconds,
+    taskTimeElapsedSeconds,
+    taskTimeRunningFor,
+    taskTimeFormatElapsed,
   ]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

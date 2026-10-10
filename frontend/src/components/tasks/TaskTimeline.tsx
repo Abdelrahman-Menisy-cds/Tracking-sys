@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import { useApp } from "../../app/AppContext";
 import { formatDateTime } from "../../app/useMockList";
 import { findDirectoryEntry } from "../../mock/data";
+import { taskStatusKey } from "./TaskPills";
 import type { TaskEventMock } from "../../mock/tasks";
 
 const actionLabels: Record<TaskEventMock["action"], { ar: string; en: string }> = {
@@ -9,6 +10,7 @@ const actionLabels: Record<TaskEventMock["action"], { ar: string; en: string }> 
   ROUTE_TO_MANAGER: { ar: "تحويل إلى مدير", en: "Routed to a manager" },
   ASSIGN: { ar: "تكليف", en: "Assigned" },
   REASSIGN: { ar: "إعادة تكليف", en: "Reassigned" },
+  STATUS_CHANGE: { ar: "تغيير الحالة", en: "Status changed" },
 };
 
 /**
@@ -37,6 +39,15 @@ export default function TaskTimeline({ events }: { events: TaskEventMock[] }) {
               <div className="muted">
                 <Fragment>
                   {t("taskTrailReassign")} <bdi>{name(event.replaces)}</bdi> → <bdi>{name(event.assigned)}</bdi>
+                </Fragment>
+              </div>
+            ) : null}
+            {event.action === "STATUS_CHANGE" ? (
+              <div className="muted">
+                <Fragment>
+                  {t("taskTrailStatusFrom")} <bdi>{event.from_status ? t(taskStatusKey[event.from_status]) : t("taskTrailNone")}</bdi>
+                  {" → "}
+                  <bdi>{event.to_status ? t(taskStatusKey[event.to_status]) : t("taskTrailNone")}</bdi>
                 </Fragment>
               </div>
             ) : null}

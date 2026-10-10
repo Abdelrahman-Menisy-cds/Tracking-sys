@@ -15,9 +15,10 @@ export type TaskPriority = "HIGH" | "MEDIUM" | "LOW";
 /**
  * Trail actions. The trail is append-only: an "ASSIGN" that happens when the
  * task already had an assignee is recorded as "REASSIGN" (carrying `replaces`)
- * instead of overwriting anything.
+ * instead of overwriting anything. STATUS_CHANGE (brief H1) carries from/to
+ * statuses the same way — the from values live on to keep history honest.
  */
-export type TaskEventAction = "CREATE" | "ROUTE_TO_MANAGER" | "ASSIGN" | "REASSIGN";
+export type TaskEventAction = "CREATE" | "ROUTE_TO_MANAGER" | "ASSIGN" | "REASSIGN" | "STATUS_CHANGE";
 
 export interface TaskEventMock {
   id: string;
@@ -30,6 +31,10 @@ export interface TaskEventMock {
   replaces?: string;
   /** The manager a ROUTE_TO_MANAGER event targeted. */
   routed_to?: string;
+  /** The status a STATUS_CHANGE event moved FROM (brief H1). */
+  from_status?: TaskStatus;
+  /** The status a STATUS_CHANGE event moved TO (brief H1). */
+  to_status?: TaskStatus;
   comment: string;
   created_at: string;
 }

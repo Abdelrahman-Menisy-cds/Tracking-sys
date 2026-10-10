@@ -6,6 +6,7 @@ import PageHeader from "../components/layout/PageHeader";
 import type { EmployeeDirectoryEntry } from "../mock/data";
 import { identityEmployeeId } from "../mock/attendance";
 import TaskDetailBody from "../components/tasks/TaskDetailBody";
+import TaskWorkPanel from "../components/tasks/TaskWorkPanel";
 import AssignTaskDialog from "../components/tasks/AssignTaskDialog";
 import type { TaskMock } from "../mock/tasks";
 
@@ -59,6 +60,8 @@ export default function TaskDetailPage() {
       {refused ? <Banner tone="error" role="alert">{refused}</Banner> : null}
       {assignedNote ? <Banner tone="success" role="status">{assignedNote}</Banner> : null}
       <TaskDetailBody task={task} />
+      {/* Brief H1 — status control + work timer, right beside the facts. */}
+      <TaskWorkPanel task={task} />
       <div className="form-actions">
         {task.assignee === null ? (
           <button type="button" className="btn btn-secondary" data-testid="detail-assign-open" onClick={openAssign}>
