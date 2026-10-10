@@ -32,6 +32,23 @@ export const dateIsValid = (value: string): boolean =>
 const timeIsValid = (value: string): boolean => /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 const nonNegativeInt = (value: string): boolean => Number.isInteger(Number(value)) && Number(value) >= 0;
 
+/**
+ * Minutes between the day's start and end, or null when the two do not form a
+ * usable range. Null means "leave the field alone" — the user is probably
+ * mid-edit and validateSchedule already reports the bad range on submit.
+ *
+ * Deliberately not wrapping past midnight: validateSchedule rejects end <=
+ * start, so a night shift never reaches a saved schedule and inventing +24h
+ * here would silently contradict the validator.
+ */
+export const minutesBetween = (start: string, end: string): number | null => {
+  if (!timeIsValid(start) || !timeIsValid(end)) return null;
+  const [startHour, startMinute] = start.split(":").map(Number);
+  const [endHour, endMinute] = end.split(":").map(Number);
+  const span = endHour * 60 + endMinute - (startHour * 60 + startMinute);
+  return span > 0 ? span : null;
+};
+
 export const defaultDraft = (today: string): ScheduleDraft => ({
   working_weekdays: [0, 1, 2, 3, 4],
   expected_start: "09:00",
@@ -116,7 +133,17 @@ export default function ScheduleEditorDialog({
     }));
 
   const setField = (field: keyof ScheduleDraft) => (event: ChangeEvent<HTMLInputElement>) =>
-    setDraft((current) => ({ ...current, [field]: event.target.value }));
+    setDraft((current) => {
+      const next = { ...current, [field]: event.target.value };
+      // Moving either end of the working day recomputes the required minutes from
+      // the new span. The field stays editable: a number typed by hand is left
+      // alone until a time changes again, because only these two keys recompute.
+      if (field === "expected_start" || field === "expected_end") {
+        const span = minutesBetween(next.expected_start, next.expected_end);
+        if (span !== null) next.expected_daily_minutes = String(span);
+      }
+      return next;
+    });
 
   const fieldMeta: Array<{ key: Exclude<keyof ScheduleDraft, "working_weekdays">; labelKey: DictKey; type: string; optional?: boolean }> = [
     { key: "expected_start", labelKey: "attendanceFirstIn", type: "time" },
