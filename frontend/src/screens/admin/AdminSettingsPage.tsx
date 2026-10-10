@@ -566,7 +566,9 @@ function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; local
           {/* §1.4 — the control is real now. It reports what the server actually did. */}
           <button
             type="button"
-            className="btn btn-secondary"
+            className="btn btn-secondary has-tooltip"
+            data-tooltip={t("adminSettingsAiNote")}
+            aria-describedby="settings-holidays-ai-note"
             onClick={runRefresh}
             disabled={ai.kind === "loading"}
             aria-busy={ai.kind === "loading"}
@@ -576,7 +578,11 @@ function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; local
           </button>
         </div>
       </div>
-      <span className="holiday-soon-note">{t("adminSettingsAiNote")}</span>
+      {/* The tooltip above carries these words on wide screens; keeping them in the
+          tree gives the control an aria-describedby target either way. */}
+      <span className="holiday-soon-note" id="settings-holidays-ai-note">
+        {t("adminSettingsAiNote")}
+      </span>
 
       {/* Which register is on screen, stated plainly. */}
       {backing === "demo" && loadFailure ? (

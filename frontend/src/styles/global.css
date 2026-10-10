@@ -341,8 +341,66 @@ button { cursor: pointer; }
 .btn-holiday-soon { gap: var(--sp-2); background: var(--neutral-soft); color: var(--neutral-strong); border-color: var(--neutral-border); cursor: default; }
 .btn.btn-holiday-soon:disabled { cursor: default; opacity: 1; box-shadow: none; }
 .btn.btn-holiday-soon:disabled:hover { background: var(--neutral-soft); color: var(--neutral-strong); }
-.holiday-soon-note { display: none; margin-block: var(--sp-2) var(--sp-4); color: var(--text-muted); font-size: var(--font-size-sm); }
-@media (max-width: 639px) { .holiday-soon-note { display: block; } }
+/* The AI explanation reads as a tooltip on the control it explains wherever there
+   is room for one, so on wide screens this paragraph stays in the tree — the
+   control points at it with aria-describedby — without painting. Previously it was
+   `display: none` above 639px, which hid the explanation from sighted and
+   assistive users alike. */
+.holiday-soon-note {
+  margin-block: var(--sp-2) var(--sp-4);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* On small screens there is no hover, so the same words are shown in full. */
+@media (max-width: 639px) {
+  .holiday-soon-note {
+    position: static;
+    inline-size: auto;
+    block-size: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+}
+
+/* Tooltip. `data-tooltip` carries the text; hover and keyboard focus both reveal
+   it, so it is not a hover-only affordance. Physical left/translate centring on
+   purpose: it centres the same way in RTL and LTR. */
+.has-tooltip { position: relative; }
+.has-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + var(--sp-2));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  inline-size: max-content;
+  max-inline-size: min(30rem, 82vw);
+  padding: var(--sp-2) var(--sp-3);
+  border: var(--timeline-width) solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-overlay);
+  color: var(--text);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  line-height: 1.55;
+  text-align: start;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 120ms ease, visibility 120ms ease;
+  pointer-events: none;
+}
+.has-tooltip:hover::after,
+.has-tooltip:focus-visible::after { opacity: 1; visibility: visible; }
+@media (prefers-reduced-motion: reduce) {
+  .has-tooltip::after { transition: none; }
+}
 /* §1.1 paired time inputs sit in one row inside the form-grid fragment */
 .pair-row { min-width: 0; }
 /* §1.1 the 7-day working-week checkbox group (fieldset.quiet-inset) */
