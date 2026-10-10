@@ -154,6 +154,7 @@ export default function AppShell() {
         { to: "/", label: t("navHome"), end: true, icon: HomeIcon },
         { to: "/requests", label: t("navMyRequests"), icon: DocumentIcon },
         { to: "/timesheets", label: t("navMyTimesheets"), icon: ClockIcon },
+        { to: "/tasks", label: t("taskNav"), icon: ActivityIcon },
       ],
     },
     {

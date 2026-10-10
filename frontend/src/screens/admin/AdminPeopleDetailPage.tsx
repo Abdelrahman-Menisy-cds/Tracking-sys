@@ -442,6 +442,9 @@ export default function AdminPeopleDetailPage() {
         </section>
       </div>
 
+      {/* ── Brief C — the two per-employee task capability flags ── */}
+      <TaskCapabilityCard employeeId={employeeId} />
+
       {feedback ? <Banner tone={feedback.tone} role={feedback.tone === "error" ? "alert" : "status"}>{feedback.text}</Banner> : null}
 
       {/* 6 · Single sticky save bar for the whole draft (§2.2 item 6) */}
@@ -622,5 +625,85 @@ function LeaveAllocation({
         />
       ) : null}
     </>
+  );
+}
+
+/* ==================== Brief C — per-employee task capability flags ==================== */
+
+function TaskCapabilityCard({ employeeId }: { employeeId: string }) {
+  const { t, locale, taskCapabilityFor, setTaskCapabilities } = useApp();
+  const saved = taskCapabilityFor(employeeId);
+  const [draft, setDraft] = useState(saved);
+  const [dirty, setDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [note, setNote] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+
+  // Re-seed the draft when the card is rendered for a different employee.
+  const [trackedId, setTrackedId] = useState(employeeId);
+  if (trackedId !== employeeId) {
+    setTrackedId(employeeId);
+    setDraft(taskCapabilityFor(employeeId));
+    setDirty(false);
+    setNote(null);
+  }
+
+  const save = () => {
+    setSaving(true);
+    window.setTimeout(() => {
+      const result = setTaskCapabilities(employeeId, draft);
+      if (result.ok) {
+        setDirty(false);
+        setNote({ tone: "success", text: t("adminPeopleSaved") });
+      } else {
+        setNote({ tone: "error", text: t("adminMutationDenied") });
+      }
+      setSaving(false);
+    }, 150);
+  };
+
+  return (
+    <section className="work-surface section" aria-labelledby="people-task-caps">
+      <div className="section-heading">
+        <h2 id="people-task-caps">{t("taskCapabilityHeading")}</h2>
+      </div>
+      <p className="page-meta">{t("taskCapabilityHintBody")}</p>
+      <div className="dashboard-grid">
+        {([
+          ["can_create_tasks", t("taskCanCreateTasks")],
+          ["can_assign_tasks", t("taskCanAssignTasks")],
+        ] as const).map(([flag, label]) => (
+          <div className="quiet-inset" key={flag}>
+            <h3>{label}</h3>
+            <div className="role-segmented" role="radiogroup" aria-label={label}>
+              {([true, false] as const).map((value) => (
+                <button
+                  key={String(value)}
+                  type="button"
+                  role="radio"
+                  aria-checked={draft[flag] === value}
+                  className={`role-segmented-option${draft[flag] === value ? " is-selected" : ""}`}
+                  disabled={saving}
+                  onClick={() => {
+                    setDraft((current) => ({ ...current, [flag]: value }));
+                    setDirty(true);
+                  }}
+                >
+                  <span>{locale === "ar" ? (value ? "نعم" : "لا") : value ? "Yes" : "No"}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      {note ? <Banner tone={note.tone} role={note.tone === "error" ? "alert" : "status"}>{note.text}</Banner> : null}
+      <div className="form-actions" style={{ marginBlockStart: "var(--sp-3)" }}>
+        <button type="button" className="btn btn-secondary" onClick={() => { setDraft(saved); setDirty(false); setNote(null); }} disabled={!dirty || saving}>
+          {t("adminPeopleDiscard")}
+        </button>
+        <button type="button" className="btn btn-primary" onClick={save} disabled={!dirty || saving} aria-busy={saving}>
+          {saving ? <><span className="spinner" aria-hidden="true" />{t("saving")}</> : t("adminPeopleSaveEmployment")}
+        </button>
+      </div>
+    </section>
   );
 }

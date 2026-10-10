@@ -18,6 +18,8 @@ import AdminOverviewPage from "./screens/admin/AdminOverviewPage";
 import AdminSettingsPage from "./screens/admin/AdminSettingsPage";
 import AdminPeoplePage, { AdminPeopleDetailPage } from "./screens/admin/AdminPeoplePage";
 import AdminAnnouncementsPage from "./screens/admin/AdminAnnouncementsPage";
+import TasksPage from "./screens/TasksPage";
+import TaskDetailPage from "./screens/TaskDetailPage";
 
 /**
  * The app screens need a session.
@@ -65,6 +67,8 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/admin/people" element={<AdminPeoplePage />} />
             <Route path="/admin/people/:employeeId" element={<AdminPeopleDetailPage />} />
             <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
+            <Route path="/tasks" element={<TasksPage />} />
+            <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
