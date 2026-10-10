@@ -28,7 +28,14 @@ urlpatterns = [
     # decision to get wrong. See config/spa.py.
     # Keep the `assets/` prefix: spa_file resolves the path against dist/ itself.
     re_path(r"^(?P<path>assets/.*)$", spa.spa_file),
+    # public/brand/ is copied verbatim by the build; its files sit one level deep,
+    # so the root-file pattern below would never match them and the logo request
+    # fell through to the shell (an <img> fed index.html renders as broken).
+    re_path(r"^(?P<path>brand/.*)$", spa.spa_file),
     re_path(r"^(?P<path>[^/]+\.(?:ico|svg|txt|webmanifest|png|jpg|webp))$", spa.spa_file),
+    # A subdirectory request that looks like a file is a missing asset, not a
+    # route: 404 it instead of handing back the shell. See spa_asset_404.
+    re_path(r"^.*/[^/]*\.[A-Za-z0-9]{2,5}$", spa.spa_asset_404),
     # No named group on purpose: the shell takes no URL kwargs.
     re_path(r"^(?:.*)$", spa.spa_index),
 ]
