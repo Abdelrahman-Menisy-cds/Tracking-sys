@@ -178,9 +178,20 @@ function ScheduleCard({ today, t, locale, orgSchedules }: { today: string; t: (k
       <div className="section-heading">
         <h2 id="settings-schedule-heading">{t("adminOrgScheduleTitle")}</h2>
         <span className="page-meta">{t("adminCurrentSchedule")}</span>
+        {current ? (
+          <button
+            type="button"
+            className="btn btn-ghost btn-compact icon-only"
+            aria-label={`${t("adminSettingsEditVersion")} — ${current.effective_from}`}
+            onClick={() => openEditor(current)}
+          >
+            <EditIcon />
+          </button>
+        ) : null}
       </div>
 
-      {/* Current schedule summary — read-only, never carries edit affordances */}
+      {/* Current schedule summary. The edit control sits in the heading above so the
+          summary itself stays a read-only read-out of what is actually in force. */}
       <div className="quiet-inset">
         {current ? (
           <dl className="decision-facts">

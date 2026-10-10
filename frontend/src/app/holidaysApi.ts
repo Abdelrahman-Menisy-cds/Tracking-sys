@@ -70,8 +70,9 @@ export async function refreshHolidays(year: number, country = "EG"): Promise<Ref
   const payload = await apiRequest<{ data: RefreshSummary }>("/holidays/refresh", {
     method: "POST",
     body: { year, country },
-    // The refresh calls Nager and then the LLM, so it is legitimately slow.
-    timeoutMs: 90000,
+    // No override: this inherits apiRequest's measured 600s budget. The refresh
+    // drives Nager and two reasoning-LLM calls, and a 90s cap used to abort a
+    // call that was going to succeed and report it as "server unreachable".
   });
   return payload.data;
 }

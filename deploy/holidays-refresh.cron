@@ -1,0 +1,22 @@
+# Nightly public-holidays refresh — crontab entry for the deployment host.
+#
+# Install (as the user that owns the checkout, no root needed):
+#     crontab -l | grep -v refresh_holidays | cat - deploy/holidays-refresh.cron | crontab -
+#
+# What it does: refreshes the public-holidays register from Nager.Date (the
+# authority) with the LLM filling Arabic names and proposing the Islamic holidays
+# Nager does not carry. The service is idempotent, so a night with nothing new
+# writes nothing — the log line will read "no changes".
+#
+# Database: this entry deliberately sets NO database flag. The job must use the
+# same database as the web process, and on a real host that comes from the
+# project's own .env (POSTGRES_*). The local dev machine runs its server with
+# DJANGO_USE_SQLITE=1, so its crontab entry carries that prefix — do not copy
+# that flag to a server.
+#
+# Logs: point the redirect at a path the service user can write. A non-zero exit
+# means Nager was unreachable and nothing was written; a warning line means the
+# LLM was down but the official import still landed.
+
+# m  h  dom mon dow   command
+0    0  *   *   *     cd /srv/tracking_system/backend && .venv/bin/python manage.py refresh_holidays >> /srv/tracking_system/backend/logs/holidays-refresh.log 2>&1
