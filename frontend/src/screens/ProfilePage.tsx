@@ -3,11 +3,26 @@ import { demoUser } from "../mock/data";
 import PageHeader from "../components/layout/PageHeader";
 import { Banner } from "../components/ui";
 import { UserIcon } from "../components/icons";
+import PrayerDhikrSettings from "../features/prayer/PrayerDhikrSettings";
+import { identityEmployeeId } from "../mock/attendance";
 
+/**
+ * The employee's own profile page. The prayer/dhikr settings block renders
+ * only when THIS employee's directory religion is MUSLIM — the block reads
+ * the religion from the signed-in identity's own directory file (e1/m1/hr1
+ * the demo identities), which HR edits on the admin People file (the same
+ * overlay the context merges). Christian and OTHER employees get nothing:
+ * the block is not merely hidden, it never mounts.
+ */
 export default function ProfilePage() {
-  const { t, locale, role } = useApp();
+  const { t, locale, role, employeeDirectory } = useApp();
   const profile = demoUser[role];
   usePageTitle(t("profileTitle"));
+
+  /** The signed-in identity's own directory entry (contains hr_file.religion). */
+  const ownEntry = employeeDirectory.find((entry) => entry.id === identityEmployeeId(role));
+  const ownReligion = ownEntry?.hr_file?.religion ?? null;
+  const isMuslim = ownReligion === "MUSLIM";
 
   const fields = [
     [t("profileJobTitle"), profile.jobTitle[locale]],
@@ -41,6 +56,7 @@ export default function ProfilePage() {
           ))}
         </dl>
       </section>
+      {isMuslim ? <PrayerDhikrSettings employeeId={identityEmployeeId(role)} isMuslim={isMuslim} /> : null}
     </div>
   );
 }

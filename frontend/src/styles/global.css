@@ -664,3 +664,74 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
   .form-actions, .form-actions .btn { width: 100%; }
 }
 @media (min-width: 640px) and (max-width: 1023px) { .app-main { padding-block: var(--sp-6); } }
+
+/* ===== Floating notice stack + prayer/dhikr settings (brief piece 3) ===== */
+.notice-stack {
+  position: fixed;
+  inset-block-start: calc(var(--sp-8) + 40px);
+  inset-inline-start: var(--sp-4);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-inline-size: min(320px, calc(100vw - var(--sp-8)));
+  pointer-events: none;
+}
+.notice-card {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.18);
+  animation: notice-in 220ms ease-out;
+}
+.notice-card-title { display: block; font-size: var(--font-size-sm); margin-block-end: var(--sp-1); }
+.notice-card-body { font-size: var(--font-size-sm); line-height: 1.6; }
+.notice-card-dhikr .notice-card-body { font-size: var(--font-size-md); }
+.notice-card-dismiss { flex: none; padding: var(--sp-1) var(--sp-2); min-inline-size: 28px; }
+@keyframes notice-in {
+  from { opacity: 0; translate: 0 -6px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .notice-card { animation: none; }
+}
+.prayer-scope-line { font-size: var(--font-size-sm); }
+.prayer-switches { display: grid; gap: var(--sp-3); margin-block: var(--sp-3); }
+.prayer-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+  cursor: pointer;
+}
+.prayer-switch input[type="checkbox"] {
+  inline-size: 18px;
+  block-size: 18px;
+  accent-color: var(--focus-ring);
+  cursor: pointer;
+}
+.prayer-switch.is-disabled { opacity: 0.55; cursor: not-allowed; }
+.prayer-switch.is-disabled input[type="checkbox"] { cursor: not-allowed; }
+.prayer-switch-label { font-weight: 600; font-size: var(--font-size-md); }
+.prayer-switch-hint { font-size: var(--font-size-sm); width: 100%; }
+.prayer-times-list { display: grid; gap: var(--sp-1); margin: var(--sp-2) 0; }
+.prayer-times-row {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--font-size-md);
+}
+.prayer-zone-note { font-size: var(--font-size-xs); margin-block-start: var(--sp-3); }
+@media (max-width: 639px) {
+  .notice-stack { inset-inline: var(--sp-3); max-inline-size: none; }
+}
