@@ -88,11 +88,25 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
   const location = useMemo(() => locationForTimeZone(), []);
   const loopRef = useRef<TriggerLoopHandle | null>(null);
   // Refs mirror the latest prefs/locale for the trigger callback without
-  // re-arming the loop on every re-render; they are written in an effect,
-  // never read during render.
+  // re-arming the loop on every re-render; both are written ONLY in the sync
+  // effect below and read ONLY inside callbacks (onTrigger, the loop's
+  // provider) — never during render, so the pure-render rule holds.
   const prefsRef = useRef(prefs);
   const localeRef = useRef(locale);
   const nextIdRef = useRef(0);
+  /**
+   * Keeps prefsRef/localeRef pointing at the latest props on every change.
+   * Without this effect both refs keep their MOUNT-time values for the whole
+   * component lifetime: the loop's provider (line ~169) then sees
+   * hourlyDhikr: false forever and returns null for every poll — which is
+   * exactly the defect that made the whole notification system dead — and
+   * even a candidate reaching onTrigger would be rejected by the guards at
+   * line ~123 reading the same frozen value. [BRIEF-D fix]
+   */
+  useEffect(() => {
+    prefsRef.current = prefs;
+    localeRef.current = locale;
+  }, [prefs, locale]);
   /**
    * Previous value of prefs.hourlyDhikr as seen by the arming effect. Seeded
    * with the MOUNT-time value (what was stored), so a reload with the
@@ -178,7 +192,7 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
             isha: times.times.isha,
           };
           const p = nextPrayerTrigger(prayerMinutes, now, -new Date().getTimezoneOffset() / 60, undefined, {
-            preReminder: currentPrefs.preReminder,
+            preReminder: currentPrefs.preReminder && currentPrefs.prayerTimes,
           });
           if (p) candidates.push(p);
           // After today's last prayer, the next REAL event is tomorrow's

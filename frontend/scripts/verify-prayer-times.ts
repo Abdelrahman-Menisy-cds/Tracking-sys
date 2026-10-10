@@ -12,7 +12,7 @@ import {
   julianDay,
   CAIRO,
   LOCAL_UTC_OFFSET,
-} from "../src/features/prayer/prayerTimes";
+} from "../src/features/prayer/prayerTimes.ts";
 
 const DATE = { year: 2026, month: 10, day: 10 };
 

@@ -54,21 +54,40 @@ export function nextPrayerTrigger(
   const eventEpochMs = (minutes: number) => localMidnightMs + minutes * 60_000;
 
   const pre = options?.preReminder ?? false;
-  for (const [prayer, minutes] of entries) {
+  // Fire-window semantics. A trigger must still be offered briefly AFTER its
+  // boundary crosses — otherwise the two conditions (provider offers while
+  // azan >= now, loop fires while azan <= now) share a single instant and
+  // any poll gap straddling the boundary swallows the notice for the whole
+  // day (this exact defect shipped once and made the stack stone-silent).
+  // But the catch-up window must be SHORT — poll-gap scale, not "until the
+  // next prayer" — or a page loaded hours later would flash a stale azan.
+  // GRACE_MS also bounds the reminder line's catch-up.
+  const GRACE_MS = 90_000;
+  for (let i = 0; i < entries.length; i++) {
+    const [prayer, minutes] = entries[i];
     const azan = eventEpochMs(minutes);
     if (azan >= nowMs) {
+      // Still in the future: offer the reminder line first when enabled.
       if (pre) {
         const remind = azan - PRE_REMINDER_LEAD_MINUTES * 60_000;
         if (remind >= nowMs) return { atMs: remind, kind: "prayer-remind", prayer };
       }
       return { atMs: azan, kind: "prayer", prayer };
     }
+    // Azan already passed: keep offering it past-due for GRACE_MS so the
+    // loop's next tick still fires it. The loop suppresses duplicates by
+    // recording atMs only on real fires, so a later tick re-sees the same
+    // trigger and drops it once fired.
+    if (azan >= nowMs - GRACE_MS) {
+      return { atMs: azan, kind: "prayer", prayer };
+    }
   }
-  // All of today's prayers are past. Roll to TOMORROW's Fajr rather than
-  // returning null: a notice for a real computed time is more useful than
-  // silence, and the trigger loop re-asks every poll anyway. The caller must
-  // supply tomorrow's times through `tomorrowFirstPrayer` when it has them;
-  // without them we return null (never invent a time).
+  // All of today's prayers are past (beyond the catch-up grace). Roll to
+  // TOMORROW's Fajr rather than returning null: a notice for a real computed
+  // time is more useful than silence, and the trigger loop re-asks every
+  // poll anyway. The caller must supply tomorrow's times through
+  // `tomorrowFirstPrayer` when it has them; without them we return null
+  // (never invent a time).
   return null;
 }
 
@@ -133,11 +152,14 @@ export function startTriggerLoop(
   const tick = () => {
     if (stopped) return;
     const trigger = provider();
-    if (trigger && trigger.atMs !== lastFiredAt) {
+    // Fire the trigger when its boundary has been crossed. `lastFiredAt` is
+    // recorded ONLY on an actual fire — a first tick that sees a FUTURE
+    // trigger must not record it, or that same trigger would be suppressed
+    // forever once time actually crosses its boundary (the notice then
+    // never fires for the whole day; this exact bug shipped once).
+    if (trigger && trigger.atMs <= Date.now() && trigger.atMs !== lastFiredAt) {
       lastFiredAt = trigger.atMs;
-      if (trigger.atMs <= Date.now()) {
-        options.onTrigger(trigger);
-      }
+      options.onTrigger(trigger);
     }
     handle = setTimeoutFn(tick, pollMs);
   };
