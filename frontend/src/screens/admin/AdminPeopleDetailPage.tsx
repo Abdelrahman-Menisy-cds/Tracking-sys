@@ -9,7 +9,6 @@ import ScheduleEditorDialog from "./ScheduleEditorDialog";
 import AdminNav from "./AdminNav";
 import type { LeaveBalance, WorkSchedule } from "../../mock/attendance";
 import {
-  employeeDirectory,
   type EmployeeDirectoryEntry,
   type EmployeeHrOnlyFile,
   type EmployeeFilePatch,
@@ -202,9 +201,14 @@ const filePatchFromDraft = (draft: FileDraft): EmployeeFilePatch => ({
 
 export default function AdminPeopleDetailPage() {
   const { employeeId } = useParams<{ employeeId: string }>();
-  const { t, locale, role, capabilities, schedules, resolveScheduleFor, setWorkSchedule, removeWorkSchedule, visibleEmployeeFile, leaveBalances, directoryLeaveBalances, leaveBalanceSummary, saveEmployeeFile } = useApp();
+  const { t, locale, role, capabilities, schedules, resolveScheduleFor, setWorkSchedule, removeWorkSchedule, visibleEmployeeFile, leaveBalances, directoryLeaveBalances, leaveBalanceSummary, saveEmployeeFile, employeeDirectory } = useApp();
   usePageTitle(t("adminPeopleTitle"));
 
+  // The directory read MUST be the context's: the context value is
+  // employeeDirectoryWithOverrides (AppContext.tsx), so a fresh page load
+  // re-applies the sessionStorage overlay. The raw fixture import this page
+  // used to read is a module constant — it never carried the overlay, which
+  // is why saved edits reverted to fixture values after every hard reload.
   const base = employeeId ? employeeDirectory.find((candidate) => candidate.id === employeeId) : undefined;
   const entry = useMemo(
     () => (base ? visibleEmployeeFile(base, { id: "hr1", role }) : null),
