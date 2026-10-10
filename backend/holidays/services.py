@@ -162,7 +162,13 @@ def _upsert_official(rows, country_code):
                 )
                 added += 1
                 continue
-            if has_arabic_script(current.name_local) and not has_arabic_script(new_local):
+            # An Arabic name already on the row is never replaced. The LLM's
+            # phrasing varies between runs, so allowing a fresh Arabic translation
+            # to win would rewrite a handful of names every single night — churn
+            # that reads as activity in the log while nothing actually changed.
+            # The LLM fills gaps; a human corrects a bad name through the UI, and
+            # that edit is a manual override this loop already skips.
+            if has_arabic_script(current.name_local):
                 new_local = current.name_local
             if current.name_local == new_local:
                 unchanged += 1
