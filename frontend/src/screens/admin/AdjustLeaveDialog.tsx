@@ -26,6 +26,7 @@ export type AdjustLeaveOutcome =
  */
 export default function AdjustLeaveDialog({
   employeeId,
+  employeeName,
   initialLeaveType,
   availableTypes,
   onClose,
@@ -108,7 +109,10 @@ export default function AdjustLeaveDialog({
         ) : null}
         <label className="field">
           <span className="field-label">{t("employee")}</span>
-          <input className="input" value={employeeId} readOnly dir="ltr" />
+          {/* A person, not a database key. Callers that know the directory pass the
+              name; the id stays as the fallback so the field is never blank, and
+              dir="auto" lets an Arabic name lay out right-to-left on its own. */}
+          <input className="input" value={employeeName ?? employeeId} readOnly dir="auto" />
         </label>
         <label className="field">
           <span className="field-label">{t("adminLeaveType")}</span>

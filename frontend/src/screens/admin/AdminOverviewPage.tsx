@@ -160,6 +160,7 @@ export default function AdminOverviewPage() {
       adjustTarget ? (
         <AdjustLeaveDialog
           employeeId={adjustTarget.employeeId}
+          employeeName={findDirectoryEntry(adjustTarget.employeeId)?.name[locale]}
           initialLeaveType={adjustTarget.type}
           availableTypes={Object.keys(leaveTypeKeys) as LeaveBalance["leave_type"][]}
           onClose={() => setAdjustTarget(null)}
