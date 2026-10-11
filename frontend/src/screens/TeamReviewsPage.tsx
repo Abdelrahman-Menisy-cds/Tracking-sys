@@ -10,11 +10,14 @@ import { formatDate, formatDateTime, formatMinutes, useMockList, weekInterval } 
 import {
   mockFetch,
   pickName,
+  teamRequests,
   type RequestMock,
   type RequestStatus,
   type TimesheetMock,
   type TimesheetStatus,
 } from "../mock/data";
+import { attendanceSchedules, directoryLeaveBalances, reviewedTeamDaysFor } from "../mock/attendance";
+import { suggestReviewDecision, type DecisionSuggestion } from "../app/reviewSuggestion";
 import {
   Banner,
   Dialog,
@@ -27,6 +30,79 @@ import {
 import OperationalTable, { type OperationalColumn } from "../components/data/OperationalTable";
 import PageHeader from "../components/layout/PageHeader";
 import Timeline from "../components/record/Timeline";
+
+/**
+ * The queue answers "should this be approved?", so a suggestion needs a real attendance
+ * window — the schedules, the requester's actual workload, and how the rest of the team
+ * turned up. The queued requesters are not demo identities and own no seeded history, so
+ * the mock seeds it for exactly them with the same generator /attendance uses (see
+ * reviewedTeamEventsFor). Derived once: the fixtures are static for the session.
+ */
+const REVIEWED_REQUESTERS = [...new Set(teamRequests.map((request) => request.requester_id))];
+const REVIEWED_TEAM_DAYS = reviewedTeamDaysFor(REVIEWED_REQUESTERS);
+
+function suggestionFor(request: RequestMock): DecisionSuggestion {
+  const anchor = (request.submitted_at ?? request.created_at).slice(0, 10);
+  return suggestReviewDecision({
+    request,
+    schedules: attendanceSchedules,
+    // Workload is the requester's own days; coverage is the whole reviewed team.
+    requesterDays: reviewedTeamDaysFor([request.requester_id]),
+    teamDays: REVIEWED_TEAM_DAYS,
+    leaveBalances: directoryLeaveBalances(anchor.slice(0, 4)),
+  });
+}
+
+const VERDICT_KEY = {
+  APPROVE: "reviewSuggestionApprove",
+  REJECT: "reviewSuggestionReject",
+  REVIEW: "reviewSuggestionReview",
+} as const;
+const VERDICT_TONE = { APPROVE: "success", REJECT: "danger", REVIEW: "warning" } as const;
+const CONFIDENCE_KEY = {
+  HIGH: "reviewSuggestionConfidenceHigh",
+  MEDIUM: "reviewSuggestionConfidenceMedium",
+  LOW: "reviewSuggestionConfidenceLow",
+} as const;
+
+/**
+ * A compact verdict for the queue row: enough to scan the queue with, nothing more —
+ * the reasoning lives in the dialog where the decision is actually taken.
+ */
+function SuggestionPill({ request }: { request: RequestMock }) {
+  const { t } = useApp();
+  const suggestion = suggestionFor(request);
+  return (
+    <span className={`pill pill-${VERDICT_TONE[suggestion.verdict]}`} title={t(CONFIDENCE_KEY[suggestion.confidence])}>
+      {t(VERDICT_KEY[suggestion.verdict])}
+    </span>
+  );
+}
+
+/**
+ * The advisor block inside the decision dialog: the recommendation, its confidence, and
+ * the numbers it was derived from. Deliberately an inset, not a verdict banner, and it
+ * never pre-selects a decision — the manager still chooses all three options freely.
+ */
+function SuggestionBlock({ request }: { request: RequestMock }) {
+  const { t, locale } = useApp();
+  const suggestion = suggestionFor(request);
+  return (
+    <section className="quiet-inset suggestion" aria-labelledby="review-suggestion-heading" data-testid="review-suggestion">
+      <h3 id="review-suggestion-heading" className="suggestion-heading">{t("reviewSuggestionHeading")}</h3>
+      <p className="suggestion-verdict">
+        <span className={`pill pill-${VERDICT_TONE[suggestion.verdict]}`}>{t(VERDICT_KEY[suggestion.verdict])}</span>
+        <span className="muted">{t(CONFIDENCE_KEY[suggestion.confidence])}</span>
+      </p>
+      <ul className="suggestion-reasons">
+        {suggestion.reasons.map((reason, index) => (
+          <li key={`${reason.kind}-${index}`}><bdi>{locale === "ar" ? reason.textAr : reason.textEn}</bdi></li>
+        ))}
+      </ul>
+      <p className="suggestion-disclosure muted">{t("reviewSuggestionDisclosure")}</p>
+    </section>
+  );
+}
 
 function isRequest(record: RequestMock | TimesheetMock): record is RequestMock {
   return "request_type" in record;
@@ -108,6 +184,7 @@ export default function TeamReviewsPage() {
     { key: "status", label: t("status"), render: (request) => <RequestStatusPill status={request.status} /> },
     { key: "submitted", label: t("submittedAt"), render: (request) => formatDateTime(request.submitted_at ?? request.created_at, locale) },
     { key: "next", label: locale === "ar" ? "المرحلة التالية" : "Next stage", render: (request) => requestNextStage(request, locale) },
+    { key: "suggestion", label: t("reviewSuggestionColumn"), render: (request) => <SuggestionPill request={request} /> },
     {
       key: "action",
       label: t("decision"),
@@ -341,6 +418,7 @@ function DecisionDialog({
               </>
             ) : null}
           </dl>
+          {isRequest(record) ? <SuggestionBlock request={record} /> : null}
           {!kind ? (
             <div className="decision-choices">
               <button className="btn btn-primary" onClick={() => setKind("APPROVE")}>{t("approve")}</button>

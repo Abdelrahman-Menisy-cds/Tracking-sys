@@ -512,6 +512,13 @@ html[dir="rtl"] .profile-menu-item { justify-content: flex-start; }
 .pill-danger { color: var(--danger-strong); background: var(--danger-soft); border-color: var(--danger-border); }
 .pill-error { color: var(--danger-strong); background: var(--danger-soft); border-color: var(--danger-border); }
 .pill-unread { color: var(--unread-strong); background: var(--unread-soft); border-color: var(--unread-border); }
+
+/* Manager-review suggestion: an advisor inset, deliberately not a verdict banner. */
+.suggestion { display: flex; flex-direction: column; gap: var(--sp-2); }
+.suggestion-heading { margin: 0; font-size: var(--font-size-sm); }
+.suggestion-verdict { display: flex; align-items: center; gap: var(--sp-2); margin: 0; }
+.suggestion-reasons { display: flex; flex-direction: column; gap: var(--sp-1); margin: 0; padding-inline-start: var(--space-5); }
+.suggestion-disclosure { margin: 0; font-size: var(--font-size-xs); }
 .status-action-block { display: grid; gap: var(--sp-3); padding: var(--sp-4); border-inline-start: var(--space-1) solid var(--warning); background: var(--warning-soft); }
 .status-action-block.approved { border-color: var(--success); background: var(--success-soft); }
 .status-action-block.rejected { border-color: var(--danger); background: var(--danger-soft); }

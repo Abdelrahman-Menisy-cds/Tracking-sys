@@ -180,7 +180,24 @@ export const employeeScheduleOverride: WorkSchedule = {
   effective_from: "2025-01-01",
 };
 
-export const attendanceSchedules: WorkSchedule[] = [organizationSchedule, employeeScheduleOverride];
+/**
+ * A second employee-scoped schedule, so the manager-review suggestion has a real
+ * employee-versus-organisation difference to report: e2 works a shorter contractual day
+ * (09:00–16:00, 360 minutes) than the organisation's 09:00–17:00 / 480.
+ */
+export const reviewedEmployeeScheduleOverride: WorkSchedule = {
+  id: "schedule-e2-operations",
+  scope: "EMPLOYEE",
+  target: "e2",
+  working_weekdays: [0, 1, 2, 3, 4],
+  expected_start: "09:00",
+  expected_end: "16:00",
+  expected_daily_minutes: 360,
+  grace_minutes: 15,
+  effective_from: "2025-01-01",
+};
+
+export const attendanceSchedules: WorkSchedule[] = [organizationSchedule, employeeScheduleOverride, reviewedEmployeeScheduleOverride];
 
 export const leaveTypes: LeaveType[] = [
   { code: "ANNUAL", is_paid: true, requires_attachment: false, counts_against_balance: true, allow_negative: false },
@@ -500,3 +517,23 @@ export const directoryEventsByIdentity: Record<DemoIdentity, AttendanceEvent[]> 
   manager: [],
   hr: directoryTodayEvents(),
 };
+
+/**
+ * Attendance history for the employees in the manager's review queue.
+ *
+ * The queued requesters (e2/e3/e4) are not demo identities, so nothing seeds them — the
+ * manager-review suggestion would otherwise have no window to reason about and could not
+ * report a workload at all. This runs the same generator the demo identities use, so the
+ * patterns (late arrival, early leave, incomplete day, no-show) match what /attendance
+ * shows. Days with no events and no closed scheduled day are never emitted as absences:
+ * the derivation stays the single source of truth, and this adds events only.
+ */
+export function reviewedTeamEventsFor(employees: string[]): AttendanceEvent[] {
+  return [...new Set(employees)].flatMap((employee) => eventsForEmployee(employee, `att-${employee}`));
+}
+
+/** The derived days behind `reviewedTeamEventsFor`, ready to feed the review suggestion. */
+export function reviewedTeamDaysFor(employees: string[]): AttendanceDay[] {
+  const events = reviewedTeamEventsFor(employees);
+  return [...new Set(employees)].flatMap((employee) => deriveAttendanceDays(events, employee));
+}
