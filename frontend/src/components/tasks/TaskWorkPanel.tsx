@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../../app/AppContext";
+import { formatDateTime } from "../../app/useMockList";
 import { Banner } from "../ui";
 import { taskStatusKey } from "./TaskPills";
 import type { TaskMock, TaskStatus } from "../../mock/tasks";
@@ -158,10 +159,10 @@ export default function TaskWorkPanel({ task }: { task: TaskMock }) {
               <span className="timeline-marker" aria-hidden="true" />
               <div>
                 <strong><bdi dir="ltr">{taskTimeFormatElapsed(entry.seconds)}</bdi></strong>
-                <div className="muted" dir="ltr">
-                  {new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.started_at))}
+                <div className="muted" dir="ltr" translate="no">
+                  {formatDateTime(entry.started_at, locale)}
                   {" → "}
-                  {new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" }).format(new Date(entry.ended_at))}
+                  {formatDateTime(entry.ended_at, locale)}
                 </div>
               </div>
             </li>

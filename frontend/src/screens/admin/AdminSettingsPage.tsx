@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { useApp, usePageTitle } from "../../app/AppContext";
+import { formatWeekdayIndex, formatWeekdayOf, formatDateLong, cairoDayIso } from "../../app/useMockList";
 import { ApiError, type ApiFailureKind } from "../../app/api";
 import { fetchHolidays, isPartial, refreshHolidays, type RefreshSummary } from "../../app/holidaysApi";
 import { Banner, Dialog, EmptyState, ErrorState, SkeletonRows, StatusPill, type StatusTone } from "../../components/ui";
@@ -29,22 +30,18 @@ type DictKey = keyof Dict;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const dateIsValid = (value: string): boolean => ISO_DATE.test(value) && Number.isFinite(new Date(`${value}T12:00:00Z`).getTime());
 
-const weekdayLabel = (weekday: number, locale: Locale): string =>
-  new Intl.DateTimeFormat(locale, { weekday: "long" }).format(new Date(Date.UTC(2023, 0, 1 + weekday)));
+const weekdayLabel = (weekday: number, locale: Locale): string => formatWeekdayIndex(weekday, locale);
 
 const numText = (value: number, locale: Locale): string => new Intl.NumberFormat(locale).format(value);
 
+// Brief H3 — the ONE shared formatting path; no screen-local Intl date formatters.
 const fullDate = (value: string, locale: Locale): string =>
-  dateIsValid(value) ? new Intl.DateTimeFormat(locale, { dateStyle: "full" }).format(new Date(`${value}T12:00:00Z`)) : value;
+  dateIsValid(value) ? formatDateLong(`${value}T12:00:00Z`, locale) : value;
 
 const weekDayOf = (value: string, locale: Locale): string =>
-  dateIsValid(value) ? new Intl.DateTimeFormat(locale, { weekday: "long" }).format(new Date(`${value}T12:00:00Z`)) : "";
+  dateIsValid(value) ? formatWeekdayOf(`${value}T12:00:00Z`, locale) : "";
 
-const cairoDateLocal = (date: Date) => {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" })
-    .formatToParts(date).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
-  return `${parts.year}-${parts.month}-${parts.day}`;
-};
+const cairoDateLocal = (date: Date) => cairoDayIso(date);
 
 type VersionState = "IN_FORCE" | "UPCOMING" | "SUPERSEDED";
 const versionState = (schedule: WorkSchedule, today: string): VersionState => {

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useApp, usePageTitle } from "../../app/AppContext";
+import { formatTime as formatTimeShared } from "../../app/useMockList";
 import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../../components/ui";
 import OperationalTable, { type OperationalColumn } from "../../components/data/OperationalTable";
 import PageHeader from "../../components/layout/PageHeader";
@@ -317,8 +318,9 @@ function OverviewBody({
   );
 }
 
+// Brief H3 — the ONE shared formatting path; no screen-local Intl formatters.
 const formatTime = (value: string | null, locale: "ar" | "en"): string =>
-  value ? new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(new Date(value)) : "—";
+  value ? formatTimeShared(value, locale) : "—";
 
 const duration = (minutes: number, locale: "ar" | "en"): string => {
   const h = Math.floor(minutes / 60);

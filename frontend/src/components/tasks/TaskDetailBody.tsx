@@ -1,14 +1,13 @@
 import { useApp } from "../../app/AppContext";
 import { findDirectoryEntry } from "../../mock/data";
-import { formatDateTime } from "../../app/useMockList";
+import { formatDateTime, formatDate } from "../../app/useMockList";
 import { TaskPriorityPill, TaskStatusPill } from "./TaskPills";
-import TaskTimeline from "./TaskTimeline";
 import type { TaskMock } from "../../mock/tasks";
 
 /**
- * The task detail — the trail, the current assignee, the status. Shared body
- * rendered by the detail page and the needs-assignment queue card; the trail
- * uses the same Timeline visual as the requests and timesheets.
+ * The task detail — facts, status, assignee, due date. Brief H3 defect 2:
+ * the trail («سجل المهمة») moved BELOW the work-time panel («وخلي سجل
+ * المهمه اخر حاجه في الصفحه»), so the page renders it as the final section.
  */
 export default function TaskDetailBody({ task }: { task: TaskMock }) {
   const { t, locale } = useApp();
@@ -47,7 +46,7 @@ export default function TaskDetailBody({ task }: { task: TaskMock }) {
           {task.due_date ? (
             <div>
               <dt>{t("taskDueDateLabel")}</dt>
-              <dd><bdi dir="ltr">{new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(`${task.due_date}T12:00:00Z`))}</bdi></dd>
+              <dd><bdi dir="ltr">{formatDate(`${task.due_date}T12:00:00Z`, locale)}</bdi></dd>
             </div>
           ) : null}
           <div>
@@ -55,12 +54,6 @@ export default function TaskDetailBody({ task }: { task: TaskMock }) {
             <dd><bdi dir="ltr">{formatDateTime(task.created_at, locale)}</bdi></dd>
           </div>
         </dl>
-      </section>
-      <section className="section" aria-labelledby="task-trail">
-        <h2 id="task-trail">{t("taskTrailHeading")}</h2>
-        {/* The trail is append-only — a REASSIGN keeps the previous ASSIGN;
-            nothing is overwritten, which is exactly what history demands. */}
-        <TaskTimeline events={task.events} />
       </section>
     </div>
   );

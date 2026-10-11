@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useApp, usePageTitle } from "../../app/AppContext";
+import { cairoDayIso } from "../../app/useMockList";
 import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../../components/ui";
 import OperationalTable, { type OperationalColumn } from "../../components/data/OperationalTable";
 import PageHeader from "../../components/layout/PageHeader";
@@ -27,11 +28,7 @@ type DictKey = keyof Dict;
  * org default — never from a stored flag column (§2.1).
  */
 
-const cairoDateLocal = (date: Date) => {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" })
-    .formatToParts(date).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
-  return `${parts.year}-${parts.month}-${parts.day}`;
-};
+const cairoDateLocal = (date: Date) => cairoDayIso(date);
 
 type RowRecord = EmployeeDirectoryEntry & { exception: boolean; balances: LeaveBalance[] };
 

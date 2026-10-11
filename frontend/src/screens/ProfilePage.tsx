@@ -1,4 +1,5 @@
 import { useApp, usePageTitle } from "../app/AppContext";
+import { formatDateLong } from "../app/useMockList";
 import { demoUser } from "../mock/data";
 import PageHeader from "../components/layout/PageHeader";
 import { Banner } from "../components/ui";
@@ -32,7 +33,7 @@ export default function ProfilePage() {
     [t("profilePhone"), profile.phone],
     [t("profileAddress"), profile.address[locale]],
     [t("profileDirectManager"), profile.directManager[locale]],
-    [t("profileJoinDate"), new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(new Date(`${profile.joinDate}T00:00:00`))],
+    [t("profileJoinDate"), formatDateLong(`${profile.joinDate}T00:00:00Z`, locale)],
   ];
 
   return (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { useApp, usePageTitle } from "../../app/AppContext";
+import { formatDateTime } from "../../app/useMockList";
 import { Banner, Dialog, EmptyState, ErrorState, SkeletonRows, StatusPill, type StatusTone } from "../../components/ui";
 import OperationalTable, { type OperationalColumn } from "../../components/data/OperationalTable";
 import PageHeader from "../../components/layout/PageHeader";
@@ -38,8 +39,8 @@ const bytesText = (bytes: number, locale: "ar" | "en"): string => {
   return `${numText(roundedMb, locale)} ${locale === "ar" ? "م.ب" : "MB"}`;
 };
 
-const fmtDateTime = (value: string, locale: string): string =>
-  new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+// Brief H3 — the ONE shared formatting path; no screen-local Intl formatters.
+const fmtDateTime = (value: string, locale: string): string => formatDateTime(value, locale === "ar" ? "ar" : "en");
 
 type Resolution =
   | { kind: "idle" }

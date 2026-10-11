@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { useApp, usePageTitle } from "../../app/AppContext";
+import { formatWeekdayIndex, formatDateTime, cairoDayIso } from "../../app/useMockList";
 import { Banner, StatusPill } from "../../components/ui";
 import PageHeader from "../../components/layout/PageHeader";
 import AttentionStrip from "../../components/state/AttentionStrip";
@@ -26,18 +27,13 @@ type DictKey = keyof Dict;
  * visibleEmployeeFile, never re-implemented here (§2.3).
  */
 
-const cairoDateLocal = (date: Date) => {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Cairo", year: "numeric", month: "2-digit", day: "2-digit" })
-    .formatToParts(date).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
-  return `${parts.year}-${parts.month}-${parts.day}`;
-};
+const cairoDateLocal = (date: Date) => cairoDayIso(date);
 
-const weekdayLabel = (weekday: number, locale: Locale): string =>
-  new Intl.DateTimeFormat(locale, { weekday: "long" }).format(new Date(Date.UTC(2023, 0, 1 + weekday)));
+const weekdayLabel = (weekday: number, locale: Locale): string => formatWeekdayIndex(weekday, locale);
 
 const fmt = (value: number, locale: Locale): string => new Intl.NumberFormat(locale).format(value);
-const fmtDateTime = (value: string, locale: Locale): string =>
-  new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+// Brief H3 — the ONE shared formatting path; no screen-local Intl date formatters.
+const fmtDateTime = (value: string, locale: Locale): string => formatDateTime(value, locale);
 
 const employmentTypeKeys = {
   FULL: "hrEmploymentTypeFull",

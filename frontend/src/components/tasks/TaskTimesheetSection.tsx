@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
+import { formatDate } from "../../app/useMockList";
 import { EmptyState } from "../ui";
 import OperationalTable, { type OperationalColumn } from "../data/OperationalTable";
 import { formatElapsed } from "../../mock/taskTime";
@@ -107,9 +108,9 @@ export default function TaskTimesheetSection({ entries }: { entries: TaskTimeEnt
       render: (row) => (
         <span className="days-list">
           {row.days.map((day) => {
-            // Days coming from entry.started_at; format them as local dates.
-            const [y, m, d] = day.split("-").map(Number);
-            const shown = new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(y, m - 1, d));
+            // Days coming from entry.started_at; format them as local dates
+            // through the ONE shared path (brief H3).
+            const shown = formatDate(`${day}T12:00:00Z`, locale);
             return <bdi key={day} dir={locale === "ar" ? "rtl" : "ltr"}>{shown}</bdi>;
           })}
         </span>

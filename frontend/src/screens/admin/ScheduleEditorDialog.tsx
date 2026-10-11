@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type FormEvent, type ChangeEvent } from "react";
 import { Banner, Dialog } from "../../components/ui";
+import { formatWeekdayIndex, formatDate as formatDateShared } from "../../app/useMockList";
 import type { Dict, Locale } from "../../i18n/dict";
 import type { WorkSchedule } from "../../mock/attendance";
 
@@ -306,8 +307,8 @@ export default function ScheduleEditorDialog({
   );
 }
 
-const weekdayLabel = (weekday: number, locale: Locale): string =>
-  new Intl.DateTimeFormat(locale, { weekday: "long" }).format(new Date(Date.UTC(2023, 0, 1 + weekday)));
+// Brief H3 — the ONE shared formatting path; no screen-local Intl formatters.
+const weekdayLabel = (weekday: number, locale: Locale): string => formatWeekdayIndex(weekday, locale);
 
 const mediumDate = (value: string, locale: Locale): string =>
-  dateIsValid(value) ? new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(`${value}T12:00:00Z`)) : value;
+  dateIsValid(value) ? formatDateShared(`${value}T12:00:00Z`, locale) : value;

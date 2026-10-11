@@ -1,5 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useApp } from "../../app/AppContext";
+import { formatDateTime } from "../../app/useMockList";
 import { Banner, Dialog, StatusPill } from "../ui";
 import { findDirectoryEntry } from "../../mock/data";
 import type { TaskCapability, TaskMock, TaskMutationResult, TaskPriority } from "../../mock/tasks";
@@ -96,7 +97,8 @@ export default function CreateTaskDialog({
     return target?.name[locale] ?? null;
   }, [assignee, routeTo, canAssign, locale]);
 
-  const fmtStamp = (value: string): string => new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  // Brief H3 — the ONE shared formatting path; no component-local Intl formatters.
+  const fmtStamp = (value: string): string => formatDateTime(value, locale);
 
   return (
     <Dialog

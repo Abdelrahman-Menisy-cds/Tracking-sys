@@ -7,6 +7,7 @@ import type { EmployeeDirectoryEntry } from "../mock/data";
 import { identityEmployeeId } from "../mock/attendance";
 import TaskDetailBody from "../components/tasks/TaskDetailBody";
 import TaskWorkPanel from "../components/tasks/TaskWorkPanel";
+import TaskTimeline from "../components/tasks/TaskTimeline";
 import AssignTaskDialog from "../components/tasks/AssignTaskDialog";
 import type { TaskMock } from "../mock/tasks";
 
@@ -62,6 +63,15 @@ export default function TaskDetailPage() {
       <TaskDetailBody task={task} />
       {/* Brief H1 — status control + work timer, right beside the facts. */}
       <TaskWorkPanel task={task} />
+      {/* Brief H3, defect 2 — the trail is the LAST section on the page:
+          «وخلي سجل المهمه اخر حاجه في الصفحه». It sits after the work-time
+          panel and before nothing. */}
+      <section className="section" aria-labelledby="task-trail">
+        <h2 id="task-trail">{t("taskTrailHeading")}</h2>
+        {/* The trail is append-only — a REASSIGN keeps the previous ASSIGN;
+            nothing is overwritten, which is exactly what history demands. */}
+        <TaskTimeline events={task.events} />
+      </section>
       <div className="form-actions">
         {task.assignee === null ? (
           <button type="button" className="btn btn-secondary" data-testid="detail-assign-open" onClick={openAssign}>
