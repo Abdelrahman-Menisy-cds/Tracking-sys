@@ -735,3 +735,76 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 @media (max-width: 639px) {
   .notice-stack { inset-inline: var(--sp-3); max-inline-size: none; }
 }
+
+/* ===== Brief H4 — the task status bar + the modern work timer ===== */
+/* A bar, not a card: full-width single row, hairline edges, no elevation,
+   no second card style — surface + card-border + existing radii only. */
+.task-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3) var(--sp-4);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--surface);
+  border: var(--timeline-width) solid var(--card-border);
+  border-inline-start: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  margin-block-end: var(--sp-6);
+}
+/* Sticks below the app header — the app header (`min-height:44px`) is not
+   itself sticky, so this lands just under the page top; focus rings pull
+   inside the bar so nothing hides behind it. */
+.task-status-bar {
+  position: sticky;
+  inset-block-start: var(--sp-3);
+  z-index: 20;
+}
+.task-status-bar :focus-visible { outline-offset: -2px; } /* the ring stays inside the bar */
+.task-status-bar .role-segmented { flex: 1 1 auto; min-inline-size: min(360px, 100%); }
+.task-status-bar-hint { color: var(--text-muted); font-size: var(--font-size-sm); }
+.task-status-bar-hint summary { cursor: pointer; color: var(--text-muted); font-size: var(--font-size-sm); list-style: none; }
+.task-status-bar-hint summary::marker { content: ""; }
+.task-status-bar-hint summary::before { content: "? "; font-weight: 700; }
+.task-status-bar-hint[open] summary { color: var(--text); }
+@media (max-width: 639px) {
+  .task-status-bar { padding: var(--sp-3); gap: var(--sp-2) var(--sp-3); }
+  .task-status-bar .role-segmented { min-inline-size: 100%; order: 3; }
+  .task-status-bar .role-segmented-option { min-height: 40px; }
+}
+
+/* The timer card: the elapsed clock is the hero, total is secondary. */
+.task-work-timer { display: grid; gap: var(--sp-4); }
+.task-work-timer.is-running { border-color: var(--accent-border); }
+.task-timer-hero {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--sp-4) var(--sp-6);
+  align-items: end;
+  padding-block-end: var(--sp-4);
+  border-block-end: var(--timeline-width) solid var(--border-subtle);
+}
+.task-timer-title { display: inline-flex; align-items: center; gap: var(--sp-2); margin: var(--space-0); font-size: var(--font-size-lg); grid-column: 1 / -1; }
+.task-timer-pulse { inline-size: 10px; block-size: 10px; border-radius: var(--radius-pill); background: var(--surface-inset); border: var(--timeline-width) solid var(--card-border); }
+.is-running .task-timer-pulse { background: var(--accent); border-color: var(--accent); animation: task-timer-pulse 2s ease-in-out infinite; }
+.is-running .task-timer-pulse { box-shadow: 0 0 0 3px var(--accent-soft); }
+@keyframes task-timer-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .is-running .task-timer-pulse { animation: none; } }
+.task-timer-clock { display: grid; gap: var(--sp-1); justify-items: start; }
+.task-timer-elapsed-value,
+.task-timer-total-value {
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-tight);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.is-running .task-timer-elapsed-value { color: var(--accent); }
+.task-timer-total-value { font-size: var(--font-size-lg); }
+.task-timer-total-box { display: grid; gap: var(--sp-1); justify-items: end; padding: var(--sp-2) var(--sp-3); background: var(--surface-subtle); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-sm); }
+.task-timer-label { font-size: var(--font-size-sm); color: var(--text-muted); }
+.task-timer-entries-title { margin: var(--space-0); font-size: var(--font-size-md); }
+@media (max-width: 639px) {
+  .task-timer-hero { grid-template-columns: 1fr; align-items: start; }
+  .task-timer-total-box { justify-items: start; }
+  .task-timer-elapsed-value, .task-timer-total-value { font-size: var(--font-size-xl, var(--font-size-2xl)); }
+}

@@ -5,6 +5,7 @@ import { Banner, EmptyState } from "../components/ui";
 import PageHeader from "../components/layout/PageHeader";
 import type { EmployeeDirectoryEntry } from "../mock/data";
 import { identityEmployeeId } from "../mock/attendance";
+import TaskStatusBar from "../components/tasks/TaskStatusBar";
 import TaskDetailBody from "../components/tasks/TaskDetailBody";
 import TaskWorkPanel from "../components/tasks/TaskWorkPanel";
 import TaskTimeline from "../components/tasks/TaskTimeline";
@@ -12,10 +13,16 @@ import AssignTaskDialog from "../components/tasks/AssignTaskDialog";
 import type { TaskMock } from "../mock/tasks";
 
 /**
- * /tasks/:taskId — the task detail page: facts, the append-only trail, and the
- * assign action. The assign button renders only when the viewer holds the
- * assign capability; the dialog and the context both refuse without it, so the
- * mirror never lies and never decides on its own.
+ * /tasks/:taskId — the task detail page. Brief H4's order, top to bottom:
+ *
+ *   header → status bar → timer card → facts → trail → assign action
+ *
+ * The status bar sits directly under the page header as the first content;
+ * the timer card sits right under it because it is what the user interacts
+ * with. The trail stays the LAST content section (H3 moved it there
+ * deliberately; «وخلي سجل المهمه اخر حاجه في الصفحه» — do not undo that).
+ * The assign button renders only when the viewer holds the assign
+ * capability; both the dialog and the context refuse without it.
  */
 export default function TaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
@@ -60,12 +67,12 @@ export default function TaskDetailPage() {
       <PageHeader title={<bdi>{task.title}</bdi>} subtitle={task.description || undefined} breadcrumb={<Link to="/tasks">{t("tasksTitle")}</Link>} />
       {refused ? <Banner tone="error" role="alert">{refused}</Banner> : null}
       {assignedNote ? <Banner tone="success" role="status">{assignedNote}</Banner> : null}
-      <TaskDetailBody task={task} />
-      {/* Brief H1 — status control + work timer, right beside the facts. */}
+      {/* Brief H4 — the status bar first, right under the header. */}
+      <TaskStatusBar task={task} />
+      {/* Brief H4 — the timer card directly under the status bar. */}
       <TaskWorkPanel task={task} />
-      {/* Brief H3, defect 2 — the trail is the LAST section on the page:
-          «وخلي سجل المهمه اخر حاجه في الصفحه». It sits after the work-time
-          panel and before nothing. */}
+      <TaskDetailBody task={task} />
+      {/* Brief H3 — the trail is the LAST section on the page. */}
       <section className="section" aria-labelledby="task-trail">
         <h2 id="task-trail">{t("taskTrailHeading")}</h2>
         {/* The trail is append-only — a REASSIGN keeps the previous ASSIGN;
