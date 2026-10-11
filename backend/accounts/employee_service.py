@@ -7,11 +7,12 @@ staged, and append an append-only AuditEvent with before/after snapshots
 (policy items 1, 6, 11; epics.md lines 173-191).
 """
 from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 
-from accounts.models import AuditEvent, EmployeeProfile, User
+from accounts.models import AuditEvent, Department, EmployeeProfile, User
 from accounts.services import deactivate_user
 
-AUDIT_TRACKED_FIELDS = ("email", "full_name", "role", "is_active", "employee_number", "job_title", "manager")
+AUDIT_TRACKED_FIELDS = ("email", "full_name", "role", "is_active", "employee_number", "job_title", "manager", "department")
 
 
 class EmployeeValidationError(ValueError):
@@ -32,6 +33,7 @@ def _snapshot(user, profile=None):
         "employee_number": profile.employee_number if profile else None,
         "job_title": profile.job_title if profile else "",
         "manager": profile.manager_id if profile else None,
+        "department": profile.department_id if profile else None,
     }
 
 
@@ -85,6 +87,36 @@ def _validate_manager(user, manager_pk):
     if not manager.is_active:
         raise EmployeeValidationError("manager", "The proposed manager must be an active user.")
     return manager
+
+
+def _validate_department(department_pk):
+    """Return the Department, or None; a bad id is a field error, never a 500."""
+    if department_pk is None or department_pk == "":
+        return None
+    try:
+        department = Department.objects.get(pk=department_pk)
+    except (Department.DoesNotExist, ValueError, TypeError):
+        raise EmployeeValidationError("department", "The proposed department does not exist.") from None
+    if not department.is_active:
+        raise EmployeeValidationError("department", "The proposed department is inactive.")
+    return department
+
+
+def _validate_manager_department(manager, department):
+    """A manager must belong to the employee's department, or the pair is refused.
+
+    Owner's rule (Story H16): a manager must never sit over somebody outside
+    their own department. It only bites once the employee HAS a department —
+    everybody who predates departments keeps the old reporting-line behaviour.
+    """
+    if manager is None or department is None:
+        return
+    manager_department_id = getattr(getattr(manager, "employee_profile", None), "department_id", None)
+    if manager_department_id != department.pk:
+        raise EmployeeValidationError(
+            "manager",
+            _("The manager is not a member of the employee's department."),
+        )
 
 
 def _would_create_cycle(user, manager):
@@ -142,10 +174,14 @@ def create_employee(*, actor, validated_data):
     manager = _validate_manager(probe, manager_pk)
     if manager is not None and _would_create_cycle(probe, manager):
         raise EmployeeValidationError("manager", "This reporting line would create a reporting cycle.")
+    department = _validate_department(validated_data.get("department")) if "department" in validated_data else None
+    _validate_manager_department(manager, department)
 
     profile_fields = {
         f: validated_data[f] for f in ("employee_number", "job_title") if f in validated_data
     }
+    if "department" in validated_data:
+        profile_fields["department"] = department
 
     # HR-created accounts receive an unusable-style random password; the
     # password issuance/reset flow is a separate story. No superuser is
@@ -193,6 +229,13 @@ def update_employee(*, actor, user, validated_data):
             raise EmployeeValidationError("manager", "This reporting line would create a reporting cycle.")
     else:
         manager = user.employee_profile.manager if hasattr(user, "employee_profile") else None
+    if "department" in validated_data:
+        department = _validate_department(validated_data["department"])
+    else:
+        department = getattr(getattr(user, "employee_profile", None), "department", None)
+    # The pair is checked against the EFFECTIVE values, so moving either side of
+    # the relationship can never leave a manager outside the employee's department.
+    _validate_manager_department(manager, department)
 
     before = _snapshot(user, getattr(user, "employee_profile", None))
     user_fields = {
@@ -205,6 +248,8 @@ def update_employee(*, actor, user, validated_data):
         for f in ("employee_number", "job_title")
         if f in validated_data
     }
+    if "department" in validated_data:
+        profile_fields["department"] = department
     if "employee_number" in profile_fields:
         if profile_fields["employee_number"] is None:
             pass

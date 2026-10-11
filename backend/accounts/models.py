@@ -7,6 +7,7 @@ status.
 from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+from django.db.models import F
 from django.utils import timezone
 
 
@@ -86,14 +87,49 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.full_name or self.email
 
 
+class Department(models.Model):
+    """A workforce department and the manager responsible for it (Story H16).
+
+    Departments are FLAT — one level, no parent — because the org asked for one
+    level and nothing has needed a tree. ``manager`` is a User with role MANAGER
+    who also belongs to this department; the service layer enforces both, the
+    model keeps the columns honest. Membership itself lives on
+    ``EmployeeProfile.department`` so a person holds at most one department.
+
+    Deleting a row must never delete people: ``EmployeeProfile.department`` is
+    SET_NULL, and the service deactivates (``is_active``) instead of deleting.
+    """
+
+    code = models.CharField(max_length=32, unique=True)
+    name_ar = models.CharField(max_length=120)
+    name_en = models.CharField(max_length=120, blank=True, default="")
+    manager = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="managed_departments",
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        ordering = ["code"]
+        verbose_name = "department"
+        verbose_name_plural = "departments"
+
+    def __str__(self) -> str:
+        return f"{self.name_ar or self.name_en} ({self.code})"
+
+
 class EmployeeProfile(models.Model):
     """Organization-authoritative employee data (Story 1.3).
 
     Owns reporting line and employee-specific organization fields that are
-    NOT identity: a nullable self-referencing manager FK, employee number,
-    and job title. Role, active status, and full name stay on User so auth
-    behavior remains unchanged. HR-only writes; profile.py owns the model
-    contract per architecture-security.md §3.
+    NOT identity: a nullable self-referencing manager FK, a nullable department
+    FK (Story H16), employee number, and job title. Role, active status, and
+    full name stay on User so auth behavior remains unchanged. HR-only writes;
+    profile.py owns the model contract per architecture-security.md §3.
     """
 
     user = models.OneToOneField(
@@ -110,6 +146,15 @@ class EmployeeProfile(models.Model):
     )
     employee_number = models.CharField(max_length=32, unique=True, null=True, blank=True)
     job_title = models.CharField(max_length=100, blank=True, default="")
+    # Nullable so the migration cannot break a single existing row: everyone who
+    # predates departments simply has none until HR assigns one.
+    department = models.ForeignKey(
+        "Department",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="members",
+    )
 
     class Meta:
         verbose_name = "employee profile"
@@ -117,6 +162,121 @@ class EmployeeProfile(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.email} (#{self.employee_number or '-'})"
+
+
+class ManagerGrant(models.Model):
+    """HR-granted scope for ONE employee, issued to ONE manager (Story H16).
+
+    The default rule is the department: a manager reads and decides only for the
+    people in their own department, and a call touching anybody else answers the
+    shared 404-style envelope rather than disclosing that the person exists.
+
+    HR can widen that rule per (manager, employee) — and per the owner's explicit
+    decision a grant widens BOTH read and management (approve/reject) for that
+    one employee, never for anyone else and never across departments.
+
+    One row per (manager, employee, scope). Rows are DEACTIVATED, never deleted,
+    so the audit trail and the HR screen can both show the history.
+    """
+
+    class Scope(models.TextChoices):
+        REQUESTS = "requests", "Requests"
+        TIMESHEETS = "timesheets", "Timesheets"
+        ATTENDANCE = "attendance", "Attendance"
+        REPORTS = "reports", "Reports"
+
+    #: The closed list HR may hand out; anything else is rejected at validation.
+    ALL_SCOPES = tuple(scope.value for scope in Scope)
+
+    manager = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="grants_as_manager",
+    )
+    employee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="grants_as_employee",
+    )
+    scope = models.CharField(max_length=16, choices=Scope.choices, db_index=True)
+    is_active = models.BooleanField(default=True)
+    # PROTECT mirrors AuditEvent: who granted what outlives the granting account.
+    granted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="grants_issued",
+    )
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        verbose_name = "manager grant"
+        verbose_name_plural = "manager grants"
+        ordering = ["-created_at", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["manager", "employee", "scope"],
+                name="uniq_manager_grant_scope",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(manager=models.F("employee")),
+                name="manager_grant_is_not_self",
+            ),
+        ]
+        indexes = [models.Index(fields=["manager", "employee", "is_active"])]
+
+    def __str__(self) -> str:
+        return f"{self.manager_id}->{self.employee_id}:{self.scope}"
+
+
+class SubscriptionCode(models.Model):
+    """Self-service signup code for HR accounts (Story H14).
+
+    One operator-issued code admits new HR users: while ``is_active`` a code
+    is REUSABLE (several subscribers may use the same code) — there are no
+    single-use semantics. The plaintext value is stored so an operator can
+    read it back and hand it to a subscriber; uniqueness and indexing live
+    on the column. Matching is done through :meth:`check_code`, which
+    resolves the candidate row by exact lookup and then confirms it with
+    ``hmac.compare_digest`` so a timing probe cannot narrow the value.
+    """
+
+    code = models.CharField(max_length=128, unique=True)
+    label = models.CharField(max_length=200, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    use_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "subscription code"
+        verbose_name_plural = "subscription codes"
+
+    def __str__(self) -> str:
+        return f"{self.code} ({'active' if self.is_active else 'inactive'})"
+
+    @classmethod
+    def check_code(cls, value: str):
+        """Return the active SubscriptionCode matching ``value`` or None.
+
+        Constant-time-safe: the candidate row is fetched by unique index
+        lookup, then the comparison is confirmed with
+        ``hmac.compare_digest`` instead of ``==`` so byte-length / prefix
+        timing cannot be used to probe the stored value.
+        """
+        import hmac
+
+        candidate = cls.objects.filter(code__iexact=value).first()
+        if candidate is None or not candidate.is_active:
+            return None
+        if not hmac.compare_digest(candidate.code, value):
+            return None
+        return candidate
+
+    def record_use(self) -> None:
+        """Count one successful signup against this code (reusable code)."""
+        type(self).objects.filter(pk=self.pk).update(
+            use_count=F("use_count") + 1, last_used_at=timezone.now()
+        )
 
 
 class AuditEvent(models.Model):

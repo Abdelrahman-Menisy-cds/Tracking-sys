@@ -8,6 +8,7 @@ import AttentionStrip from "../../components/state/AttentionStrip";
 import AdjustLeaveDialog, { leaveTypeKeys, type AdjustLeaveOutcome } from "./AdjustLeaveDialog";
 import ScheduleEditorDialog from "./ScheduleEditorDialog";
 import AdminNav from "./AdminNav";
+import ManagerGrantsPanel from "./ManagerGrantsPanel";
 import type { LeaveBalance, WorkSchedule } from "../../mock/attendance";
 import {
   type EmployeeDirectoryEntry,
@@ -400,6 +401,7 @@ export default function AdminPeopleDetailPage() {
   return (
     <div className="page people-detail-page">
       <AdminNav />
+      {role === "hr" ? <ManagerGrantsPanel employeeEmail={base?.email ?? null} /> : null}
       <PageHeader
         title={entry.name[locale]}
         subtitle={<span>{t("adminPeopleEmploymentSubtitle")} · <bdi dir="ltr">{entry.employee_number}</bdi> · {entry.department[locale]}</span>}

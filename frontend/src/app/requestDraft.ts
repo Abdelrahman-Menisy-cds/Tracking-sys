@@ -50,12 +50,57 @@ export function draftSpan(draft: RequestDraft): RequestedSpan | null {
   return { kind: "FULL_DAYS", days };
 }
 
-/** The period in words, for the live preview under the picker. */
+/**
+ * The period in words, for the live receipt under the picker.
+ *
+ * Returns ONE of three visible states, so the page can show what the picked span means at
+ * pick time — not only after a submit attempt:
+ *  - a counted span («4 يوم عمل» / «120 دقيقة») when normal;
+ *  - the single-day state for a FULL_DAYS span whose end was never picked — the silent
+ *    `endDate = startDate` default read aloud before any submit (critique 4.1);
+ *  - the zero-working-day state (a weekend, or a reversed range) as its own string with
+ *    its own token, styled --danger live at the pick surface (critique 4.4/4.6);
+ *  - the missing-clock state for a PART_DAY window whose endpoints are missing or
+ *    unordered — the empty-not-prefilled times speak before validation (spec §3).
+ */
+export type DurationState = "COUNTED" | "SINGLE_DAY" | "NO_WORKING_DAY" | "REVERSED" | "REVERSED_CLOCK" | "EMPTY_CLOCK";
+
+export function durationState(draft: RequestDraft): DurationState | null {
+  const kind = periodKindOf(draft.requestType);
+  if (kind === "SINGLE_DATE") return null;
+  if (!draft.startDate) return null;
+  if (kind === "PART_DAY") {
+    if (minutesBetween(draft.startTime, draft.endTime) > 0) return "COUNTED";
+    /* The clock endpoints speak for themselves: both empty (the strip boots here),
+       one empty, or both picked but unordered. The first two are the "not picked
+       yet" state, the last one carries the reversed sentence at the pick surface. */
+    if (draft.startTime && draft.endTime) return "REVERSED_CLOCK";
+    return "EMPTY_CLOCK";
+  }
+  if (!draft.endDate) return "SINGLE_DAY";
+  if (draft.endDate < draft.startDate) return "REVERSED";
+  const days = workingDaysBetween(draft.startDate, draft.endDate);
+  if (days > 0) return "COUNTED";
+  return "NO_WORKING_DAY";
+}
+
+/** The receipt's first line: the span in words, exactly as the title will read it. */
 export function durationText(draft: RequestDraft, locale: "ar" | "en"): string | null {
   const span = draftSpan(draft);
   if (!span) return null;
   if (span.kind === "FULL_DAYS" && span.days > 0) return fill(dict[locale].requestPeriodDays, span.days);
   if (span.kind === "PART_DAY" && span.minutes > 0) return fill(dict[locale].requestPeriodMinutes, span.minutes);
+  return null;
+}
+
+/** The live warning beside the counted duration; null when nothing is being warned about. */
+export function durationWarningText(draft: RequestDraft, locale: "ar" | "en"): string | null {
+  const state = durationState(draft);
+  if (state === "SINGLE_DAY") return dict[locale].requestPeriodSingleDay;
+  if (state === "NO_WORKING_DAY") return dict[locale].requestPeriodNoWorkingDay;
+  if (state === "REVERSED") return dict[locale].requestPeriodReversed;
+  if (state === "REVERSED_CLOCK") return dict[locale].requestPeriodTimesReversed;
+  if (state === "EMPTY_CLOCK") return dict[locale].requestPeriodEmptyClock;
   return null;
 }
 

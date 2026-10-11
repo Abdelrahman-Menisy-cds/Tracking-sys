@@ -651,6 +651,82 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .role-segmented-option:hover:not(.is-selected) { background: var(--surface-subtle); color: var(--text); }
 .role-segmented-option.is-selected { background: var(--accent); color: var(--on-accent); }
 .role-segmented-option:focus-visible { outline: var(--space-1) solid var(--focus-ring); outline-offset: var(--space-1); }
+/* ===== H13c — «طلب جديد» (/requests/new) — page-scoped ONLY; other screens keep their layout ===== */
+/* §5.1 the three tokens: the form's width cap, the sticky strip's reserved platform, and the
+   period inputs' numerals (native date/time glyphs shrink to 12-13px in WebKit; 16px +
+   tabular figures keep both scripts' digits aligned with the rest of the form). */
+.new-request-page { --form-max: 720px; --stick-actions-height: 64px; --period-numeric: tabular-nums; max-width: min(100%, var(--form-max)); }
+/* Design §1.3: field labels shrink one step on this page only — directions, not body copy. */
+.new-request-page .field-label { font-size: var(--font-size-sm); }
+/* Design §2.2: the four Arabic type names wrap instead of truncating; each option carries its
+   own muted path line under the label. Selection keeps the primitive's solid-accent rule. */
+.new-request-page .role-segmented { flex-wrap: wrap; row-gap: var(--sp-2); }
+.new-request-page .role-segmented-option { flex: 1 1 min(100%, 10rem); min-inline-size: 0; align-items: flex-start; gap: 2px; min-block-size: 44px; padding-block: var(--sp-2); }
+.new-request-page .role-segmented-hint { display: block; flex-basis: 100%; color: var(--text-muted); font-size: var(--font-size-xs); font-weight: 500; }
+/* Review fix (H13d): inside the selected option the hint sat at ~1.03:1 — muted ink on the accent
+   surface. It takes the on-accent ink instead; the 12px/500-vs-16px/700 step keeps the hierarchy. */
+.new-request-page .role-segmented-option.is-selected .role-segmented-hint { color: var(--on-accent); }
+/* §3 period layout: ONE row — dates side by side, or date + clock window on a single line.
+   No stacked full-width siblings; the row hugs its content instead of filling the card. */
+.new-request-page .request-period-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.new-request-page .request-period-row .field { flex: 0 1 auto; margin-block: 0; min-inline-size: 0; }
+.new-request-page .request-period-row .input { width: 170px; font-size: var(--font-size-md); font-variant-numeric: var(--period-numeric); font-weight: 600; }
+.new-request-page .request-period-row .field > .field-label { margin-block-end: 0; }
+.new-request-page .request-inset { padding-block: var(--sp-3) var(--sp-4); }
+.new-request-page .request-inset legend { color: var(--text-muted); margin: 0 0 var(--sp-3); }
+/* The live receipt: the derived title IS what buildRequestTitle returns — accent numeral only.
+   Zero-working-day and missing-endpoint warnings leave the accent family for --danger, live. */
+.new-request-page .request-receipt { display: grid; gap: 2px; margin-block-start: var(--sp-3); }
+.new-request-page .request-receipt-line { font-weight: 700; color: var(--text); }
+.new-request-page .request-receipt-line .field-hint { display: inline; margin: 0; font-size: inherit; }
+.new-request-page .request-receipt-range { font-variant-numeric: var(--period-numeric); }
+.new-request-page .request-receipt .request-live-warning { color: var(--danger-strong); }
+/* Design §2.6: the sticky action strip, with its reserved platform so the last field and the
+   success banner never hide under it. Order: the primary first, draft second, back ghost. */
+.new-request-page .request-stick-actions {
+  position: sticky; bottom: 0; z-index: 10;
+  display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap;
+  margin-block: 0 calc(-1 * var(--sp-2));
+  padding-block: var(--sp-3);
+  padding-block-end: max(var(--sp-3), calc(var(--stick-actions-height) - 44px));
+  border-block-start: var(--timeline-width) solid var(--border-subtle);
+  background: var(--surface);
+  border-radius: 0 0 var(--radius-surface) var(--radius-surface);
+  scroll-margin-block-end: var(--stick-actions-height);
+  inset-block-end: -1px;
+}
+.new-request-page .request-stick-actions .btn-primary { order: -1; min-width: 180px; }
+.new-request-page .request-stick-actions .btn-ghost { margin-inline-start: auto; }
+/* §4 validation wiring: aria-invalid lands on the failing control; the inline error node sits
+   directly under the failing row and the control points at it. */
+.new-request-page .request-inline-error { display: block; margin-block-start: var(--sp-2); color: var(--danger-strong); font-weight: 700; }
+.new-request-page .input[aria-invalid="true"] { border-color: var(--danger); }
+/* §2.5 attachments: one dashed muted line replaces the native English "Choose File" chrome;
+   the real disabled file input stays in the tree, visually hidden, for assistive tech. */
+.new-request-page .file-placeholder {
+  display: flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-height: var(--control-min-h); width: 100%;
+  border: var(--timeline-width) dashed var(--border-control); border-radius: var(--radius-sm);
+  color: var(--text-muted); font-size: var(--font-size-sm); background: var(--surface);
+  cursor: default;
+}
+.new-request-page .file-input-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* §4 the reason: soft cap 500, a quiet counter that appears only near the cap. */
+.new-request-page .reason-count { color: var(--text-muted); font-size: var(--font-size-xs); font-variant-numeric: var(--period-numeric); }
+.new-request-page .reason-count.is-warned { color: var(--warning-strong); font-weight: 700; }
+/* The receipt line keeps its bidi runs isolated even in the LTR document direction. */
+.new-request-page .request-receipt-range { unicode-bidi: plaintext; }
+/* §2.1 the inline step indicator: header's end side, desktop only (≈<700px drops it). */
+.new-request-steps { font-size: var(--font-size-sm); white-space: nowrap; }
+@media (max-width: 699px) { .new-request-steps { display: none; } }
+/* §4 critique 4.7: the safe action is first inside the guard banner. */
+.confirm-leave-actions { display: flex; gap: var(--sp-3); flex-wrap: wrap; margin-block-start: var(--sp-2); }
+@media (max-width: 639px) {
+  .new-request-page .request-period-row .input { width: min(170px, 100%); }
+  .new-request-page .request-stick-actions { gap: var(--sp-2); }
+  .new-request-page .request-stick-actions .btn { min-width: 100%; }
+  .new-request-page .request-stick-actions .btn-primary { order: -1; }
+}
 .login-role-hint { margin-block-end: var(--space-0); font-size: var(--font-size-sm); }
 .login-preferences-header { display: flex; flex: 0 0 auto; justify-content: flex-end; gap: var(--sp-2); margin-block-end: var(--space-0); }
 .login-panel .brand-lockup { margin-block-end: var(--sp-6); border: var(--radius-none); padding: var(--space-0); }
@@ -666,6 +742,16 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .password-visibility-toggle:focus-visible { outline: var(--space-1) solid var(--focus-ring); outline-offset: var(--space-1); }
 .password-visibility-toggle .icon { width: var(--icon-size); height: var(--icon-size); }
 .login-submit { width: 100%; }
+/* Story H14b: the signup entry line and its link-styled toggle. Borderless but a
+   real <button>, so keyboard focus and aria-expanded are free. */
+.login-signup-entry { margin-block: var(--sp-6) var(--space-0); text-align: center; color: var(--text-muted); }
+.login-signup-toggle { padding: var(--space-0) var(--sp-1); border: var(--radius-none); background: transparent; color: var(--accent); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.login-signup-toggle:hover { color: var(--text); }
+.login-signup-toggle:focus-visible { outline: var(--space-1) solid var(--focus-ring); outline-offset: var(--space-1); border-radius: var(--radius-sm); }
+.login-signup-note { margin-block-end: var(--sp-4); }
+.login-signup-contact { margin-block: var(--sp-2) var(--sp-4); color: var(--text-muted); }
+.login-signup-phone { color: var(--accent); font-weight: 700; text-decoration-thickness: 1px; text-underline-offset: 2px; white-space: nowrap; unicode-bidi: plaintext; }
+.login-signup-phone:focus-visible { outline: var(--space-1) solid var(--focus-ring); outline-offset: var(--space-1); border-radius: var(--radius-sm); }
 .login-demo-note { margin-block-start: var(--sp-6); margin-block-end: var(--space-0); padding-block-start: var(--sp-4); border-block-start: var(--timeline-width) solid var(--border-subtle); }
 @media (forced-colors: active) { :focus-visible { outline: var(--space-1) solid CanvasText; } .btn, .pill, .nav-link, .work-surface, .table-wrap { border: var(--timeline-width) solid ButtonText; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; scroll-behavior: auto !important; } .skeleton { animation: none; } }

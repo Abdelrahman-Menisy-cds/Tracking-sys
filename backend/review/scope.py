@@ -42,26 +42,50 @@ MANAGER_TIMESHEET_HISTORY_STATES = (
 )
 
 
-def _active_direct_report_ids(manager):
-    """PKs of the manager's CURRENT active direct reports (profile-derived).
+def _scoped_employee_ids(manager):
+    """PKs the manager may READ and DECIDE for (Story H16).
 
-    The reporting line lives on EmployeeProfile.manager (server
-    authority), not on any request snapshot; only ACTIVE employees count.
+    Owner's rule: a manager's scope is their own department. Two sources are
+    unioned and both are bounded by that department whenever the manager has one:
+
+      * every active member of the manager's department, and
+      * the manager's active direct reports (the pre-H16 reporting line).
+
+    With no department — every account that predates Story H16, and any manager
+    HR has not placed yet — the result is EXACTLY the old one: active direct
+    reports only. That keeps the existing scope contract intact while the org
+    migrates, and it is why the old name was renamed rather than redefined.
+
+    HR grants (ManagerGrant, active, this manager) then add named employees one
+    by one. Per the owner's explicit decision a grant carries BOTH read and
+    decide for that employee — and for nobody else.
     """
-    from accounts.models import EmployeeProfile
+    from accounts.models import EmployeeProfile, ManagerGrant
 
-    return list(
-        EmployeeProfile.objects.filter(manager_id=manager.pk, user__is_active=True)
-        .values_list("user_id", flat=True)
+    profile = EmployeeProfile.objects.filter(user_id=manager.pk).first()
+    department_id = profile.department_id if profile is not None else None
+
+    members = EmployeeProfile.objects.filter(user__is_active=True).exclude(user_id=manager.pk)
+    if department_id is None:
+        members = members.filter(manager_id=manager.pk)
+    else:
+        members = members.filter(department_id=department_id)
+    ids = set(members.values_list("user_id", flat=True))
+    ids.update(
+        ManagerGrant.objects.filter(
+            manager_id=manager.pk, is_active=True, employee__is_active=True
+        ).values_list("employee_id", flat=True)
     )
+    return ids
 
 
 def scope_requests(manager):
     """Manager/HR scope queryset; applied before filters/count/pagination.
 
-    Manager: active direct reports' submitted history (their relevant
-    pending review states included). HR: the whole organization (visibility
-    separate from action). Anonymous/inactive/other roles: empty queryset.
+    Manager: their department (or their direct reports) submitted history, with
+    HR grants unioned in (their relevant pending review states included). HR:
+    the whole organization (visibility separate from action).
+    Anonymous/inactive/other roles: empty queryset.
     """
     if not getattr(manager, "is_authenticated", False):
         return EmployeeRequest.objects.none()
@@ -71,9 +95,9 @@ def scope_requests(manager):
         # HR read scope = organization records; drafts are not yet records.
         return EmployeeRequest.objects.exclude(status=EmployeeRequest.Status.DRAFT)
     if manager.role == User.Role.MANAGER:
-        report_ids = _active_direct_report_ids(manager)
+        scoped_ids = _scoped_employee_ids(manager)
         return EmployeeRequest.objects.filter(
-            requester_id__in=report_ids,
+            requester_id__in=scoped_ids,
             status__in=MANAGER_REQUEST_HISTORY_STATES,
         )
     return EmployeeRequest.objects.none()
@@ -88,9 +112,9 @@ def scope_timesheets(manager):
     if manager.role == User.Role.HR:
         return Timesheet.objects.all()
     if manager.role == User.Role.MANAGER:
-        report_ids = _active_direct_report_ids(manager)
+        scoped_ids = _scoped_employee_ids(manager)
         return Timesheet.objects.filter(
-            employee_id__in=report_ids,
+            employee_id__in=scoped_ids,
             status__in=MANAGER_TIMESHEET_HISTORY_STATES,
         )
     return Timesheet.objects.none()
@@ -121,7 +145,7 @@ def can_decide_request(user, request_obj) -> bool:
         # Current active direct-report scope (AC 4.1), not the snapshot; the
         # only state a manager can act on is PENDING_MANAGER.
         return (
-            request_obj.requester_id in _active_direct_report_ids(user)
+            request_obj.requester_id in _scoped_employee_ids(user)
             and request_obj.status == EmployeeRequest.Status.PENDING_MANAGER
         )
     if user.role == User.Role.HR:
@@ -150,7 +174,7 @@ def can_decide_timesheet(user, sheet) -> bool:
     if sheet.employee_id == user.pk:
         return False  # self-review is never permitted
     if user.role == User.Role.MANAGER:
-        if sheet.employee_id not in _active_direct_report_ids(user):
+        if sheet.employee_id not in _scoped_employee_ids(user):
             return False
         return sheet.status in MANAGER_TIMESHEET_HISTORY_STATES
     return False

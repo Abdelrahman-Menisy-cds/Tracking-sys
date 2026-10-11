@@ -10,6 +10,7 @@ import PageHeader from "../../components/layout/PageHeader";
 import AdjustLeaveDialog, { leaveTypeKeys } from "./AdjustLeaveDialog";
 import ScheduleEditorDialog from "./ScheduleEditorDialog";
 import AdminNav from "./AdminNav";
+import OrgDepartmentsPanel from "./OrgDepartmentsPanel";
 import { ChevronDownIcon, EditIcon, FilterIcon, InfoIcon, SearchIcon, TrashIcon } from "../../components/icons";
 import type { Dict, Locale } from "../../i18n/dict";
 import type {
@@ -91,6 +92,7 @@ export default function AdminSettingsPage() {
       <AdminNav />
       <PageHeader title={t("adminNavSettings")} subtitle={t("adminSubtitle")} />
       <Banner tone="info">{t("adminDemoBoundary")}</Banner>
+      <OrgDepartmentsPanel />
       {phase === "loading" ? (
         <section className="work-surface" aria-busy="true">
           <SkeletonRows rows={3} />

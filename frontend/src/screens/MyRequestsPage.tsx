@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
 import { useMockList, formatDateTime } from "../app/useMockList";
 import { mockFetch, requestTypes, type RequestMock, type RequestStatus } from "../mock/data";
-import { buildRequestTitle, draftPeriodFields, durationText, periodKindOf, validateDraft, type DraftIssue, type RequestDraft } from "../app/requestDraft";
+import { buildRequestTitle, draftPeriodFields, durationWarningText, periodKindOf, validateDraft, type DraftIssue, type RequestDraft } from "../app/requestDraft";
 import { Banner, EmptyState, ErrorState, RequestStatusPill, SkeletonRows } from "../components/ui";
 import OperationalTable, { type OperationalColumn } from "../components/data/OperationalTable";
 import PageHeader from "../components/layout/PageHeader";
@@ -47,10 +47,18 @@ export default function MyRequestsPage() {
 
 export function NewRequestPage() {
   const { t, locale, saveDemoRequest } = useApp(); const navigate = useNavigate(); const periodRef = useRef<HTMLInputElement>(null); const clockRef = useRef<HTMLInputElement>(null); const summaryRef = useRef<HTMLDivElement>(null);
-  const [typeId, setTypeId] = useState(requestTypes[0].id); const [startDate, setStartDate] = useState(""); const [endDate, setEndDate] = useState(""); const [startTime, setStartTime] = useState("09:00"); const [endTime, setEndTime] = useState("11:00"); const [reason, setReason] = useState(""); const [issue, setIssue] = useState<DraftIssue | null>(null); const [savedMessage, setSavedMessage] = useState<string | null>(null); const [busy, setBusy] = useState(false); const [confirmLeave, setConfirmLeave] = useState(false);
+  const [typeId, setTypeId] = useState(requestTypes[0].id); const [startDate, setStartDate] = useState(""); const [endDate, setEndDate] = useState(""); const [startTime, setStartTime] = useState(""); const [endTime, setEndTime] = useState(""); const [reason, setReason] = useState(""); const [issue, setIssue] = useState<DraftIssue | null>(null); const [savedMessage, setSavedMessage] = useState<null | { kind: "success" | "error"; text: string }>(null); const [busy, setBusy] = useState(false); const [confirmLeave, setConfirmLeave] = useState(false);
   const selectedType = requestTypes.find((requestType) => requestType.id === typeId) ?? requestTypes[0];
   const draft: RequestDraft = { requestType: selectedType, startDate, endDate, startTime, endTime, reason };
-  const kind = periodKindOf(selectedType); const duration = durationText(draft, locale); const hasUnsaved = Boolean(startDate || endDate || reason.trim());
+  const kind = periodKindOf(selectedType);
+  const derivedTitle = buildRequestTitle(draft, locale);
+  const receiptWarning = durationWarningText(draft, locale);
+  /* hasUnsaved compares against the LAST-SAVED snapshot (critique 4.8): after a successful
+     save the snapshot moves, so «رجوع» stops claiming unsaved changes that no longer exist. */
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
+  const currentSnapshot = JSON.stringify([typeId, startDate, endDate, startTime, endTime, reason.trim()]);
+  const hasUnsaved = Boolean(startDate || endDate || startTime || endTime || reason.trim()) && currentSnapshot !== (savedSnapshot ?? JSON.stringify([typeId, "", "", "", "", ""]));
+  const receiptId = "request-receipt";
   usePageTitle(t("newRequest"));
   const focusIssue = (problem: DraftIssue) => window.setTimeout(() => (problem.field === "clock" ? clockRef.current : periodRef.current)?.focus(), 0);
   const save = async (submit: boolean) => {
@@ -59,31 +67,91 @@ export function NewRequestPage() {
     if (problem) { focusIssue(problem); return; }
     setBusy(true);
     try {
-      const returned = await saveDemoRequest({ typeId, title: buildRequestTitle(draft, locale), details: reason.trim(), ...draftPeriodFields(draft), submit });
-      setSavedMessage(locale === "ar"
-        ? `${submit ? "أرسلت" : "حفظت"} طبقة العرض التجريبية الطلب بالحالة «${returned.status === "DRAFT" ? t("stDraft") : t("stPendingManager")}». هذا التغيير غير دائم وسيختفي بعد إعادة تحميل الصفحة.`
-        : `The demo data layer ${submit ? "submitted" : "saved"} the request as “${returned.status === "DRAFT" ? t("stDraft") : t("stPendingManager")}”. This change is non-persistent and will disappear after reload.`);
+      await saveDemoRequest({ typeId, title: derivedTitle, details: reason.trim(), ...draftPeriodFields(draft), submit });
+      setSavedSnapshot(JSON.stringify([typeId, startDate, endDate, startTime, endTime, reason.trim()]));
+      setSavedMessage({ kind: "success", text: submit ? t("requestSubmitSuccess") : t("requestDraftSuccess") });
+      if (submit) {
+        /* §3 (critical blocker): the page's job is done — navigate to the list. The saved
+           request is at the top of myRequestItems, so the new row IS the first one. */
+        navigate("/requests");
+        return;
+      }
     } catch {
-      setSavedMessage(locale === "ar" ? "لم تؤكد طبقة العرض التغيير. احتفظنا بالقيم؛ أعد المحاولة." : "The demo data layer did not confirm the change. Your values are preserved; retry.");
+      setSavedMessage({ kind: "error", text: t("requestRetryFailure") });
     } finally {
       setBusy(false);
     }
   };
-  const dateField = (id: string, label: string, value: string, onChange: (next: string) => void, ref?: typeof periodRef, min?: string) => <label className="field"><span className="field-label">{label}</span><input id={id} ref={ref} className="input" type="date" value={value} min={min || undefined} onChange={(event) => onChange(event.target.value)} /></label>;
-  const timeField = (id: string, label: string, value: string, onChange: (next: string) => void, ref?: typeof clockRef) => <label className="field"><span className="field-label">{label}</span><input id={id} ref={ref} className="input" type="time" value={value} onChange={(event) => onChange(event.target.value)} /></label>;
-  return <div className="page reading-page"><PageHeader title={t("newRequest")} subtitle={locale === "ar" ? "طلب جديد · اختر النوع والمدة من التقويم" : "New request · choose a type and pick the period"} breadcrumb={<Link to="/requests">{t("myRequestsTitle")}</Link>} />
+  const tryLeave = () => (hasUnsaved ? setConfirmLeave(true) : navigate("/requests"));
+  /* §4: the failing control gets aria-invalid + a describedby pointer to the error line; both
+     clear the moment validation passes again (issue === null). */
+  const issueId = issue ? `request-issue-${issue.field}` : undefined;
+  const dateField = (id: string, label: string, value: string, onChange: (next: string) => void, ref?: typeof periodRef, min?: string) => <label className="field"><span className="field-label">{label}</span><input id={id} ref={ref} className="input" type="date" dir="ltr" lang={locale} value={value} min={min || undefined} onChange={(event) => onChange(event.target.value)} aria-invalid={issue?.field === "period" ? "true" : undefined} aria-describedby={(issue?.field === "period" ? issueId : receiptId)} /></label>;
+  const timeField = (id: string, label: string, value: string, onChange: (next: string) => void, ref?: typeof clockRef) => <label className="field"><span className="field-label">{label}</span><input id={id} ref={ref} className="input" type="time" dir="ltr" value={value} onChange={(event) => onChange(event.target.value)} aria-invalid={issue?.field === "clock" ? "true" : undefined} aria-describedby={issue?.field === "clock" ? issueId : receiptId} /></label>;
+  /* H13d review fixes, both measured on the served build:
+     - an error must clear the moment its field is valid again: only the submit gate RAISES an
+       issue, and editing re-runs that gate while one is showing, so `aria-invalid` and the inline
+       message go away as soon as the draft is valid;
+     - the picker is ONE tab stop with RTL-aware arrow keys, and each option describes its OWN path
+       line — the old group-level aria-describedby pointed at an id no element carried. */
+  const revalidate = (next: Partial<RequestDraft>) => { if (issue) setIssue(validateDraft({ ...draft, ...next }, locale)); };
+  const onStartDate = (value: string) => { setStartDate(value); revalidate({ startDate: value }); };
+  const onEndDate = (value: string) => { setEndDate(value); revalidate({ endDate: value }); };
+  const onStartTime = (value: string) => { setStartTime(value); revalidate({ startTime: value }); };
+  const onEndTime = (value: string) => { setEndTime(value); revalidate({ endTime: value }); };
+  const chooseType = (next: (typeof requestTypes)[number], moveFocus: boolean) => {
+    setTypeId(next.id);
+    /* §3: the picked values survive a type switch; the receipt re-runs itself below. */
+    revalidate({ requestType: next });
+    if (moveFocus) window.requestAnimationFrame(() => document.getElementById(`request-type-option-${next.id}`)?.focus());
+  };
+  const moveType = (event: { key: string; preventDefault: () => void }, index: number) => {
+    const rtl = document.documentElement.getAttribute("dir") === "rtl";
+    const forward = rtl ? "ArrowLeft" : "ArrowRight";
+    const backward = rtl ? "ArrowRight" : "ArrowLeft";
+    const step = event.key === forward || event.key === "ArrowDown" ? 1 : event.key === backward || event.key === "ArrowUp" ? -1 : 0;
+    if (!step) return;
+    event.preventDefault();
+    chooseType(requestTypes[(index + step + requestTypes.length) % requestTypes.length], true);
+  };
+  const typeField = <div className="field type-field"><span className="field-label" id="request-type-label">{t("requestType")}</span><div className="role-segmented" role="radiogroup" aria-labelledby="request-type-label">{requestTypes.map((requestType, index) => {
+    const selected = typeId === requestType.id;
+    const pathId = `request-type-path-${requestType.id}`;
+    return <button key={requestType.id} id={`request-type-option-${requestType.id}`} type="button" role="radio" aria-checked={selected} aria-label={requestType.name[locale]} aria-describedby={pathId} tabIndex={selected ? 0 : -1} className={`role-segmented-option${selected ? " is-selected" : ""}`} onClick={() => chooseType(requestType, false)} onKeyDown={(event) => moveType(event, index)}>{requestType.name[locale]}<span className="role-segmented-hint" id={pathId}>{requestType.requires_hr_approval ? t("requestTypePathManagerHr") : t("requestTypePathManager")}</span></button>;
+  })}</div></div>;
+  const periodField = <fieldset className="quiet-inset field request-inset"><legend className="field-label">{t("requestPeriod")}</legend>
+    <div className="request-period-row">
+      {kind === "PART_DAY"
+        ? <>{dateField("request-period", t("requestPeriodDate"), startDate, onStartDate, periodRef)}{timeField("request-clock", t("requestPeriodFromTime"), startTime, onStartTime, clockRef)}{timeField("request-clock-end", t("requestPeriodToTime"), endTime, onEndTime)}</>
+        : <>{dateField("request-period", kind === "SINGLE_DATE" ? t("requestPeriodDate") : t("requestPeriodFrom"), startDate, onStartDate, periodRef)}{kind === "FULL_DAYS" && dateField("request-period-end", t("requestPeriodTo"), endDate, onEndDate, undefined, startDate)}</>}
+    </div>
+    {kind === "SINGLE_DATE" && <span className="field-hint request-single-hint">{t("requestPeriodSingleOnly")}</span>}
+    {issue && <span id={issueId} className="request-inline-error">{issue.message}</span>}
+    {startDate ? <div id={receiptId} className="request-receipt">
+      {receiptWarning
+        ? <span className="request-receipt-line request-live-warning"><bdi>{receiptWarning}</bdi></span>
+        : <span className="request-receipt-line"><bdi>{derivedTitle}</bdi></span>}
+    </div> : null}
+  </fieldset>;
+  const reasonId = "request-reason-text";
+  return <div className="page reading-page new-request-page"><PageHeader title={t("newRequest")} subtitle={t("newRequestSubtitle")} breadcrumb={<Link to="/requests">{t("myRequestsTitle")}</Link>} primaryAction={<span className="page-meta new-request-steps" aria-hidden="true">{t("newRequestSteps")}</span>} />
     {issue && <div className="banner banner-error" role="alert" tabIndex={-1} ref={summaryRef}><a href={issue.field === "clock" ? "#request-clock" : "#request-period"} onClick={() => (issue.field === "clock" ? clockRef.current : periodRef.current)?.focus()}>{issue.message}</a></div>}
-    <form className="work-surface" noValidate onSubmit={(event) => event.preventDefault()}><label className="field"><span className="field-label">{t("requestType")}</span><select className="select" name="request-type" value={typeId} onChange={(event) => { setTypeId(Number(event.target.value)); setIssue(null); }}>{requestTypes.map((requestType) => <option key={requestType.id} value={requestType.id}>{requestType.name[locale]}</option>)}</select><span className="field-hint">{selectedType.requires_hr_approval ? (locale === "ar" ? "المسار: المدير ثم الموارد البشرية." : "Review path: manager, then HR.") : (locale === "ar" ? "المسار: مراجعة المدير." : "Review path: manager review.")}</span></label>
-      <fieldset className="quiet-inset field"><legend className="field-label">{t("requestPeriod")}</legend>
-        {kind === "PART_DAY"
-          ? <>{dateField("request-period", t("requestPeriodDate"), startDate, setStartDate, periodRef)}{timeField("request-clock", t("requestPeriodFromTime"), startTime, setStartTime, clockRef)}{timeField("request-clock-end", t("requestPeriodToTime"), endTime, setEndTime)}</>
-          : <>{dateField("request-period", kind === "SINGLE_DATE" ? t("requestPeriodDate") : t("requestPeriodFrom"), startDate, setStartDate, periodRef)}{kind === "FULL_DAYS" && dateField("request-period-end", t("requestPeriodTo"), endDate, setEndDate, undefined, startDate)}</>}
-        <span className="field-hint">{duration ? `${t("requestPeriodHint")} ${duration}` : t("requestPeriodHint")}</span>
-      </fieldset>
-      <label className="field"><span className="field-label">{t("requestReason")}</span><textarea className="textarea" name="details" value={reason} onChange={(event) => setReason(event.target.value)} /></label>
-      <fieldset className="quiet-inset field"><legend className="field-label">{t("attachments")}</legend><input className="input" type="file" disabled aria-describedby="attachment-demo" /><span id="attachment-demo" className="field-hint">{locale === "ar" ? "رفع المرفقات غير متاح في النسخة التجريبية. سيعرض النظام سياسة الخادم عند الربط." : "Uploads are unavailable in this demo. Server policy will be shown when integrated."}</span></fieldset>
-      {savedMessage && <Banner tone="success">{savedMessage}</Banner>}<div className="form-actions"><button className="btn btn-secondary" type="button" disabled={busy} onClick={() => hasUnsaved ? setConfirmLeave(true) : navigate("/requests")}>{t("back")}</button><button className="btn btn-secondary" type="button" disabled={busy} onClick={() => save(false)}>{t("saveDraft")}</button><button className="btn btn-primary" type="button" disabled={busy} onClick={() => save(true)}>{busy ? <><span className="spinner" aria-hidden="true" />{t("saving")}</> : t("submitRequest")}</button></div>
-      {confirmLeave && <Banner tone="warning" role="alert"><div><p>{locale === "ar" ? "لديك تعديلات غير محفوظة. هل تريد الخروج دون حفظ؟" : "You have unsaved changes. Leave without saving?"}</p><div className="form-actions"><button className="btn btn-secondary" type="button" onClick={() => navigate("/requests")}>{locale === "ar" ? "خروج دون حفظ" : "Leave without saving"}</button><button className="btn btn-primary" type="button" onClick={() => setConfirmLeave(false)}>{t("cancel")}</button></div></div></Banner>}
+    <form className="work-surface" noValidate onSubmit={(event) => event.preventDefault()}>
+      {typeField}
+      {periodField}
+      <label className="field"><span className="field-label">{t("requestReasonOptional")}</span><textarea id={reasonId} className="textarea" name="details" rows={3} maxLength={500} placeholder={t("requestReasonPlaceholder")} value={reason} onChange={(event) => setReason(event.target.value)} aria-describedby="reason-hint" /><span className="field-hint" id="reason-hint">{`${t("requestReasonHint")} ${reason.length >= 440 ? t("requestReasonCountNear").replace("%s", String(reason.length)) : ""}`}</span></label>
+      <label className="field request-attachments-field"><span className="field-label">{t("attachments")}</span>
+        <span className="file-placeholder">{t("attachmentsDemo")}</span>
+        <input type="file" disabled aria-hidden="true" aria-label={t("attachmentsDemo")} className="file-input-hidden" tabIndex={-1} />
+        <span className="field-hint" id="attachment-demo">{t("attachmentsNote")}</span>
+      </label>
+      {savedMessage && <Banner tone={savedMessage.kind === "success" ? "success" : "error"} role={savedMessage.kind === "error" ? "alert" : "status"}>{savedMessage.text}</Banner>}
+      <div className="form-actions request-stick-actions">
+        <button className="btn btn-primary" type="button" disabled={busy} aria-busy={busy} onClick={() => save(true)}>{busy ? <><span className="spinner" aria-hidden="true" />{t("saving")}</> : t("submitRequest")}</button>
+        <button className="btn btn-secondary" type="button" disabled={busy} onClick={() => save(false)}>{t("saveDraft")}</button>
+        <button className="btn btn-ghost" type="button" disabled={busy} onClick={tryLeave}>{t("back")}</button>
+      </div>
+      {confirmLeave && <Banner tone="warning" role="alert"><div><p>{locale === "ar" ? "لديك تعديلات غير محفوظة. هل تريد الخروج دون حفظ؟" : "You have unsaved changes. Leave without saving?"}</p><div className="confirm-leave-actions"><button className="btn btn-primary" type="button" onClick={() => setConfirmLeave(false)}>{t("cancel")}</button><button className="btn btn-danger" type="button" onClick={() => navigate("/requests")}>{locale === "ar" ? "خروج دون حفظ" : "Leave without saving"}</button></div></div></Banner>}
     </form>
   </div>;
 }

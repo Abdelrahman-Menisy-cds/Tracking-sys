@@ -34,7 +34,8 @@ from accounts.employee_serializers import (
     EmployeeReadSerializer,
     EmployeeUpdateSerializer,
 )
-from accounts.serializers import CurrentUserSerializer, CurrentUserUpdateSerializer, LoginSerializer
+from accounts.serializers import CurrentUserSerializer, CurrentUserUpdateSerializer, LoginSerializer, SignupSerializer
+from accounts.views import SignupView
 from notifications.serializers import NotificationReadStateSerializer, NotificationSerializer
 from reqs import serializers as reqs_serializers
 from review.serializers import (
@@ -74,6 +75,13 @@ TIMESHEET_EVENT = _component(ts_serializers.TimesheetEventSerializer(), "Timeshe
 
 # Request body components (write shapes), exactly as the views instantiate them.
 LOGIN_REQUEST = _component(LoginSerializer(), "LoginRequest")
+SIGNUP_REQUEST = _component(SignupSerializer(), "SignupRequest")
+SIGNUP_EMAIL_IN_USE = {
+    "title": "SignupEmailInUse",
+    "type": "object",
+    "properties": {"outcome": {"type": "string", "enum": ["email_in_use"]}},
+    "required": ["outcome"],
+}
 CURRENT_USER_UPDATE_REQUEST = _component(CurrentUserUpdateSerializer(partial=True), "CurrentUserUpdateRequest")
 EMPLOYEE_CREATE_REQUEST = _component(EmployeeCreateSerializer(), "EmployeeCreateRequest")
 EMPLOYEE_UPDATE_REQUEST = _component(EmployeeUpdateSerializer(partial=True), "EmployeeUpdateRequest")
@@ -251,6 +259,28 @@ def _schema(request_bodies=None, responses=None):
         (_ViewSchema,),
         {"request_bodies": request_bodies or {}, "responses": responses or {}},
     )
+
+
+class SignupSchema(_ViewSchema):
+    request_bodies = {"post": _body(_object_ref("SignupRequest"))}
+    responses = {
+        # SignupView.post: 200 CurrentUser + csrftoken on success,
+        # 200 {"data": {"outcome": "email_in_use"}} for an existing account.
+        "post": {
+            **_json_response("200", "Session established.", {
+                "type": "object",
+                "properties": {
+                    "data": _object_ref("CurrentUser"),
+                    "meta": {"type": "object", "properties": {"csrftoken": {"type": "string"}}},
+                },
+            }),
+            **_json_response("200", "Email already registered; account untouched (non-enumerating).", _data_envelope(SIGNUP_EMAIL_IN_USE)),
+            **_error_response("400", "invalid_code: wrong or inactive subscription code (generic)."),
+            **_error_response("403", "CSRF check failed on the unsafe method."),
+            **_error_response("422", "Validation failed (e.g. weak password or bad email)."),
+            **_error_response("429", "Signup rate limit exceeded (10/min per IP)."),
+        },
+    }
 
 
 class AccountsSchema(_ViewSchema):
@@ -879,6 +909,7 @@ def _wire_schemas():
 
     _attach_schema(accounts_views.CsrfBootstrapView, AccountsSchema)
     _attach_schema(accounts_views.LoginView, AccountsSchema)
+    _attach_schema(accounts_views.SignupView, SignupSchema)
     _attach_schema(accounts_views.LogoutView, AccountsSchema)
     _attach_schema(accounts_views.MeView, MeSchema)
     _attach_schema(employee_views.EmployeeListView, EmployeeSchema)
@@ -1045,6 +1076,7 @@ COMPONENT_SCHEMAS = {
     "TimesheetEvent": TIMESHEET_EVENT,
     "Attachment": ATTACHMENT,
     "LoginRequest": LOGIN_REQUEST,
+    "SignupRequest": SIGNUP_REQUEST,
     "CurrentUserUpdateRequest": CURRENT_USER_UPDATE_REQUEST,
     "EmployeeCreateRequest": EMPLOYEE_CREATE_REQUEST,
     "EmployeeUpdateRequest": EMPLOYEE_UPDATE_REQUEST,

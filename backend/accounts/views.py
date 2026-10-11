@@ -24,8 +24,14 @@ class LoginRateThrottle(AnonRateThrottle):
     scope = "login"
 
 
-from accounts.serializers import CurrentUserSerializer, CurrentUserUpdateSerializer, LoginSerializer
-from accounts.services import sign_in, sign_out
+class SignupRateThrottle(AnonRateThrottle):
+    """Limit unauthenticated signup attempts to 10 per minute per IP (H14)."""
+
+    scope = "signup"
+
+
+from accounts.serializers import CurrentUserSerializer, CurrentUserUpdateSerializer, LoginSerializer, SignupSerializer
+from accounts.services import sign_in, sign_out, sign_up
 
 
 class CsrfBootstrapView(APIView):
@@ -71,6 +77,82 @@ class LoginView(APIView):
                     request=request,
                 ),
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            {
+                "data": CurrentUserSerializer(user).data,
+                "meta": {"csrftoken": get_token(request)},
+            }
+        )
+
+
+class SignupView(APIView):
+    """POST /api/v1/auth/signup — self-service HR signup (Story H14).
+
+    Anonymous callers reach this view exactly like LoginView: no
+    authentication classes, CSRF enforced explicitly via
+    CsrfEnforcedSessionAuthentication.enforce_csrf, throttled by its own
+    10/min-anonymous scope.
+
+    success         -> 200 {"data": CurrentUserSerializer, "meta": csrftoken},
+                       caller is signed in (sign_in service contract).
+    wrong/inactive
+    code            -> 400 invalid_code (generic; «الكود غير صحيح»).
+    existing email
+    +valid code     -> 200 with data {"outcome": "email_in_use"} — account
+                       untouched (role preserved), no user data, no
+                       enumeration; mirrors login's generic posture.
+    weak password   -> 422 validation_error with the app's validator msgs.
+
+    Audit: no AuditEvent is written for self-signup. AuditEvent.actor is a
+    required PROTECT FK implying an authenticated responsible actor, and a
+    self-service caller IS the resulting user rather than an actor acting
+    on someone else; fabricating an actor would be a lie in the audit
+    trail. The code's use counter (accounts.SubscriptionCode.use_count /
+    last_used_at) is the durable record of this flow.
+    """
+
+    permission_classes = []  # anonymous callers must reach this endpoint
+    authentication_classes = []  # anonymous callers; CSRF enforced in post()
+    throttle_classes = [SignupRateThrottle]
+
+    def post(self, request):
+        # CSRF enforced explicitly, same as LoginView (no csrf_exempt).
+        CsrfEnforcedSessionAuthentication().enforce_csrf(request)
+        serializer = SignupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user, error = sign_up(
+            request=request,
+            email=serializer.validated_data["email"],
+            code=serializer.validated_data["code"],
+            password=serializer.validated_data["password"],
+        )
+        if error == "invalid_code":
+            return Response(
+                error_payload(
+                    code="invalid_code",
+                    message="الكود غير صحيح.",
+                    fields={"code": ["الكود غير صحيح."]},
+                    request=request,
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if error == "invalid_password":
+            return Response(
+                error_payload(
+                    code="validation_error",
+                    message="Validation failed.",
+                    fields={"password": ["This password is too weak."]},
+                    request=request,
+                ),
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+        if error == "active_account":
+            # Non-enumerating: an existing email is confirmed usable but no
+            # account data or role change is offered; the caller signs in
+            # through /auth/login with their own credentials.
+            return Response(
+                {"data": {"outcome": "email_in_use"}, "meta": {"csrftoken": get_token(request)}}
             )
         return Response(
             {

@@ -1,3 +1,5 @@
+from django.core.exceptions import ValidationError as django_exceptions_ValidationError
+from django.core.validators import EmailValidator
 from rest_framework import serializers
 
 
@@ -8,6 +10,28 @@ class LoginSerializer(serializers.Serializer):
         trim_whitespace=False,
         style={"input_type": "password"},
     )
+
+
+class SignupSerializer(serializers.Serializer):
+    """Body of POST /auth/signup: {email, code, password} (Story H14)."""
+
+    email = serializers.EmailField(trim_whitespace=True)
+    code = serializers.CharField(max_length=128, trim_whitespace=True)
+    password = serializers.CharField(
+        max_length=128,
+        trim_whitespace=False,
+        style={"input_type": "password"},
+    )
+
+    def validate_password(self, value):
+        """Run the app's own password validators; surface their messages."""
+        from django.contrib.auth.password_validation import validate_password
+
+        try:
+            validate_password(value)
+        except django_exceptions_ValidationError as exc:
+            raise serializers.ValidationError(list(exc.messages)) from exc
+        return value
 
 
 class CurrentUserSerializer(serializers.Serializer):

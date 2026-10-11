@@ -14,7 +14,9 @@ import {
   buildRequestTitle,
   draftPeriodFields,
   draftSpan,
+  durationState,
   durationText,
+  durationWarningText,
   periodKindOf,
   validateDraft,
   type RequestDraft,
@@ -87,6 +89,22 @@ check("the leave title is built in the reader's locale", buildRequestTitle(leave
 check("the exit title names the type and the window", buildRequestTitle(exitDraft, "ar") === "تصريح خروج أثناء اليوم — 120 دقيقة", buildRequestTitle(exitDraft, "ar"));
 check("the correction title names its day", /[٠-٩0-9]/.test(buildRequestTitle(correctionDraft, "ar")) && buildRequestTitle(correctionDraft, "ar").includes(correctionType.name.ar), buildRequestTitle(correctionDraft, "ar"));
 check("the live duration matches the span", durationText(leaveDraft, "ar") === "4 يوم عمل", durationText(leaveDraft, "ar"));
+
+/* ------------------------------------------------------------------ *
+ * 3b. H13c — the receipt reacts at PICK time (spec §3: the receipt is
+ * what the manager will read first; it must speak before any submit).
+ * ------------------------------------------------------------------ */
+check("a start-only leave reads its single-day state live", durationState({ ...leaveDraft, endDate: "" }) === "SINGLE_DAY", durationState({ ...leaveDraft, endDate: "" }));
+check("the single-day state's wording is the contract's wording", durationWarningText({ ...leaveDraft, endDate: "" }, "ar") === "يوم واحد (لم تختر بعد تاريخ نهاية)", durationWarningText({ ...leaveDraft, endDate: "" }, "ar"));
+check("a weekend-only span warns of zero working days", durationState({ ...leaveDraft, startDate: friday, endDate: saturday }) === "NO_WORKING_DAY", durationState({ ...leaveDraft, startDate: friday, endDate: saturday }));
+check("a reversed span has its own reversed state", durationState({ ...leaveDraft, endDate: isoDay(toSunday - 1) }) === "REVERSED", durationState({ ...leaveDraft, endDate: isoDay(toSunday - 1) }));
+check("the reversed span's live warning is the submit gate's own sentence", durationWarningText({ ...leaveDraft, endDate: isoDay(toSunday - 1) }, "ar") === "تاريخ النهاية قبل تاريخ البداية.", durationWarningText({ ...leaveDraft, endDate: isoDay(toSunday - 1) }, "ar"));
+check("the zero-working-day warning carries the submit gate's sentence", durationWarningText({ ...leaveDraft, startDate: friday, endDate: saturday }, "ar") === "المدة المختارة ما فيها يوم عمل.", durationWarningText({ ...leaveDraft, startDate: friday, endDate: saturday }, "ar"));
+check("an empty exit clock reads its empty state live", durationState({ ...exitDraft, startTime: "", endTime: "" }) === "EMPTY_CLOCK", durationState({ ...exitDraft, startTime: "", endTime: "" }));
+check("a reversed exit clock warns before any submit", durationState({ ...exitDraft, startTime: "12:00", endTime: "10:00" }) === "REVERSED_CLOCK" && durationWarningText({ ...exitDraft, startTime: "12:00", endTime: "10:00" }, "ar") === "وقت النهاية لازم يكون بعد وقت البداية.", durationWarningText({ ...exitDraft, startTime: "12:00", endTime: "10:00" }, "ar"));
+check("a counted exit span reports no warning", durationWarningText(exitDraft, "ar") === null, durationWarningText(exitDraft, "ar"));
+check("a complete leave reports no warning", durationWarningText(leaveDraft, "ar") === null, durationWarningText(leaveDraft, "ar"));
+check("a correction reads no receipt line at all", durationState(correctionDraft) === null && durationWarningText(correctionDraft, "ar") === null, [durationState(correctionDraft), durationWarningText(correctionDraft, "ar")]);
 
 check("a missing period is refused", validateDraft({ ...leaveDraft, startDate: "" }, "ar")?.field === "period", validateDraft({ ...leaveDraft, startDate: "" }, "ar"));
 check("a reversed range is refused", validateDraft({ ...leaveDraft, endDate: isoDay(toSunday - 1) }, "ar")?.field === "period", validateDraft({ ...leaveDraft, endDate: isoDay(toSunday - 1) }, "ar"));

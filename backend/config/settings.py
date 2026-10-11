@@ -42,6 +42,11 @@ MIDDLEWARE = [
     "config.api_version.APIVersionMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    # H15a: activate the request locale (Accept-Language) BEFORE CommonMiddleware
+    # (Django's documented order) so Django's own translated validator messages
+    # reach the client in the client's language. LANGUAGE_CODE stays "en": the
+    # default is per-request, never a global Arabic one.
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -99,6 +104,14 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = "en"
 TIME_ZONE = "UTC"
 USE_I18N = True
+
+# H15a: project-owned translations (LOCALE_PATHS) back the Accept-Language
+# strings Django's own catalogs miss — concretely the MinimumLengthValidator
+# "too short" message whose ar entry is absent upstream (Django #36378,
+# wontfix). LOCALE_PATHS locales are merged above per-app catalogs, so this
+# layer both fills gaps and can override; English msgids keep `en` output
+# unchanged (LANGUAGE_CODE stays "en", no Arabic default).
+LOCALE_PATHS = [BASE_DIR / "locale"]
 USE_TZ = True
 
 STATIC_URL = "static/"
@@ -141,6 +154,7 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "config.api.api_exception_handler",
     "DEFAULT_THROTTLE_RATES": {
         "login": "10/min",
+        "signup": "10/min",
         "mutation": "60/min",
         "attachment_upload": "20/hour",
         "report_export": "5/hour",

@@ -27,12 +27,15 @@ export type ApiFailureKind =
 export class ApiError extends Error {
   readonly kind: ApiFailureKind;
   readonly status: number;
+  /** Per-field messages from the server's error envelope, e.g. {password: ["…"]} (H15b). */
+  readonly fields?: Record<string, string[]>;
 
-  constructor(kind: ApiFailureKind, status: number, message: string) {
+  constructor(kind: ApiFailureKind, status: number, message: string, fields?: Record<string, string[]>) {
     super(message);
     this.name = "ApiError";
     this.kind = kind;
     this.status = status;
+    this.fields = fields;
   }
 }
 
@@ -64,10 +67,12 @@ async function ensureCsrfToken(): Promise<string | null> {
 }
 
 type RequestOptions = {
-  method?: "GET" | "POST";
+  method?: "GET" | "POST" | "PATCH" | "DELETE";
   body?: unknown;
   /** Give up after this long. A hanging request must not look like a slow success. */
   timeoutMs?: number;
+  /** The UI locale, so the server's own validator messages come back in the operator's language. */
+  acceptLanguage?: string;
 };
 
 /** The signed-in account as the server describes it. */
@@ -99,6 +104,31 @@ export async function getIdentity(): Promise<ServerIdentity> {
   return payload.data;
 }
 
+/**
+ * Self-service HR signup (Story H14). Same CSRF bootstrap as login().
+ *
+ * Success is a signed-in session: the server creates the HR account and
+ * establishes it on the same request (mirroring sign_in), so the payload is
+ * the same envelope login() returns.
+ *
+ * The one non-signup outcome is `email_in_use`: an existing email answered with
+ * a valid code returns `{"data": {"outcome": "email_in_use"}}` — non-enumerating,
+ * no re-role, no account data. It is NOT a ServerIdentity and must not be
+ * adopted as one, so it is raised as an ApiError and the login screen renders
+ * its own line for it.
+ */
+export async function signup(email: string, code: string, password: string, locale?: string): Promise<ServerIdentity> {
+  const payload = await apiRequest<{ data: ServerIdentity | { outcome?: string } }>("/auth/signup", {
+    method: "POST",
+    body: { email, code, password },
+    acceptLanguage: locale,
+  });
+  if ("outcome" in payload.data && payload.data.outcome === "email_in_use") {
+    throw new ApiError("invalid", 200, "email_in_use");
+  }
+  return payload.data as ServerIdentity;
+}
+
 export async function logout(): Promise<void> {
   await apiRequest<void>("/auth/logout", { method: "POST" });
 }
@@ -118,11 +148,15 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   // A cold refresh drives Nager AND two reasoning-LLM calls, measured at ~348s
   // end to end. A short timeout aborts a call that was going to succeed and
   // reports it as unreachable, which is a lie about what happened.
-  const { method = "GET", body, timeoutMs = 600000 } = options;
+  const { method = "GET", body, timeoutMs = 600000, acceptLanguage } = options;
   const headers: Record<string, string> = { Accept: "application/json" };
+  if (acceptLanguage) headers["Accept-Language"] = acceptLanguage;
 
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  if (method === "POST") {
+  // Every unsafe method needs the token, not just POST: Django enforces CSRF on
+  // PATCH and DELETE too, and a missing header there looks exactly like a
+  // permission problem.
+  if (method !== "GET") {
     const token = await ensureCsrfToken();
     if (token) headers["X-CSRFToken"] = token;
   }
@@ -162,19 +196,23 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   // Prefer the backend's own error envelope: {"error": {"code", "message"}}.
   let message = `Request failed (${response.status}).`;
+  let fields: Record<string, string[]> | undefined;
   try {
-    const payload = (await response.json()) as { error?: { message?: string } };
+    const payload = (await response.json()) as { error?: { message?: string; fields?: Record<string, string[]> } };
     if (payload?.error?.message) message = payload.error.message;
+    // A validation failure names the field(s); without this the caller can only print the
+    // generic sentence («Validation failed.») and the operator never learns what to fix.
+    if (payload?.error?.fields && Object.keys(payload.error.fields).length > 0) fields = payload.error.fields;
   } catch {
     /* a non-JSON error body is not worth guessing at */
   }
 
-  if (response.status === 401) throw new ApiError("unauthenticated", 401, message);
+  if (response.status === 401) throw new ApiError("unauthenticated", 401, message, fields);
   // The permission matrix returns 404 for a non-HR caller (no existence disclosure),
   // so 404 here means "not allowed", not "missing".
   if (response.status === 403 || response.status === 404) {
-    throw new ApiError("forbidden", response.status, message);
+    throw new ApiError("forbidden", response.status, message, fields);
   }
-  if (response.status >= 500) throw new ApiError("server", response.status, message);
-  throw new ApiError("invalid", response.status, message);
+  if (response.status >= 500) throw new ApiError("server", response.status, message, fields);
+  throw new ApiError("invalid", response.status, message, fields);
 }
