@@ -204,5 +204,5 @@ export function weekInterval(weekStart: string, locale: "ar" | "en"): string {
 export function formatMinutes(minutes: number, locale: "ar" | "en"): string {
   const hours = Math.floor(minutes / 60);
   const remainderMinutes = minutes % 60;
-  return locale === "ar" ? `${hours} ساعة و${remainderMinutes} دقيقة` : `${hours} h ${remainderMinutes} min`;
+  return locale === "ar" ? `${hours}\u00a0ساعة\u00a0و${remainderMinutes}\u00a0دقيقة` : `${hours}\u00a0h\u00a0${remainderMinutes}\u00a0min`;
 }

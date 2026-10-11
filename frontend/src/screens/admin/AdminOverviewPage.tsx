@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useApp, usePageTitle } from "../../app/AppContext";
-import { formatDate, formatTimeRange } from "../../app/useMockList";
+import { formatDate, formatMinutes as duration, formatTimeRange } from "../../app/useMockList";
 import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../../components/ui";
 import OperationalTable, { type OperationalColumn } from "../../components/data/OperationalTable";
 import PageHeader from "../../components/layout/PageHeader";
@@ -316,10 +316,3 @@ function OverviewBody({
   );
 }
 
-// Brief H3 — the ONE shared formatting path; no screen-local Intl formatters.
-
-const duration = (minutes: number, locale: "ar" | "en"): string => {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${h}${locale === "ar" ? "س" : "h"} ${m}${locale === "ar" ? "د" : "m"}`;
-};

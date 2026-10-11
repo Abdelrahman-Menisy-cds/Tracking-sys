@@ -5,7 +5,7 @@ import { useApp, usePageTitle } from "../app/AppContext";
 import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../components/ui";
 import { ClockIcon, CloseIcon, InfoIcon } from "../components/icons";
 import { attendanceExceptionForEvent, cairoDate, identityEmployeeId, type AttendanceDay, type AttendanceEvent } from "../mock/attendance";
-import { formatDate as formatDateShared, formatTime as formatTimeShared, formatTimeRange, formatWallClockRange } from "../app/useMockList";
+import { formatDate as formatDateShared, formatMinutes as duration, formatTime as formatTimeShared, formatTimeRange, formatWallClockRange } from "../app/useMockList";
 import PageHeader from "../components/layout/PageHeader";
 
 type Pair = { inAt: string; outAt: string | null };
@@ -15,7 +15,6 @@ const todayIso = () => cairoDate(new Date());
 // Brief H3 — the ONE shared formatting path; no screen-local Intl formatters.
 const formatTime = (value: string | null, locale: "ar" | "en") => value ? formatTimeShared(value, locale) : "—";
 const formatDate = (value: string, locale: "ar" | "en") => formatDateShared(`${value}T12:00:00Z`, locale);
-const duration = (minutes: number, locale: "ar" | "en") => { const h = Math.floor(minutes / 60); const m = minutes % 60; return `${h}${translate(locale, "attendanceHoursSuffix")} ${m}${translate(locale, "attendanceMinutesSuffix")}`; };
 const minutesBetween = (start: string, end: string) => Math.max(0, Math.round((Date.parse(end) - Date.parse(start)) / 60000));
 
 function eventPairs(events: AttendanceEvent[], date: string): Pair[] {

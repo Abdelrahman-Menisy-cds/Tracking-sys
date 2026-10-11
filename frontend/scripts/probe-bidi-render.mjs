@@ -19,7 +19,7 @@ const PORT = 9663;
 function audit() {
   const ZW = /[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
   const IS_ZW = /[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/;
-  const RE = /\d{1,2}[\/.:]\d{2}|[\u0621-\u064A]{2,}\s*\d{4}|\d{1,2}\s*[\u0621-\u064A]+\s*\d{4}|\d+\s*[سصمد]\b/;
+  const RE = /\d{1,2}[\/.:]\d{2}|[\u0621-\u064A]{2,}\s*\d{4}|\d{1,2}\s*[\u0621-\u064A]+\s*\d{4}|^\d+\s+ساعة\s+و\d+\s+دقيقة$|^\d+\s+h\s+\d+\s+min$/;
   const main = document.querySelector("main") || document.querySelector("[role=main]");
   if (!main) return [];
   const out = [];
@@ -44,7 +44,10 @@ function audit() {
     }
     if (chars.length < 3) continue;
     const visual = [...chars].sort((a, b) => a.x - b.x).map((c) => c.ch).join("").replace(/\s+/g, " ").trim();
-    out.push({ logical, visual, same: visual === logical });
+    const duration = /^(\d+) ساعة و(\d+) دقيقة$/.exec(logical);
+    // Arabic words read right-to-left; only the Latin digit runs read left-to-right.
+    const expected = duration ? `ةقيقد ${duration[2]}و ةعاس ${duration[1]}` : logical;
+    out.push({ logical, visual, same: visual === expected });
   }
   const seen = new Set();
   return out.filter((r) => (seen.has(r.logical) ? false : (seen.add(r.logical), true))).slice(0, 40);
