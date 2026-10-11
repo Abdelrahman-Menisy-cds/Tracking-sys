@@ -592,7 +592,7 @@ export const dict = {
     dhikrNoticeTitle: "ذكر الساعة",
     prayerUnavailableLine: "لا يمكن حساب المواقيت لهذا التاريخ والموقع.",
     /* ===== Brief C — the tasks cycle: create / assign / route-to-manager ===== */
-    stOpen: "مفتوحة",
+    stOpen: "جديدة",
     stInProgress: "جارية",
     stDone: "منجزة",
     taskNav: "المهام",
@@ -1267,7 +1267,7 @@ export const dict = {
     dhikrNoticeTitle: "Hourly dhikr",
     prayerUnavailableLine: "Times could not be computed for this date and location.",
     /* ===== Brief C — the tasks cycle: create / assign / route-to-manager ===== */
-    stOpen: "Open",
+    stOpen: "New",
     stInProgress: "In progress",
     stDone: "Done",
     taskNav: "Tasks",
