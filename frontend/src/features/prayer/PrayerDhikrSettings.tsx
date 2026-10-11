@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useApp } from "../../app/AppContext";
+import { formatWallClock } from "../../app/useMockList";
 import { usePrayerNotices, type PrayerPreferences } from "../../features/prayer/usePrayerNotices";
 import { FloatingNoticeStack, type FloatingNoticeData } from "../../features/prayer/FloatingNoticeStack";
 import { formatPrayerMinutes, type PrayerTimes } from "../../features/prayer/prayerTimes";
@@ -109,7 +110,7 @@ export default function PrayerDhikrSettings({ employeeId, isMuslim }: PrayerDhik
                   <dt>{row.label}</dt>
                   <dd>
                     <time dateTime={formatPrayerMinutes(times.times[row.key])}>
-                      {formatPrayerMinutes(times.times[row.key])}
+                      {formatWallClock(formatPrayerMinutes(times.times[row.key]), locale)}
                     </time>
                   </dd>
                 </div>

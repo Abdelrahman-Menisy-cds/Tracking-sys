@@ -140,8 +140,8 @@ export function formatWeekdayOf(isoDate: string, locale: "ar" | "en"): string {
     .format(new Date(isoDate));
 }
 
-/** The long/full date shapes (profile join date, admin validity lines),
- *  still Latin digits and bidi-isolated. */
+/** Long date for a single-record detail (profile, holiday); lists, tables and
+ *  dense validity rows use numeric formatDate instead. */
 export function formatDateLong(isoDate: string, locale: "ar" | "en"): string {
   const parts = new Intl.DateTimeFormat(localeTag(locale), {
     year: "numeric", month: "long", day: "numeric", timeZone: CAIRO_TIME_ZONE,
@@ -165,8 +165,12 @@ export function formatTimeRange(fromIso: string | null, toIso: string | null, lo
   return isolated(`${fromIso ? unwrapped(formatTime(fromIso, locale)) : "—"} → ${toIso ? unwrapped(formatTime(toIso, locale)) : "—"}`);
 }
 
-export function formatWallClockRange(from: string, to: string, locale: "ar" | "en"): string {
-  return isolated(`${unwrapped(formatWallClock(from, locale))} → ${unwrapped(formatWallClock(to, locale))}`);
+export function formatDateTimeRange(fromIso: string, toIso: string, locale: "ar" | "en"): string {
+  return isolated(`${unwrapped(formatDateTime(fromIso, locale))} → ${unwrapped(formatDateTime(toIso, locale))}`);
+}
+
+export function formatWallClockRange(from: string, to: string | null, locale: "ar" | "en"): string {
+  return isolated(`${unwrapped(formatWallClock(from, locale))} → ${to ? unwrapped(formatWallClock(to, locale)) : "—"}`);
 }
 
 /** Numeric dates in dense rows and schedule validity ranges. */

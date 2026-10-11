@@ -46,12 +46,12 @@ export default function TaskDetailBody({ task }: { task: TaskMock }) {
           {task.due_date ? (
             <div>
               <dt>{t("taskDueDateLabel")}</dt>
-              <dd><bdi dir="ltr">{formatDate(`${task.due_date}T12:00:00Z`, locale)}</bdi></dd>
+              <dd>{formatDate(`${task.due_date}T12:00:00Z`, locale)}</dd>
             </div>
           ) : null}
           <div>
             <dt>{t("taskWillBeCreatedAt")}</dt>
-            <dd><bdi dir="ltr">{formatDateTime(task.created_at, locale)}</bdi></dd>
+            <dd>{formatDateTime(task.created_at, locale)}</dd>
           </div>
         </dl>
       </section>

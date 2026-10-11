@@ -30,7 +30,7 @@ export default function TaskTimeline({ events }: { events: TaskEventMock[] }) {
           <div>
             <strong>{actionLabels[event.action][locale]}</strong>
             <div className="muted">
-              <bdi>{name(event.actor)}</bdi> · <bdi dir="ltr">{formatDateTime(event.created_at, locale)}</bdi>
+              <bdi>{name(event.actor)}</bdi> · {formatDateTime(event.created_at, locale)}
             </div>
             {event.action === "ASSIGN" ? (
               <div className="muted">{t("taskAssignee")}: <bdi>{name(event.assigned)}</bdi></div>

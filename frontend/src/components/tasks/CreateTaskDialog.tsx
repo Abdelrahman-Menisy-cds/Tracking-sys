@@ -212,7 +212,7 @@ export default function CreateTaskDialog({
               </div>
               <div>
                 <dt>{t("taskWillBeCreatedAt")}</dt>
-                <dd><bdi dir="ltr">{fmtStamp(new Date().toISOString())}</bdi></dd>
+                <dd>{fmtStamp(new Date().toISOString())}</dd>
               </div>
             </dl>
           </div>

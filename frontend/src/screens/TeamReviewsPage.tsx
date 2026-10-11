@@ -125,7 +125,7 @@ export default function TeamReviewsPage() {
       label: t("week"),
       render: (sheet) => (
         <Link to={`/reviews/timesheets/${sheet.id}`}>
-          <bdi>{weekInterval(sheet.week_start, locale)}</bdi>
+          {weekInterval(sheet.week_start, locale)}
         </Link>
       ),
     },
@@ -415,7 +415,7 @@ export function ReviewTimesheetDetailPage() {
   return (
     <div className="page reading-page">
       <PageHeader
-        title={<>{t("week")}: <bdi>{weekInterval(sheet.week_start, locale)}</bdi></>}
+        title={<>{t("week")}: {weekInterval(sheet.week_start, locale)}</>}
         subtitle={`${t("employee")}: ${pickName(sheet.employee_name, locale)} · ${locale === "ar" ? "المنطقة الزمنية للمؤسسة" : "Organization timezone"}: Africa/Cairo`}
         breadcrumb={<Link to="/reviews">{t("teamReviewsTitle")}</Link>}
       />
@@ -430,7 +430,7 @@ export function ReviewTimesheetDetailPage() {
           <dl className="decision-facts">
             {sheet.entries.map((entry) => (
               <div key={entry.id}>
-                <dt><bdi>{formatDate(entry.work_date, locale)}</bdi></dt>
+                <dt>{formatDate(entry.work_date, locale)}</dt>
                 <dd>{formatMinutes(entry.duration_minutes, locale)} · {t("breakTime")}: {formatMinutes(entry.unpaid_break_minutes, locale)}{entry.description ? <> · <bdi>{entry.description}</bdi></> : null}</dd>
               </div>
             ))}

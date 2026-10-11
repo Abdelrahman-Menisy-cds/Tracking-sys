@@ -11,7 +11,7 @@
 import * as path from "node:path";
 import * as fs from "node:fs";
 import { fileURLToPath } from "node:url";
-import { formatDate, formatDateLong, formatDateRange, formatDateTime, formatTime, formatTimeRange, formatWallClock, formatWallClockRange, formatWeekdayIndex, formatWeekdayOf, weekInterval } from "../src/app/useMockList";
+import { formatDate, formatDateLong, formatDateRange, formatDateTime, formatDateTimeRange, formatTime, formatTimeRange, formatWallClock, formatWallClockRange, formatWeekdayIndex, formatWeekdayOf, weekInterval } from "../src/app/useMockList";
 
 let failed = false;
 const check = (label: string, ok: boolean, detail?: unknown) => {
@@ -67,6 +67,7 @@ for (const locale of ["ar", "en"] as const) {
     ["week", weekInterval("2026-10-05", locale)],
     ["date range", formatDateRange("2024-01-01T12:00:00Z", null, locale)],
     ["time range", formatTimeRange("2026-10-11T06:00:00Z", null, locale)],
+    ["date-time range", formatDateTimeRange("2026-10-11T06:00:00Z", "2026-10-11T15:00:00Z", locale)],
     ["wall-clock range", formatWallClockRange("09:00", "17:00", locale)],
   ]) unwrap(value);
 }
@@ -82,6 +83,7 @@ const offenders: string[] = [];
 const rawDisplay: string[] = [];
 const wrappedFormatters: string[] = [];
 const pageLocalFormatting: string[] = [];
+const discardedRenderValues: string[] = [];
 const walk = (dir: string) => {
   for (const name of fs.readdirSync(dir)) {
     const full = path.join(dir, name);
@@ -96,10 +98,12 @@ const walk = (dir: string) => {
     if (!/^(screens|components)\//.test(rel)) continue;
     // Storage keys, date/time input values and comparison expressions are not display.
     if (/>\s*\d{4}-\d{2}-\d{2}\s*</.test(text)
-      || /(?:<(?:bdi|span|strong|dd|dt|th|td)[^>]*>|subtitle=\{)[^\n]*\{(?:\w+\.)?(?:effective_from|effective_to|work_date|due_date|date)\}/.test(text)) rawDisplay.push(rel);
+      || />\s*\{(?:\w+\.)?(?:effective_from|effective_to|work_date|due_date|date)\}\s*</.test(text)
+      || /aria-label=\{`[^`]*\$\{(?:\w+\.)?(?:effective_from|effective_to|work_date|due_date|date)\}/.test(text)) rawDisplay.push(rel);
     if (/<bdi(?:\s+[^>]*)?>\s*\{(?:format(?:Date|Time|WallClock|Weekday)|weekInterval|fullDate|fmtDateTime|fmtStamp|mediumDate)\(/.test(text)
       || /<bdi[^>]*>[^<]*\{[^}]*format(?:Date|Time|WallClock)/.test(text)) wrappedFormatters.push(rel);
     if (/\bnew Intl\.DateTimeFormat|\.toLocale(?:Date|Time)?String\(|\.toISOString\(\)\s*\}/.test(text)) pageLocalFormatting.push(rel);
+    if (/render:\s*\([^)]*\)\s*=>\s*\{\s*(?:formatDate|formatTime|fmtDateTime|weekInterval)\(/.test(text)) discardedRenderValues.push(rel);
   }
 };
 walk(srcRoot);
@@ -110,8 +114,12 @@ check("5 · the two engine-only users are still confined to their known files",
 check("H8 · no raw ISO date is rendered as JSX text or a field value", rawDisplay.length === 0, rawDisplay);
 check("H8 · canonical formatter calls have no bdi/dir wrapper", wrappedFormatters.length === 0, wrappedFormatters);
 check("H8 · screens/components have no page-local date/time producers", pageLocalFormatting.length === 0, pageLocalFormatting);
+check("H8 · table renderers return their formatted value", discardedRenderValues.length === 0, discardedRenderValues);
+const prayerDisplay = fs.readFileSync(path.join(srcRoot, "features", "prayer", "PrayerDhikrSettings.tsx"), "utf8");
+check("H8 · profile prayer clocks use the canonical wall-clock display", /\{formatWallClock\(formatPrayerMinutes\(/.test(prayerDisplay)
+  && !/>\s*\{formatPrayerMinutes\(/.test(prayerDisplay));
 const formatSource = fs.readFileSync(path.join(srcRoot, "app", "useMockList.ts"), "utf8");
-for (const name of ["weekInterval", "formatDateRange", "formatTimeRange", "formatWallClockRange"]) {
+for (const name of ["weekInterval", "formatDateRange", "formatTimeRange", "formatDateTimeRange", "formatWallClockRange"]) {
   const body = formatSource.split(`export function ${name}(`)[1]?.split(/\nexport function /)[0] ?? "";
   check(`H8 · ${name} isolates the composed range`, /return isolated\(/.test(body));
 }

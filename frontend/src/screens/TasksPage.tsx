@@ -153,7 +153,7 @@ export default function TasksPage() {
       columns.push({
         key: "created",
         label: t("taskWillBeCreatedAt"),
-        render: (task) => <bdi dir="ltr">{formatDateTime(task.created_at, locale)}</bdi>,
+        render: (task) => formatDateTime(task.created_at, locale),
       });
     }
     return columns;

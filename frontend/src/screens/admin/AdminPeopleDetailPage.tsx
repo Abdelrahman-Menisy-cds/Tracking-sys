@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { useApp, usePageTitle } from "../../app/AppContext";
-import { formatWeekdayIndex, formatDateTime, cairoDayIso } from "../../app/useMockList";
+import { formatWeekdayIndex, formatDateTime, formatWallClockRange, cairoDayIso } from "../../app/useMockList";
 import { Banner, StatusPill } from "../../components/ui";
 import PageHeader from "../../components/layout/PageHeader";
 import AttentionStrip from "../../components/state/AttentionStrip";
@@ -53,7 +53,7 @@ type EmploymentTypeCode = keyof typeof employmentTypeKeys;
 
 const scheduleText = (schedule: WorkSchedule, locale: Locale): string =>
   `${schedule.working_weekdays.map((weekday) => weekdayLabel(weekday, locale)).join(locale === "ar" ? "، " : ", ")}`
-  + ` · ${schedule.expected_start}–${schedule.expected_end} · ${fmt(schedule.expected_daily_minutes, locale)} ${locale === "ar" ? "دقيقة/يوم" : "min/day"}`;
+  + ` · ${formatWallClockRange(schedule.expected_start, schedule.expected_end, locale)} · ${fmt(schedule.expected_daily_minutes, locale)} ${locale === "ar" ? "دقيقة/يوم" : "min/day"}`;
 
 // ── File-draft validation (§2.3 shared + HR-only fields) ──
 // Same ids/render pattern as ScheduleEditorDialog: errors[key] feeds

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useApp, usePageTitle } from "../../app/AppContext";
-import { formatTime as formatTimeShared } from "../../app/useMockList";
+import { formatDate, formatTimeRange } from "../../app/useMockList";
 import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../../components/ui";
 import OperationalTable, { type OperationalColumn } from "../../components/data/OperationalTable";
 import PageHeader from "../../components/layout/PageHeader";
@@ -225,9 +225,7 @@ function OverviewBody({
     {
       key: "times",
       label: `${t("attendanceFirstIn")} – ${t("attendanceLastOut")}`,
-      render: (entry) => (
-        <bdi dir="ltr">{formatTime(entry.day.first_in_at, locale)} → {formatTime(entry.day.last_out_at, locale)}</bdi>
-      ),
+      render: (entry) => formatTimeRange(entry.day.first_in_at, entry.day.last_out_at, locale),
     },
     {
       key: "status",
@@ -261,7 +259,7 @@ function OverviewBody({
     return (
       <div className="page">
         <AdminNav />
-        <PageHeader title={t("adminOverviewTitle")} subtitle={`${t("adminOverviewSnapshotPrefix")} ${today}`} />
+        <PageHeader title={t("adminOverviewTitle")} subtitle={`${t("adminOverviewSnapshotPrefix")} ${formatDate(`${today}T12:00:00Z`, locale)}`} />
         <ErrorState onRetry={retry} />
       </div>
     );
@@ -272,7 +270,7 @@ function OverviewBody({
       <AdminNav />
       <PageHeader
         title={t("adminOverviewTitle")}
-        subtitle={<>{t("adminOverviewSnapshotPrefix")} <bdi dir="ltr">{today}</bdi></>}
+        subtitle={<>{t("adminOverviewSnapshotPrefix")} {formatDate(`${today}T12:00:00Z`, locale)}</>}
       />
       <Banner tone="info" role="status">{t("adminOverviewScopeBanner")}</Banner>
       {phase === "loading" ? (
@@ -319,8 +317,6 @@ function OverviewBody({
 }
 
 // Brief H3 — the ONE shared formatting path; no screen-local Intl formatters.
-const formatTime = (value: string | null, locale: "ar" | "en"): string =>
-  value ? formatTimeShared(value, locale) : "—";
 
 const duration = (minutes: number, locale: "ar" | "en"): string => {
   const h = Math.floor(minutes / 60);

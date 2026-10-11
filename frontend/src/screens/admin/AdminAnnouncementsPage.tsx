@@ -302,7 +302,7 @@ function ComposerSection({ t, locale }: { t: (key: DictKey) => string; locale: "
               {" · "}
               {t("hrAnnouncementPendingLine").replace("%s", numText(resolution.recipientCount, locale))}
               {" · "}
-              <bdi dir="ltr">{fmtDateTime(resolution.startedAt, locale)}</bdi>
+              {fmtDateTime(resolution.startedAt, locale)}
             </div>
           </Banner>
         ) : null}
@@ -313,7 +313,7 @@ function ComposerSection({ t, locale }: { t: (key: DictKey) => string; locale: "
             <p className="page-meta">
               {t("hrAnnouncementReceiptTime").replace("%s", "")}
               {" "}
-              <bdi dir="ltr">{fmtDateTime(resolution.settledAt, locale)}</bdi>
+              {fmtDateTime(resolution.settledAt, locale)}
             </p>
           </Banner>
         ) : null}
@@ -693,7 +693,7 @@ function HistorySection({
     {
       key: "sent",
       label: t("hrAnnouncementSentAt"),
-      render: (record) => <bdi dir="ltr">{fmtDateTime(record.created_at, locale)}</bdi>,
+      render: (record) => fmtDateTime(record.created_at, locale),
     },
     {
       key: "status",

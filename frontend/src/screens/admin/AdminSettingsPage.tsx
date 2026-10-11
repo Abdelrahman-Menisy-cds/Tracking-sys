@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { useApp, usePageTitle } from "../../app/AppContext";
-import { formatWeekdayIndex, formatWeekdayOf, formatDateLong, cairoDayIso } from "../../app/useMockList";
+import { formatWeekdayIndex, formatWeekdayOf, formatDate, formatDateLong, formatDateRange, formatWallClockRange, cairoDayIso } from "../../app/useMockList";
 import { ApiError, type ApiFailureKind } from "../../app/api";
 import { fetchHolidays, isPartial, refreshHolidays, type RefreshSummary } from "../../app/holidaysApi";
 import { Banner, Dialog, EmptyState, ErrorState, SkeletonRows, StatusPill, type StatusTone } from "../../components/ui";
@@ -179,7 +179,7 @@ function ScheduleCard({ today, t, locale, orgSchedules }: { today: string; t: (k
           <button
             type="button"
             className="btn btn-ghost btn-compact icon-only"
-            aria-label={`${t("adminSettingsEditVersion")} — ${current.effective_from}`}
+            aria-label={`${t("adminSettingsEditVersion")} — ${formatDate(`${current.effective_from}T12:00:00Z`, locale)}`}
             onClick={() => openEditor(current)}
           >
             <EditIcon />
@@ -198,7 +198,7 @@ function ScheduleCard({ today, t, locale, orgSchedules }: { today: string; t: (k
             </div>
             <div>
               <dt>{t("attendanceExpected")}</dt>
-              <dd><bdi dir="ltr">{current.expected_start}</bdi> – <bdi dir="ltr">{current.expected_end}</bdi></dd>
+              <dd>{formatWallClockRange(current.expected_start, current.expected_end, locale)}</dd>
             </div>
             <div>
               <dt>{t("adminExpectedDailyMinutes")}</dt>
@@ -210,7 +210,7 @@ function ScheduleCard({ today, t, locale, orgSchedules }: { today: string; t: (k
             </div>
             <div>
               <dt>{t("adminCurrentSchedule")}</dt>
-              <dd><bdi dir="ltr">{current.effective_from}</bdi> → <bdi dir="ltr">{current.effective_to ?? "—"}</bdi></dd>
+              <dd>{formatDateRange(`${current.effective_from}T12:00:00Z`, current.effective_to ? `${current.effective_to}T12:00:00Z` : null, locale)}</dd>
             </div>
           </dl>
         ) : (
@@ -233,11 +233,11 @@ function ScheduleCard({ today, t, locale, orgSchedules }: { today: string; t: (k
             return (
               <li className="compact-row" key={version.id}>
                 <div>
-                  <strong><bdi dir="ltr">{version.effective_from}</bdi> → <bdi dir="ltr">{version.effective_to ?? "—"}</bdi></strong>
+                  <strong>{formatDateRange(`${version.effective_from}T12:00:00Z`, version.effective_to ? `${version.effective_to}T12:00:00Z` : null, locale)}</strong>
                   <div className="page-meta">
                     {version.working_weekdays.map((weekday) => weekdayLabel(weekday, locale)).join(locale === "ar" ? "، " : ", ")}
                     {" · "}
-                    <bdi dir="ltr">{version.expected_start}–{version.expected_end}</bdi>
+                    {formatWallClockRange(version.expected_start, version.expected_end, locale)}
                     {" · "}
                     {numText(version.expected_daily_minutes, locale)} +{numText(version.grace_minutes, locale)}
                   </div>
@@ -727,7 +727,7 @@ function HolidayRow({ holiday, t, locale, onEdit, onDelete }: { holiday: PublicH
   return (
     <li className="compact-row">
       <div>
-        <strong><bdi dir="ltr">{fullDate(holiday.date, locale)}</bdi></strong>
+        <strong>{fullDate(holiday.date, locale)}</strong>
         <div className="page-meta">{weekDayOf(holiday.date, locale)} · {holiday.name[locale]}{holiday.recurring ? ` · ${t("adminSettingsRecurring")}` : ""}</div>
         {badge ? (
           <div style={{ marginBlockStart: "var(--sp-1)" }}>
@@ -862,7 +862,7 @@ function HolidayDeleteDialog({
   const [submitting, setSubmitting] = useState(false);
   return (
     <Dialog title={t("adminSettingsDeleteTitle")} description={t("adminSettingsDeleteDescription")} busy={submitting} onClose={onClose}>
-      <p><strong>{target.name[locale]}</strong> · <bdi dir="ltr">{fullDate(target.date, locale)}</bdi></p>
+      <p><strong>{target.name[locale]}</strong> · {fullDate(target.date, locale)}</p>
       <form noValidate onSubmit={(event) => {
         event.preventDefault();
         setSubmitting(true);
