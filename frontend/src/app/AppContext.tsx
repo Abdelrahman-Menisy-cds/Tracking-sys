@@ -203,9 +203,15 @@ function storeSessionTasks(tasks: TaskMock[]): void {
  * memory" contract the banner describes.
  */
 function initialSessionTasks(): TaskMock[] {
-  const sessionExtras = readSessionTasks();
+  const sessionTasks = readSessionTasks();
+  const sessionById = new Map(sessionTasks.map((task) => [task.id, task]));
   const fixtureIds = new Set(demoTasks.map((task) => task.id));
-  return [...cloneFixture(demoTasks), ...sessionExtras.filter((task) => !fixtureIds.has(task.id))];
+  // Session copies of fixture tasks OVERRIDE the fixture row: an assignee
+  // change made earlier in the session must survive a reload, otherwise a
+  // reassignment silently reverts to the seeded assignee.
+  const fixtures = cloneFixture(demoTasks).map((task) => sessionById.get(task.id) ?? task);
+  const extras = sessionTasks.filter((task) => !fixtureIds.has(task.id));
+  return [...fixtures, ...extras];
 }
 
 function readStoredLocale(): Locale {

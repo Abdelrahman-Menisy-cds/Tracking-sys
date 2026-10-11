@@ -10,9 +10,10 @@ import { identityEmployeeId } from "../mock/attendance";
 import { TaskDemoBanner, TaskPriorityPill, TaskStatusPill } from "../components/tasks/TaskPills";
 import CreateTaskDialog from "../components/tasks/CreateTaskDialog";
 import AssignTaskDialog from "../components/tasks/AssignTaskDialog";
+import TaskTimesheetSection from "../components/tasks/TaskTimesheetSection";
 import type { TaskMock, TaskStatus } from "../mock/tasks";
 
-type TaskTab = "needs" | "mine" | "created";
+type TaskTab = "needs" | "mine" | "created" | "timesheet";
 type StatusFilter = TaskStatus | "ALL";
 
 /**
@@ -22,7 +23,7 @@ type StatusFilter = TaskStatus | "ALL";
  * to miss, as the brief demands. Tabs an identity cannot use do not render.
  */
 export default function TasksPage() {
-  const { t, locale, role, employeeDirectory, tasks, taskCapabilityFor, createTask, assignTask } = useApp();
+  const { t, locale, role, employeeDirectory, tasks, taskCapabilityFor, createTask, assignTask, taskTimeEntries } = useApp();
   usePageTitle(t("tasksTitle"));
 
   const myId = identityEmployeeId(role);
@@ -44,6 +45,11 @@ export default function TasksPage() {
     () => tasks.filter((task) => task.assignee === null && task.routed_to_manager === myId),
     [tasks, myId],
   );
+  /**
+   * Brief H2 — the timesheet reads the H1 store through the context's live
+   * state (the single truth); it stays in sync with any timer just stopped.
+   */
+  const timeEntries = taskTimeEntries ?? [];
 
   const [activeTab, setActiveTab] = useState<TaskTab>(isManager ? "needs" : "mine");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
@@ -51,13 +57,17 @@ export default function TasksPage() {
   const [assignTarget, setAssignTarget] = useState<TaskMock | null>(null);
   const [recent, setRecent] = useState<{ task: TaskMock; routed: boolean } | null>(null);
 
+  const hasLoggedTime = timeEntries.length > 0;
   const tabs = useMemo(() => {
     const list: { id: TaskTab; label: string; count: number }[] = [];
     if (isManager) list.push({ id: "needs", label: t("tasksNeedsAssignmentTitle"), count: needsAssignment.length });
     list.push({ id: "mine", label: t("taskListMine"), count: myTasks.length });
     if (myCapability.can_create_tasks) list.push({ id: "created", label: t("taskListCreated"), count: createdTasks.length });
+    // Brief H2 — the timesheet tab renders for any identity that can see
+    // time: an employee their own logged time, a manager/HR the team's.
+    if (hasLoggedTime) list.push({ id: "timesheet", label: t("taskTabTimesheet"), count: 0 });
     return list;
-  }, [isManager, myCapability.can_create_tasks, myTasks.length, createdTasks.length, needsAssignment.length, t]);
+  }, [isManager, myCapability.can_create_tasks, myTasks.length, createdTasks.length, needsAssignment.length, hasLoggedTime, t]);
 
   const isAssignCapable = myCapability.can_assign_tasks;
 
@@ -159,22 +169,28 @@ export default function TasksPage() {
       </div>
 
       <div className="filter-toolbar">
-        <label className="field">
-          <span className="field-label">{t("status")}</span>
-          <select
-            className="select"
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-          >
-            <option value="ALL">{locale === "ar" ? "كل الحالات" : "All statuses"}</option>
-            {(["OPEN", "IN_PROGRESS", "DONE", "CANCELLED"] as TaskStatus[]).map((status) => (
-              <option key={status} value={status}>{t(status === "OPEN" ? "stOpen" : status === "IN_PROGRESS" ? "stInProgress" : status === "DONE" ? "stDone" : "stCancelled")}</option>
-            ))}
-          </select>
-        </label>
+        {activeTab !== "timesheet" ? (
+          <>
+            <label className="field">
+              <span className="field-label">{t("status")}</span>
+              <select
+                className="select"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+              >
+                <option value="ALL">{locale === "ar" ? "كل الحالات" : "All statuses"}</option>
+                {(["OPEN", "IN_PROGRESS", "DONE", "CANCELLED"] as TaskStatus[]).map((status) => (
+                  <option key={status} value={status}>{t(status === "OPEN" ? "stOpen" : status === "IN_PROGRESS" ? "stInProgress" : status === "DONE" ? "stDone" : "stCancelled")}</option>
+                ))}
+              </select>
+            </label>
+          </>
+        ) : null}
       </div>
 
-      {visibleTasks(activeTab).length === 0 ? (
+      {activeTab === "timesheet" ? (
+        <TaskTimesheetSection entries={timeEntries} />
+      ) : visibleTasks(activeTab).length === 0 ? (
         <EmptyState
           message={activeTab === "needs" ? t("taskEmptyRouted") : activeTab === "mine" ? t("taskEmptyMine") : t("taskEmptyCreated")}
           action={activeTab === "created" && myCapability.can_create_tasks ? (
