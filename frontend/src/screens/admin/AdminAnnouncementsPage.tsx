@@ -408,7 +408,7 @@ function ComposerSection({ t, locale }: { t: (key: DictKey) => string; locale: "
 
         {/* --- 4. Channel + 5. Audience — side-by-side via form-grid on desktop --- */}
         <div className="form-grid">
-          <fieldset className="field" style={{ margin: 0 }}>
+          <fieldset className="field announce-choice-field">
             <legend className="field-label">{t("hrAnnouncementChannel")}</legend>
             <div className="role-segmented" role="radiogroup" aria-label={t("hrAnnouncementChannel")}>
               {(["EMAIL", "NOTIFICATION", "BOTH"] as AnnouncementChannel[]).map((value) => (
@@ -427,7 +427,7 @@ function ComposerSection({ t, locale }: { t: (key: DictKey) => string; locale: "
             </div>
           </fieldset>
 
-          <fieldset className="field" style={{ margin: 0 }}>
+          <fieldset className="field announce-choice-field">
             <legend className="field-label">{t("hrAnnouncementAudience")}</legend>
             <div className="role-segmented" role="radiogroup" aria-label={t("hrAnnouncementAudience")}>
               {([
@@ -453,15 +453,14 @@ function ComposerSection({ t, locale }: { t: (key: DictKey) => string; locale: "
         {/* --- Two-step audience: expandable searchable, department-grouped picker --- */}
         {audienceMode === "SELECTED" ? (
           <details
-            className="quiet-inset"
-            style={{ marginBlock: "var(--sp-4)" }}
+            className="quiet-inset announce-audience-picker"
             open={pickerOpen}
             onToggle={(event) => setPickerOpen((event.target as HTMLDetailsElement).open)}
           >
             <summary className="field-label">
               {t("hrAnnouncementAudiencePickerSummary").replace("%s", numText(selectedIds.length, locale))}
             </summary>
-            <label className="field" style={{ marginBlockEnd: "var(--sp-3)" }}>
+            <label className="field announce-picker-search">
               <span className="field-label"><SearchIcon />{t("hrAnnouncementAudienceSearchLabel")}</span>
               <input
                 className="input"
@@ -479,8 +478,8 @@ function ComposerSection({ t, locale }: { t: (key: DictKey) => string; locale: "
             {filteredGroups.map((group) => {
               const groupAllSelected = group.entries.every((entry) => selectedIds.includes(entry.id));
               return (
-                <div key={group.key} style={{ marginBlockEnd: "var(--sp-3)" }}>
-                  <div className="row-actions" style={{ marginBlockEnd: "var(--sp-2)" }}>
+                <div className="announce-picker-group" key={group.key}>
+                  <div className="row-actions announce-picker-group-heading">
                     <strong>{group.label[locale]}</strong>
                     <button
                       type="button"
@@ -512,7 +511,7 @@ function ComposerSection({ t, locale }: { t: (key: DictKey) => string; locale: "
                 </div>
               );
             })}
-            <div className="row-actions" style={{ marginBlockStart: "var(--sp-2)" }}>
+            <div className="row-actions announce-picker-actions">
               <button
                 type="button"
                 className="btn btn-secondary btn-compact"
@@ -570,7 +569,7 @@ function ComposerSection({ t, locale }: { t: (key: DictKey) => string; locale: "
         )}
 
         {/* --- 7. Send, gated on §4.1 item 7's four conditions --- */}
-        <form className="form-actions" style={{ marginBlockStart: "var(--sp-4)" }} onSubmit={pressSend}>
+        <form className="form-actions announce-send-actions" onSubmit={pressSend}>
           <button type="submit" className="btn btn-primary" disabled={!canSend || locked} aria-describedby="send-hint">
             {locked ? (
               <>
@@ -780,7 +779,7 @@ function DeliveryListDialog({
       }
       onClose={onClose}
     >
-      <ul className="compact-list" style={{ marginBlockEnd: "var(--sp-4)" }}>
+      <ul className="compact-list announce-delivery-list">
         {sorted.map((entry) => (
           <li className="compact-row" key={entry.id}>
             <bdi>{entry.name[locale]}</bdi>

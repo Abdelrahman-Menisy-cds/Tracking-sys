@@ -438,6 +438,18 @@ button { cursor: pointer; }
 .interval-row { display: flex; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3); border-block-end: var(--timeline-width) solid var(--border-subtle); }
 .attendance-status-stack { display: grid; gap: var(--sp-1); min-inline-size: 0; }
 .form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-4); }
+.people-facts-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.people-contract-grid { flex: 1; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
+.people-sticky-actions { position: sticky; bottom: 0; z-index: 2; padding-block: var(--sp-3); border-block-start: var(--timeline-width) solid var(--border-subtle); background: var(--surface); }
+.announce-choice-field { margin: 0; min-width: 0; }
+.announce-choice-field .role-segmented { flex-wrap: wrap; }
+.announce-choice-field .role-segmented-option { min-width: min(100%, 8rem); }
+.announce-audience-picker { margin-block: var(--sp-4); }
+.announce-picker-search, .announce-picker-group { margin-block-end: var(--sp-3); }
+.announce-picker-group-heading { margin-block-end: var(--sp-2); }
+.announce-picker-actions { margin-block-start: var(--sp-2); }
+.announce-send-actions { margin-block-start: var(--sp-4); }
+.announce-delivery-list { margin-block-end: var(--sp-4); }
 @media (max-width: 639px) { .attendance-clock-card, .attendance-grid { grid-template-columns: 1fr; display: grid; } .clock-primary-action { width: 100%; } .form-grid { grid-template-columns: 1fr; gap: var(--space-0); } .quick-clock .btn { inline-size: 40px; padding-inline: 0; font-size: 0; } .quick-clock .btn .icon { margin: 0; } }
 .language-toggle-header { inline-size: var(--control-min-h); padding-inline: var(--sp-2); }
 .profile-details { display: grid; gap: var(--sp-2); margin: var(--space-0); }

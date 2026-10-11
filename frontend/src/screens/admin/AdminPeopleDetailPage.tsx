@@ -645,7 +645,7 @@ export default function AdminPeopleDetailPage() {
       {/* 6 · Single sticky save bar for the whole draft (§2.2 item 6). The file
           panels validate on the same Save — one draft, one save bar; selecting
           never saves. A refused save keeps the draft dirty. */}
-      <div className="form-actions" style={{ position: "sticky", bottom: 0, zIndex: 2, background: "var(--surface)", borderTop: "var(--timeline-width) solid var(--border-subtle)", paddingBlock: "var(--sp-3)" }}>
+      <div className="form-actions people-sticky-actions">
         {dirty ? <span className="field-hint" role="status">{t("adminPeopleDirtyWarning")}</span> : null}
         <button type="button" className="btn btn-secondary" onClick={discard} disabled={!dirty || anySaving}>
           {t("adminPeopleDiscard")}
@@ -745,7 +745,7 @@ function SharedFileFacts({
 
   return (
     <form className="quiet-inset" onSubmit={(event) => event.preventDefault()}>
-      <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+      <div className="form-grid people-facts-grid">
         <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
           <span className="field-label">{t("adminPeopleFactName")} · <bdi>{arabic}</bdi></span>
           <input className="input" value={draft.nameAr} disabled={disabled} id={FACT_FIELD_IDS.nameAr}
@@ -872,7 +872,7 @@ function HrOnlyFileFacts({
 
   return (
     <form className="quiet-inset" onSubmit={(event) => event.preventDefault()}>
-      <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+      <div className="form-grid people-facts-grid">
         <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
           <span className="field-label">
             {t("adminPeopleFactSalary")} — <bdi dir="ltr">{hrFile.salary.currency}</bdi> · {locale === "ar" ? "شهري" : "monthly"}
@@ -969,7 +969,7 @@ function HrOnlyFileFacts({
       <ul className="attachment-list">
         {draft.contracts.map((contract) => (
           <li className="attachment-row" key={contract.id}>
-            <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", flex: 1 }}>
+            <div className="form-grid people-contract-grid">
               <label className="field" style={{ marginBlockEnd: "var(--sp-2)" }}>
                 <span className="field-label"><bdi>{arabic}</bdi></span>
                 <input className="input" value={contract.type.ar} disabled={disabled}
