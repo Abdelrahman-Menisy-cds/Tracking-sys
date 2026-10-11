@@ -149,12 +149,13 @@ export default function AdminPeoplePage() {
       <PageHeader title={t("adminPeopleTitle")} subtitle={t("adminPeopleSubtitle")} />
       <Banner tone="info">{t("adminDemoBoundary")}</Banner>
 
-      <section className="work-surface section" aria-labelledby="people-roster">
+      <section className="section" aria-labelledby="people-roster">
         <div className="section-heading">
           <h2 id="people-roster">{t("adminPeopleTitle")}</h2>
           <span className="page-meta">{new Intl.NumberFormat(locale).format(filtered.length)}</span>
         </div>
 
+        <div className="filter-panel">
         <div className="filter-toolbar">
           <label className="field">
             <span className="field-label">{t("employee")}</span>
@@ -167,6 +168,9 @@ export default function AdminPeoplePage() {
               onChange={(event) => setSearch(event.target.value)}
             />
           </label>
+        </div>
+        {search.trim() ? <div className="applied-filters tasks-filter-chips" aria-label={t("taskFiltersApplied")}><span className="filter-chip">{t("employee")}: {search.trim()}<button type="button" className="tasks-chip-remove" aria-label={t("taskFilterRemove").replace("%s", t("employee"))} onClick={() => setSearch("")}>×</button></span><button type="button" className="btn btn-secondary" onClick={() => setSearch("")}>{t("taskFiltersClearAll")}</button></div> : null}
+        <p className="page-meta tasks-result-count" role="status">{t("taskFiltersShowing").replace("%s", String(filtered.length)).replace("%s", String(rows.length))}</p>
         </div>
 
         {phase === "loading" ? (

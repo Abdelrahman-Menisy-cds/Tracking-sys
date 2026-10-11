@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { DEMO_MODE, useApp, usePageTitle, type Appearance } from "../app/AppContext";
 import { ApiError, login } from "../app/api";
 import BrandLockup from "../components/brand/BrandLockup";
+import PageHeader from "../components/layout/PageHeader";
 import { MoonIcon, SunIcon } from "../components/icons";
 import type { Locale, Role } from "../i18n/dict";
 
@@ -164,7 +165,7 @@ export default function LoginPage() {
       <div className="login-brand-watermark" aria-hidden="true">
         <img src={`/brand/logo-${resolvedTheme}.png`} alt="" />
       </div>
-      <section className="login-panel" aria-labelledby="sign-in-heading">
+      <section className="work-surface login-panel" aria-labelledby="sign-in-heading">
         <div className="login-header-row">
           <BrandLockup showTagline />
           <div className="login-preferences-header">
@@ -188,7 +189,7 @@ export default function LoginPage() {
             </button>
           </div>
         </div>
-        <h1 id="sign-in-heading">{t("signIn")}</h1>
+        <PageHeader title={t("signIn")} headingId="sign-in-heading" />
         <form onSubmit={submit} noValidate>
           {error && (
             <div className="banner banner-error" role="alert">

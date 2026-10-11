@@ -129,13 +129,10 @@ export function AttendanceHistoryPage() {
       <Banner tone="info">
         <strong>{translate(locale, "attendanceWhatStatesMean")}</strong> {translate(locale, "attendanceStatesHelp")}
       </Banner>
-      <section className="work-surface">
+      <section className="section">
         <section className="filter-panel" aria-labelledby="attendance-history-filters-heading">
           <div className="filter-panel-heading">
             <h2 id="attendance-history-filters-heading">{translate(locale, "attendanceHistoryFilters")}</h2>
-            {activeFilters.length > 0 ? (
-              <button className="btn btn-ghost btn-compact" type="button" onClick={clearAllFilters}>{translate(locale, "attendanceClearAllFilters")}</button>
-            ) : null}
           </div>
           <div className="filter-toolbar">
             <label className="field">
@@ -161,7 +158,7 @@ export function AttendanceHistoryPage() {
           </div>
           {activeFilters.length > 0 ? (
             <div className="applied-filters" aria-live="polite">
-              <span>{translate(locale, "attendanceAppliedFilters")}</span>
+              <span>{translate(locale, "taskFiltersApplied")}</span>
               {activeFilters.map((activeFilter) => (
                 <span className="filter-chip" key={activeFilter.key}>
                   {activeFilter.label}
@@ -175,11 +172,12 @@ export function AttendanceHistoryPage() {
                   </button>
                 </span>
               ))}
+              <button className="btn btn-secondary" type="button" onClick={clearAllFilters}>{translate(locale, "taskFiltersClearAll")}</button>
             </div>
           ) : null}
         </section>
         <div className="filter-count-line">
-          <p className="table-caption" aria-live="polite">{filtered.length} {translate(locale, "attendanceRecordsCount")}</p>
+          <p className="table-caption" aria-live="polite">{translate(locale, "taskFiltersShowing").replace("%s", String(filtered.length)).replace("%s", String(attendanceDays.length))}</p>
         </div>
         {state === "loading" ? (
             <SkeletonRows />

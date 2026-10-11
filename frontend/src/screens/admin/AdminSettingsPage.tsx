@@ -386,7 +386,7 @@ function LeaveSection() {
   ];
 
   return (
-    <section className="work-surface section" aria-labelledby="settings-leave-heading" id="settings-leave">
+    <section className="section" aria-labelledby="settings-leave-heading" id="settings-leave">
       <div className="section-heading">
         <h2 id="settings-leave-heading">{t("adminSettingsLeaveTitle")}</h2>
         <span className="page-meta">
@@ -394,6 +394,7 @@ function LeaveSection() {
         </span>
       </div>
 
+      <div className="filter-panel">
       <div className="filter-toolbar">
         <label className="field">
           <span className="field-label"><SearchIcon />{t("employee")}</span>
@@ -423,7 +424,7 @@ function LeaveSection() {
 
       {activeFilters.length ? (
         <div className="applied-filters" aria-live="polite">
-          <span>{t("attendanceAppliedFilters")}</span>
+          <span>{t("taskFiltersApplied")}</span>
           {activeFilters.map((filter) => (
             <span className="filter-chip" key={filter.key}>
               {filter.label}
@@ -437,9 +438,11 @@ function LeaveSection() {
               </button>
             </span>
           ))}
-          <button type="button" className="btn btn-ghost btn-compact" onClick={clearAllFilters}>{t("attendanceClearAllFilters")}</button>
+          <button type="button" className="btn btn-secondary" onClick={clearAllFilters}>{t("taskFiltersClearAll")}</button>
         </div>
       ) : null}
+      <p className="page-meta tasks-result-count" role="status">{t("taskFiltersShowing").replace("%s", String(filtered.length)).replace("%s", String(rows.length))}</p>
+      </div>
 
       {confirmMessage ? <Banner tone="success" role="status">{confirmMessage}</Banner> : null}
 

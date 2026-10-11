@@ -6,7 +6,7 @@ import { mockFetch, requestTypes, type RequestMock, type RequestStatus } from ".
 import { Banner, EmptyState, ErrorState, RequestStatusPill, SkeletonRows } from "../components/ui";
 import OperationalTable, { type OperationalColumn } from "../components/data/OperationalTable";
 import PageHeader from "../components/layout/PageHeader";
-import { CloseIcon, FilterIcon, PlusIcon } from "../components/icons";
+import { FilterIcon, PlusIcon } from "../components/icons";
 
 function nextStage(request: RequestMock, locale: "ar" | "en") {
   const ar = locale === "ar";
@@ -33,7 +33,14 @@ export default function MyRequestsPage() {
   ];
   return <div className="page"><PageHeader title={t("myRequestsTitle")} subtitle={locale === "ar" ? "نطاق العمل الشخصي · بيانات تجريبية محدثة الآن" : "Personal scope · demo data refreshed now"} primaryAction={<button className="btn btn-primary" onClick={() => navigate("/requests/new")}><PlusIcon />{t("newRequest")}</button>} />
     {list.phase === "loading" && <SkeletonRows rows={4} />}{list.phase === "error" && <ErrorState onRetry={list.retry} />}{list.phase === "empty" && <EmptyState message={t("noRequestsYet")} action={<button className="btn btn-primary" onClick={() => navigate("/requests/new")}><PlusIcon />{t("newRequest")}</button>} />}
-    {list.phase === "ready" && <><div className="filter-toolbar"><label className="field"><span className="field-label"><FilterIcon />{t("status")}</span><select className="select" value={statusFilter} onChange={(event) => setFilter(event.target.value)}><option value="all">{locale === "ar" ? "كل الحالات" : "All statuses"}</option>{(["DRAFT", "PENDING_MANAGER", "PENDING_HR", "APPROVED", "RETURNED", "REJECTED", "CANCELLED"] as RequestStatus[]).map((status) => <option key={status} value={status}>{status === "DRAFT" ? t("stDraft") : status === "PENDING_MANAGER" ? t("stPendingManager") : status === "PENDING_HR" ? t("stPendingHr") : status === "APPROVED" ? t("stApproved") : status === "RETURNED" ? t("stReturned") : status === "REJECTED" ? t("stRejected") : t("stCancelled")}</option>)}</select></label></div>{statusFilter !== "all" && <div className="applied-filters"><span>{locale === "ar" ? "الفلاتر المطبقة:" : "Applied filters:"}</span><span className="filter-chip">{t("status")}<button className="btn btn-secondary" onClick={() => setFilter("all")}><CloseIcon />{locale === "ar" ? "مسح" : "Clear"}</button></span></div>}{filtered.length === 0 ? <EmptyState message={t("noRequestsFiltered")} action={<button className="btn btn-secondary" onClick={() => setFilter("all")}>{locale === "ar" ? "مسح الفلاتر" : "Clear filters"}</button>} /> : <OperationalTable caption={locale === "ar" ? `${filtered.length} سجل في نطاقك الشخصي` : `${filtered.length} records in your personal scope`} columns={columns} records={filtered} />}</>}
+    {list.phase === "ready" && <>
+      <div className="filter-panel page-filter-panel">
+        <div className="filter-toolbar"><label className="field"><span className="field-label"><FilterIcon />{t("status")}</span><select className="select" value={statusFilter} onChange={(event) => setFilter(event.target.value)}><option value="all">{t("taskFilterAllStatuses")}</option>{(["DRAFT", "PENDING_MANAGER", "PENDING_HR", "APPROVED", "RETURNED", "REJECTED", "CANCELLED"] as RequestStatus[]).map((status) => <option key={status} value={status}>{status === "DRAFT" ? t("stDraft") : status === "PENDING_MANAGER" ? t("stPendingManager") : status === "PENDING_HR" ? t("stPendingHr") : status === "APPROVED" ? t("stApproved") : status === "RETURNED" ? t("stReturned") : status === "REJECTED" ? t("stRejected") : t("stCancelled")}</option>)}</select></label></div>
+        {statusFilter !== "all" && <div className="applied-filters tasks-filter-chips" aria-label={t("taskFiltersApplied")}><span className="filter-chip">{t("status")}<button type="button" className="tasks-chip-remove" aria-label={t("taskFilterRemove").replace("%s", t("status"))} onClick={() => setFilter("all")}>×</button></span><button type="button" className="btn btn-secondary" onClick={() => setFilter("all")}>{t("taskFiltersClearAll")}</button></div>}
+        <p className="page-meta tasks-result-count" role="status">{t("taskFiltersShowing").replace("%s", String(filtered.length)).replace("%s", String(myRequestItems.length))}</p>
+      </div>
+      {filtered.length === 0 ? <EmptyState message={t("noRequestsFiltered")} action={<button className="btn btn-secondary" onClick={() => setFilter("all")}>{t("taskFiltersClearAll")}</button>} /> : <OperationalTable caption={locale === "ar" ? `${filtered.length} سجل في نطاقك الشخصي` : `${filtered.length} records in your personal scope`} columns={columns} records={filtered} />}
+    </>}
   </div>;
 }
 

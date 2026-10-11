@@ -73,7 +73,7 @@ export default function TaskDetailPage() {
       <TaskWorkPanel task={task} />
       <TaskDetailBody task={task} />
       {/* Brief H3 — the trail is the LAST section on the page. */}
-      <section className="section" aria-labelledby="task-trail">
+      <section className="work-surface section" aria-labelledby="task-trail">
         <h2 id="task-trail">{t("taskTrailHeading")}</h2>
         {/* The trail is append-only — a REASSIGN keeps the previous ASSIGN;
             nothing is overwritten, which is exactly what history demands. */}
