@@ -1,6 +1,7 @@
 import { dict } from "../i18n/dict";
 import { leaveBalanceSummary, type AttendanceDay, type LeaveBalance, type WorkSchedule } from "../mock/attendance";
 import type { RequestMock } from "../mock/data";
+import { formatDate } from "./useMockList";
 import type { TaskMock, TaskStatus } from "../mock/tasks";
 
 export type SuggestionVerdict = "APPROVE" | "REJECT" | "REVIEW";
@@ -41,9 +42,9 @@ export type RequestedSpan =
 export const SUGGESTION_WINDOW_DAYS = 14;
 
 /**
- * The demo's requests carry their span in prose, never in structured fields, so this is
- * an explicit pattern table over the wording the fixtures actually use. An unrecognised
- * request yields UNKNOWN — and the caller must show that, not guess a span.
+ * The demo's seed requests carry their span in prose, never in structured fields, so this is
+ * an explicit pattern table over the wording the fixtures actually use. It is the fallback
+ * only: a request raised from the dated form states its own period, and that period wins.
  */
 const SPAN_PATTERNS: { pattern: RegExp; span: RequestedSpan }[] = [
   { pattern: /أسبوع|اسبوع/, span: { kind: "FULL_DAYS", days: 5 } },
@@ -54,9 +55,66 @@ const SPAN_PATTERNS: { pattern: RegExp; span: RequestedSpan }[] = [
   { pattern: /ساعة واحدة/, span: { kind: "PART_DAY", minutes: 60 } },
 ];
 
-export function parseDemoRequestSpan(request: RequestMock): RequestedSpan {
+/** The working week the demo falls back to when no schedule is in hand (Egypt: Sun–Thu). */
+export const DEFAULT_WORKING_WEEKDAYS = [0, 1, 2, 3, 4];
+
+/**
+ * Working days between two ISO dates, inclusive, honouring the employee's working weekdays.
+ * A range that covers no working day (a weekend, a reversed range) counts as 0 days.
+ */
+export function workingDaysBetween(start: string, end: string, workingWeekdays: number[] = DEFAULT_WORKING_WEEKDAYS): number {
+  const from = new Date(`${start}T00:00:00Z`);
+  const to = new Date(`${end}T00:00:00Z`);
+  if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || to < from) return 0;
+  let days = 0;
+  for (const cursor = new Date(from); cursor <= to; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    if (workingWeekdays.includes(cursor.getUTCDay())) days += 1;
+  }
+  return days;
+}
+
+/** Minutes between two wall-clock times on the same day; 0 when either is unusable. */
+export function minutesBetween(startTime: string, endTime: string): number {
+  const parse = (value: string) => {
+    const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+    if (!match) return null;
+    const hour = Number(match[1]);
+    const minute = Number(match[2]);
+    if (hour > 23 || minute > 59) return null;
+    return hour * 60 + minute;
+  };
+  const from = parse(startTime);
+  const to = parse(endTime);
+  if (from === null || to === null || to <= from) return 0;
+  return to - from;
+}
+
+/**
+ * A request's span: the dates it was raised with when it has them, the fixture prose otherwise.
+ * An unrecognised request yields UNKNOWN — and the caller must show that, not guess a span.
+ */
+export function parseDemoRequestSpan(request: RequestMock, workingWeekdays: number[] = DEFAULT_WORKING_WEEKDAYS): RequestedSpan {
+  if (request.start_date) {
+    const minutes = request.start_time && request.end_time ? minutesBetween(request.start_time, request.end_time) : 0;
+    if (minutes > 0) return { kind: "PART_DAY", minutes };
+    const days = workingDaysBetween(request.start_date, request.end_date ?? request.start_date, workingWeekdays);
+    if (days > 0) return { kind: "FULL_DAYS", days };
+  }
   const wording = `${request.title} ${request.details}`;
   return SPAN_PATTERNS.find(({ pattern }) => pattern.test(wording))?.span ?? { kind: "UNKNOWN" };
+}
+
+/** The picked period, written for a reader: the dates, plus the clock window of a part-day. */
+export function requestPeriodText(request: RequestMock, locale: "ar" | "en"): string | null {
+  if (!request.start_date) return null;
+  const day = formatDate(request.start_date, locale);
+  if (request.start_time && request.end_time) {
+    return locale === "ar"
+      ? `${day} · من ${request.start_time} إلى ${request.end_time}`
+      : `${day} · ${request.start_time}–${request.end_time}`;
+  }
+  const lastDay = request.end_date && request.end_date !== request.start_date ? formatDate(request.end_date, locale) : null;
+  return lastDay ? `${day} – ${lastDay}` : day;
 }
 
 /** The demo's annual-leave type, matched on its Arabic name first (the fixture's source of truth). */
@@ -87,7 +145,6 @@ export function suggestReviewDecision({ request, schedules, requesterDays, teamD
 
   const ownDays = requesterDays.filter(inWindow);
   const peerDays = teamDays.filter((day) => day.employee !== request.requester_id && inWindow(day));
-  const span = parseDemoRequestSpan(request);
   const spanText = (locale: "ar" | "en") =>
     span.kind === "FULL_DAYS"
       ? locale === "ar" ? `${span.days} أيام عمل` : `${span.days} working days`
@@ -107,6 +164,8 @@ export function suggestReviewDecision({ request, schedules, requesterDays, teamD
         [...own.working_weekdays].sort().join() !== [...organization.working_weekdays].sort().join()),
   );
   const effective = own ?? organization;
+  // The span: the dates the request was raised with, or the seed fixture's own wording.
+  const span = parseDemoRequestSpan(request, effective?.working_weekdays);
 
   // ---- Workload: what the requester actually worked against what was expected ----
   const measured = ownDays.filter((day) => day.status !== "LEAVE" && day.status !== "HOLIDAY" && day.expected_minutes > 0);
@@ -213,8 +272,10 @@ export function suggestReviewDecision({ request, schedules, requesterDays, teamD
     ),
   );
 
-  // The dialog shows a short set, ordered above by decision weight — a manager reads four.
-  const shown = reasons.slice(0, 4);
+  // Every signal the engine used is shown, in a declared order: a decision dialog that hides
+  // evidence is worse than a longer one, and the order is declared here, not by push order.
+  const SHOWN_KINDS: SuggestionReasonKind[] = ["BALANCE", "TASKS", "DEPARTMENT", "WORKLOAD", "COVERAGE", "SCHEDULE"];
+  const shown = SHOWN_KINDS.flatMap((kind) => reasons.filter((item) => item.kind === kind));
 
   // ---- Verdict: named rules, no hidden weighting ----
   // Positive: the requester is carrying a real load, or the team is in good shape.

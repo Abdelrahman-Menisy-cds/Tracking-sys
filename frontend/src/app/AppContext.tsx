@@ -335,7 +335,17 @@ interface AppState {
   markNotificationRead: (notificationId: string) => void;
   removeNotification: (notificationId: string) => void;
   clearNotifications: () => void;
-  saveDemoRequest: (input: { typeId: number; title: string; details: string; submit: boolean }) => Promise<RequestMock>;
+  saveDemoRequest: (input: {
+    typeId: number;
+    title: string;
+    details: string;
+    /** The period picked from the calendar; absent on a type that asks for no period. */
+    startDate?: string | null;
+    endDate?: string | null;
+    startTime?: string | null;
+    endTime?: string | null;
+    submit: boolean;
+  }) => Promise<RequestMock>;
   submitDemoTimesheet: (timesheetId: string, entries: TimeEntryMock[]) => Promise<TimesheetMock>;
   decideDemoRequest: (requestId: string, decision: ReviewDecision, comment: string, expectedVersion: number) => Promise<RequestMock>;
   decideDemoTimesheet: (timesheetId: string, decision: ReviewDecision, comment: string, expectedVersion: number) => Promise<TimesheetMock>;
@@ -1034,7 +1044,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, 150);
   }, [role]);
 
-  const saveDemoRequest = useCallback(async ({ typeId, title, details, submit }: { typeId: number; title: string; details: string; submit: boolean }) => {
+  const saveDemoRequest = useCallback(async ({ typeId, title, details, startDate, endDate, startTime, endTime, submit }: {
+    typeId: number;
+    title: string;
+    details: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    startTime?: string | null;
+    endTime?: string | null;
+    submit: boolean;
+  }) => {
     const commandIdentity = role;
     await demoDelay();
     if (activeIdentityRef.current !== commandIdentity) throw mutationIssue("missing");
@@ -1048,6 +1067,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       request_type: requestType,
       title,
       details,
+      start_date: startDate ?? null,
+      end_date: endDate ?? startDate ?? null,
+      start_time: startTime ?? null,
+      end_time: endTime ?? null,
       status,
       version: 1,
       submitted_at: submit ? now : null,

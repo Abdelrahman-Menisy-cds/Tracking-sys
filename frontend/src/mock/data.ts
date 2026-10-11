@@ -54,6 +54,15 @@ export interface RequestMock {
   submitted_at: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * The period the request asks for, when it was raised from the dated form. The demo's seed
+   * fixtures predate the picker and carry their span in their own wording instead.
+   */
+  start_date?: string | null;
+  end_date?: string | null;
+  /** A part-day request covers a clock window inside `start_date` rather than whole days. */
+  start_time?: string | null;
+  end_time?: string | null;
   attachments: AttachmentMock[];
   events: RequestEventMock[];
   permissions: { can_decide: boolean };

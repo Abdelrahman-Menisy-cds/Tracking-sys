@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
 import { useMockList, formatDateTime } from "../app/useMockList";
+import { requestPeriodText } from "../app/reviewSuggestion";
 import { mockFetch, pickName, type RequestMock } from "../mock/data";
 import { Banner, EmptyState, ErrorState, RequestStatusPill, SkeletonRows } from "../components/ui";
 import Timeline from "../components/record/Timeline";
@@ -20,9 +21,11 @@ export default function RequestDetailPage() {
   const request = state.phase === "ready" ? state.data : null;
   if (!request) return <div className="page"><PageHeader title={t("details")} /><Banner tone="warning" role="alert">{t("relatedUnavailable")}</Banner><Link to="/requests">{t("back")}</Link></div>;
   const reason = correctionReason(request.events);
+  const period = requestPeriodText(request, locale);
   return <div className="page"><PageHeader title={<bdi>{request.title}</bdi>} subtitle={`${pickName(request.request_type.name, locale)} · ${t("requester")}: ${pickName(request.requester_name, locale)}`} breadcrumb={<Link to="/requests">{t("myRequestsTitle")}</Link>} />
     <div className="work-surface record-header"><div className="record-header-main"><div className="record-meta"><span>{t("requestType")}: {pickName(request.request_type.name, locale)}</span><span>{t("lastUpdate")}: {formatDateTime(request.updated_at, locale)}</span><span dir="ltr" translate="no">ID: <bdi>{request.id}</bdi></span></div><RequestStatusPill status={request.status} /></div><div className="status-action-block"><div className="status-action-row"><strong>{locale === "ar" ? "الخطوة التالية" : "Next stage"}</strong><span>{nextStage(request.status, locale)}</span></div>{reason && <p>{locale === "ar" ? "سبب الإعادة:" : "Correction reason:"} <bdi>{reason}</bdi></p>}{(request.status === "RETURNED" || request.status === "DRAFT") && <Link className="btn btn-primary" to="/requests/new">{locale === "ar" ? "متابعة التصحيح" : "Continue correction"}</Link>}</div></div>
-    <section className="work-surface section" aria-labelledby="request-details"><h2 id="request-details">{t("requestDetails")}</h2><p className="preserve-lines"><bdi>{request.details}</bdi></p></section>
+    {period && <section className="work-surface section" aria-labelledby="request-period"><h2 id="request-period">{t("requestPeriod")}</h2><p><bdi>{period}</bdi></p></section>}
+    <section className="work-surface section" aria-labelledby="request-details"><h2 id="request-details">{t("requestReason")}</h2><p className="preserve-lines"><bdi>{request.details}</bdi></p></section>
     <section className="work-surface section" aria-labelledby="request-attachments"><h2 id="request-attachments">{t("attachments")}</h2>{request.attachments.length === 0 ? <EmptyState message={t("noAttachments")} action={<span className="muted">{t("attachmentsNote")}</span>} /> : <ul className="attachment-list">{request.attachments.map((attachment) => <li className="attachment-row" key={attachment.id}><bdi dir="ltr">{attachment.original_filename}</bdi><span className="muted">{attachment.declared_content_type} · {Math.round(attachment.size_bytes / 1024)} KB · {attachment.scan_status === "clean" ? (locale === "ar" ? "فحص سليم" : "Scan clean") : attachment.scan_status === "pending" ? (locale === "ar" ? "بانتظار الفحص" : "Awaiting scan") : (locale === "ar" ? "محجوز؛ الملف غير متاح" : "Quarantined; file unavailable")}</span></li>)}</ul>}</section>
     <section className="work-surface section" aria-labelledby="request-history"><h2 id="request-history">{t("history")}</h2><Timeline events={request.events} /></section>
   </div>;

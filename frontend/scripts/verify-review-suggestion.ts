@@ -112,11 +112,12 @@ const light = run({ requesterDays: lightDays });
 check("a lightly-loaded requester is never REJECTed", light.verdict !== "REJECT", light.verdict);
 
 /* ------------------------------------------------------------------ *
- * 6. Every reason carries the numbers it was derived from, and there are
- *    between two and four of them.
+ * 6. Every reason carries the numbers it was derived from, and the engine hands over
+ *    every signal it used — the dialog, not the engine, decides how they are ordered.
  * ------------------------------------------------------------------ */
 for (const [label, suggestion] of [["APPROVE", reap], ["REJECT", noBalance], ["REVIEW", unknownSpan]] as const) {
-  check(`${label}: 2-4 reasons`, suggestion.reasons.length >= 2 && suggestion.reasons.length <= 4, suggestion.reasons.length);
+  check(`${label}: reports at least two reasons`, suggestion.reasons.length >= 2, suggestion.reasons.length);
+  check(`${label}: reports each signal once`, new Set(suggestion.reasons.map((reason) => reason.kind)).size === suggestion.reasons.length, suggestion.reasons.map((reason) => reason.kind));
   check(`${label}: every reason carries a number`, suggestion.reasons.every((reason) => /\d/.test(reason.textAr) && /\d/.test(reason.textEn)), suggestion.reasons.map((reason) => reason.kind));
   check(`${label}: Arabic and English both rendered`, suggestion.reasons.every((reason) => reason.textAr.length > 0 && reason.textEn.length > 0));
 }

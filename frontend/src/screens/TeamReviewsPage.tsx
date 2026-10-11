@@ -19,7 +19,7 @@ import {
 } from "../mock/data";
 import { attendanceSchedules, directoryLeaveBalances, reviewedTeamDaysFor } from "../mock/attendance";
 import { allDemoTasks } from "../mock/tasks";
-import { suggestReviewDecision, type DecisionSuggestion } from "../app/reviewSuggestion";
+import { requestPeriodText, suggestReviewDecision, type DecisionSuggestion } from "../app/reviewSuggestion";
 import {
   Banner,
   Dialog,
@@ -477,7 +477,8 @@ export function ReviewRequestDetailPage() {
     <div className="page reading-page">
       <PageHeader title={<bdi>{request.title}</bdi>} subtitle={`${t("employee")}: ${pickName(request.requester_name, locale)}`} breadcrumb={<Link to="/reviews">{t("teamReviewsTitle")}</Link>} />
       <div className="status-action-block"><RequestStatusPill status={request.status} /><p>{requestNextStage(request, locale)}</p></div>
-      <section className="work-surface section" aria-labelledby="review-details"><h2 id="review-details">{t("requestDetails")}</h2><p className="preserve-lines"><bdi>{request.details}</bdi></p></section>
+      {requestPeriodText(request, locale) && <section className="work-surface section" aria-labelledby="review-period"><h2 id="review-period">{t("requestPeriod")}</h2><p><bdi>{requestPeriodText(request, locale)}</bdi></p></section>}
+      <section className="work-surface section" aria-labelledby="review-details"><h2 id="review-details">{t("requestReason")}</h2><p className="preserve-lines"><bdi>{request.details}</bdi></p></section>
       <section className="work-surface section" aria-labelledby="review-history"><h2 id="review-history">{t("history")}</h2><Timeline events={request.events} /></section>
       <Banner tone="info">{locale === "ar" ? "هذه بيانات نطاق تجريبي وليست دليلاً على التفويض. القرارات غير دائمة ومتاحة من الطابور." : "This is demo-scoped data, not authorization evidence. Non-persistent decisions are available from the queue."}</Banner>
     </div>
