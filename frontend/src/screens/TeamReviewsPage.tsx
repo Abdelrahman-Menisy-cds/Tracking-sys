@@ -179,6 +179,7 @@ export default function TeamReviewsPage() {
           </span>
         </Banner>
       ) : null}
+      <div className="work-surface review-queue">
       <div
         className="review-tabs"
         role="tablist"
@@ -217,6 +218,7 @@ export default function TeamReviewsPage() {
             />
           </>
         ) : null}
+      </div>
       </div>
       {deciding ? (
         <DecisionDialog
@@ -383,8 +385,8 @@ export function ReviewRequestDetailPage() {
   const state = useMockList(() => mockFetch(teamRequestItems.find((request) => request.id === id) ?? null, 250), [id, teamRequestItems]);
   usePageTitle(t("details"));
   if (!capabilities.canReview) return <SafeReviewUnavailable />;
-  if (state.phase === "loading") return <SkeletonRows rows={3} />;
-  if (state.phase === "error") return <ErrorState onRetry={state.retry} />;
+  if (state.phase === "loading") return <div className="page"><PageHeader title={t("details")} /><SkeletonRows rows={3} /></div>;
+  if (state.phase === "error") return <div className="page"><PageHeader title={t("details")} /><ErrorState onRetry={state.retry} /></div>;
   const request = state.phase === "ready" ? state.data : null;
   if (!request) return <SafeReviewUnavailable backToReviews />;
   return (
@@ -392,7 +394,7 @@ export function ReviewRequestDetailPage() {
       <PageHeader title={<bdi>{request.title}</bdi>} subtitle={`${t("employee")}: ${pickName(request.requester_name, locale)}`} breadcrumb={<Link to="/reviews">{t("teamReviewsTitle")}</Link>} />
       <div className="status-action-block"><RequestStatusPill status={request.status} /><p>{requestNextStage(request, locale)}</p></div>
       <section className="work-surface section" aria-labelledby="review-details"><h2 id="review-details">{t("requestDetails")}</h2><p className="preserve-lines"><bdi>{request.details}</bdi></p></section>
-      <section className="section" aria-labelledby="review-history"><h2 id="review-history">{t("history")}</h2><Timeline events={request.events} /></section>
+      <section className="work-surface section" aria-labelledby="review-history"><h2 id="review-history">{t("history")}</h2><Timeline events={request.events} /></section>
       <Banner tone="info">{locale === "ar" ? "هذه بيانات نطاق تجريبي وليست دليلاً على التفويض. القرارات غير دائمة ومتاحة من الطابور." : "This is demo-scoped data, not authorization evidence. Non-persistent decisions are available from the queue."}</Banner>
     </div>
   );
@@ -404,8 +406,8 @@ export function ReviewTimesheetDetailPage() {
   const state = useMockList(() => mockFetch(teamTimesheetItems.find((sheet) => sheet.id === id) ?? null, 250), [id, teamTimesheetItems]);
   usePageTitle(t("details"));
   if (!capabilities.canReview) return <SafeReviewUnavailable />;
-  if (state.phase === "loading") return <SkeletonRows rows={3} />;
-  if (state.phase === "error") return <ErrorState onRetry={state.retry} />;
+  if (state.phase === "loading") return <div className="page"><PageHeader title={t("details")} /><SkeletonRows rows={3} /></div>;
+  if (state.phase === "error") return <div className="page"><PageHeader title={t("details")} /><ErrorState onRetry={state.retry} /></div>;
   const sheet = state.phase === "ready" ? state.data : null;
   if (!sheet) return <SafeReviewUnavailable backToReviews />;
   const worked = sheet.entries.reduce((sum, entry) => sum + entry.duration_minutes, 0);
@@ -433,9 +435,9 @@ export function ReviewTimesheetDetailPage() {
               </div>
             ))}
           </dl>
-        ) : <p className="muted">{locale === "ar" ? "لا توجد إدخالات ضمن الاستجابة التجريبية." : "No entries are present in the demo response."}</p>}
+        ) : <EmptyState message={locale === "ar" ? "لا توجد إدخالات ضمن الاستجابة التجريبية." : "No entries are present in the demo response."} />}
       </section>
-      <section className="section" aria-labelledby="review-timesheet-history"><h2 id="review-timesheet-history">{t("history")}</h2><Timeline events={sheet.events} /></section>
+      <section className="work-surface section" aria-labelledby="review-timesheet-history"><h2 id="review-timesheet-history">{t("history")}</h2><Timeline events={sheet.events} /></section>
       <Banner tone="info">{locale === "ar" ? "قرار سجل الوقت متاح من طابور المراجعة بعد فحص هذا الدليل." : "The timesheet decision is available from the review queue after inspecting this evidence."}</Banner>
     </div>
   );
