@@ -64,8 +64,8 @@ export function useMockList<T>(load: () => Promise<T>, deps: unknown[] = []): Li
  *  - NO per-row time zone name («غرينتش+3» reorders inside RTL text and
  *    reads as «3+») — the zone is stated once on the page, not per row.
  *  - Every returned value is wrapped in Unicode isolates (LRI … PDI) so it
- *    renders in the same correct order in a text node, inside <bdi>, or in
- *    an RTL paragraph. Per-number RTL marks (U+200F) are NOT used — that
+ *    renders in the same correct order in a text node or RTL paragraph.
+ *    Call sites must not add <bdi> or dir overrides. Per-number RTL marks (U+200F) are NOT used — that
  *    pattern is what was broken.
  */
 const CAIRO_TIME_ZONE = "Africa/Cairo";
@@ -76,6 +76,10 @@ const PDI = "\u2069";
 /** Wrap a formatted value in bidi isolates — brief H3 rule 4. */
 function isolated(value: string): string {
   return `${LRI}${value}${PDI}`;
+}
+
+function unwrapped(value: string): string {
+  return value.slice(LRI.length, -PDI.length);
 }
 
 function localeTag(locale: "ar" | "en") {
@@ -113,7 +117,7 @@ function paddedTimeParts(date: Date, locale: "ar" | "en"): { hour: string; minut
 export function formatDateTime(isoDate: string, locale: "ar" | "en"): string {
   const date = new Date(isoDate);
   const time = paddedTimeParts(date, locale);
-  const day = formatDate(isoDate, locale).slice(1, -1); // unwrap the isolates for composition
+  const day = unwrapped(formatDate(isoDate, locale));
   return isolated(`${day} · ${time.hour}:${time.minute} ${time.period}`.trim());
 }
 
@@ -139,9 +143,35 @@ export function formatWeekdayOf(isoDate: string, locale: "ar" | "en"): string {
 /** The long/full date shapes (profile join date, admin validity lines),
  *  still Latin digits and bidi-isolated. */
 export function formatDateLong(isoDate: string, locale: "ar" | "en"): string {
-  return isolated(new Intl.DateTimeFormat(localeTag(locale), {
+  const parts = new Intl.DateTimeFormat(localeTag(locale), {
     year: "numeric", month: "long", day: "numeric", timeZone: CAIRO_TIME_ZONE,
-  }).format(new Date(isoDate)));
+  }).formatToParts(new Date(isoDate)).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
+  // Each directional run is isolated so the RTL month cannot reorder the year.
+  return isolated(`${isolated(parts.day)} ${isolated(parts.month)} ${isolated(parts.year)}`);
+}
+
+/** Wall-clock configuration, not an instant: preserve the supplied HH:mm. */
+export function formatWallClock(value: string, locale: "ar" | "en"): string {
+  const [hours, minutes] = value.split(":").map(Number);
+  const date = new Date(Date.UTC(2026, 0, 1, hours, minutes));
+  const parts = new Intl.DateTimeFormat(localeTag(locale), {
+    hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "UTC",
+  }).formatToParts(date).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
+  return isolated(`${String(Number(parts.hour)).padStart(2, "0")}:${parts.minute} ${(parts.dayPeriod ?? "").toUpperCase()}`);
+}
+
+/** A single isolated time range; null represents a missing endpoint. */
+export function formatTimeRange(fromIso: string | null, toIso: string | null, locale: "ar" | "en"): string {
+  return isolated(`${fromIso ? unwrapped(formatTime(fromIso, locale)) : "—"} → ${toIso ? unwrapped(formatTime(toIso, locale)) : "—"}`);
+}
+
+export function formatWallClockRange(from: string, to: string, locale: "ar" | "en"): string {
+  return isolated(`${unwrapped(formatWallClock(from, locale))} → ${unwrapped(formatWallClock(to, locale))}`);
+}
+
+/** Numeric dates in dense rows and schedule validity ranges. */
+export function formatDateRange(fromIso: string, toIso: string | null, locale: "ar" | "en"): string {
+  return isolated(`${unwrapped(formatDate(fromIso, locale))} → ${toIso ? unwrapped(formatDate(toIso, locale)) : "—"}`);
 }
 
 export function weekInterval(weekStart: string, locale: "ar" | "en"): string {
@@ -154,7 +184,11 @@ export function weekInterval(weekStart: string, locale: "ar" | "en"): string {
     year: "numeric",
     timeZone: "UTC",
   });
-  return `${formatter.format(start)} – ${formatter.format(end)}`;
+  const part = (date: Date): string => {
+    const values = formatter.formatToParts(date).reduce<Record<string, string>>((result, item) => { result[item.type] = item.value; return result; }, {});
+    return `${isolated(values.day)} ${isolated(values.month)} ${isolated(values.year)}`;
+  };
+  return isolated(`${part(start)} – ${part(end)}`);
 }
 
 export function formatMinutes(minutes: number, locale: "ar" | "en"): string {
