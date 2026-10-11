@@ -60,6 +60,7 @@ export default function TasksPage() {
   const [search, setSearch] = useState("");
   const [period, setPeriod] = useState<PeriodFilter>("today");
   const [employeeFilter, setEmployeeFilter] = useState("ALL");
+  const [taskEmployeeFilter, setTaskEmployeeFilter] = useState("ALL");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [customApplied, setCustomApplied] = useState(false);
@@ -90,6 +91,7 @@ export default function TasksPage() {
     .filter((row) => (timeTitle(row.task_id) ?? "").toLowerCase().includes(search.trim().toLowerCase())) : [];
   const matchesTask = (task: TaskMock) => {
     if (statusFilter !== "ALL" && task.status !== statusFilter) return false;
+    if (isTeamViewer && taskEmployeeFilter !== "ALL" && task.assignee !== taskEmployeeFilter) return false;
     const query = search.trim().toLowerCase();
     if (!query) return true;
     return [task.title, findDirectoryEntry(task.created_by)?.name[locale], task.assignee ? findDirectoryEntry(task.assignee)?.name[locale] : ""]
@@ -105,7 +107,7 @@ export default function TasksPage() {
     if (hasLoggedTime) list.push({ id: "timesheet", label: t("taskTabTimesheet"), count: filteredTimeRows.length });
     return list;
   // Counts intentionally derive from the same filter predicates as the active list.
-  }, [isManager, myCapability.can_create_tasks, myTasks, createdTasks, needsAssignment, hasLoggedTime, filteredTimeRows.length, search, statusFilter, locale, t]);
+  }, [isManager, isTeamViewer, myCapability.can_create_tasks, myTasks, createdTasks, needsAssignment, hasLoggedTime, filteredTimeRows.length, search, statusFilter, taskEmployeeFilter, locale, t]);
 
   const isAssignCapable = myCapability.can_assign_tasks;
 
@@ -165,12 +167,13 @@ export default function TasksPage() {
   const baseTasks = activeTab === "needs" ? needsAssignment : activeTab === "mine" ? myTasks : createdTasks;
   const statusLabel = (status: TaskStatus) => t(status === "OPEN" ? "stOpen" : status === "IN_PROGRESS" ? "stInProgress" : status === "DONE" ? "stDone" : "stCancelled");
   const clearAll = () => {
-    setSearch(""); setStatusFilter("ALL"); setPeriod("all"); setEmployeeFilter("ALL");
+    setSearch(""); setStatusFilter("ALL"); setPeriod("all"); setEmployeeFilter("ALL"); setTaskEmployeeFilter("ALL");
     setCustomFrom(""); setCustomTo(""); setCustomApplied(false);
   };
   const chips: TaskFilterChip[] = [];
   if (search.trim()) chips.push({ key: "search", label: `${t("taskFilterSearch")}: ${search.trim()}`, onRemove: () => setSearch("") });
   if (activeTab !== "timesheet" && statusFilter !== "ALL") chips.push({ key: "status", label: `${t("status")}: ${statusLabel(statusFilter)}`, onRemove: () => setStatusFilter("ALL") });
+  if (activeTab !== "timesheet" && isTeamViewer && taskEmployeeFilter !== "ALL") chips.push({ key: "task-employee", label: `${t("taskTimesheetFilterEmployee")}: ${employeeDirectory.find((entry) => entry.id === taskEmployeeFilter)?.name[locale] ?? taskEmployeeFilter}`, onRemove: () => setTaskEmployeeFilter("ALL") });
   if (activeTab === "timesheet") {
     if (period !== "all") chips.push({ key: "period", label: `${t("taskTimesheetFilterPeriod")}: ${t(period === "today" ? "taskTimesheetPeriodToday" : period === "week" ? "taskTimesheetPeriodWeek" : period === "month" ? "taskTimesheetPeriodMonth" : "taskTimesheetPeriodCustom")}`, onRemove: () => { setPeriod("all"); setCustomFrom(""); setCustomTo(""); setCustomApplied(false); } });
     if (employeeFilter !== "ALL") chips.push({ key: "employee", label: `${t("taskTimesheetFilterEmployee")}: ${employeeChoices.find((choice) => choice.id === employeeFilter)?.name ?? employeeFilter}`, onRemove: () => setEmployeeFilter("ALL") });
@@ -245,6 +248,12 @@ export default function TasksPage() {
               {(["OPEN", "IN_PROGRESS", "DONE", "CANCELLED"] as TaskStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}
             </select>
           </div>
+          {isTeamViewer ? <div className="field"><label className="field-label" htmlFor="tasks-employee-filter">{t("taskTimesheetFilterEmployee")}</label>
+            <select id="tasks-employee-filter" data-testid="tasks-employee-filter" className="select" value={taskEmployeeFilter} onChange={(event) => setTaskEmployeeFilter(event.target.value)}>
+              <option value="ALL">{t("taskFilterAllEmployees")}</option>
+              {employeeDirectory.map((entry) => <option key={entry.id} value={entry.id}>{entry.name[locale]}</option>)}
+            </select>
+          </div> : null}
         </TaskFilterToolbar>
       {visibleTasks(activeTab).length === 0 ? (
         <EmptyState
