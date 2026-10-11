@@ -57,9 +57,10 @@ export function useMockList<T>(load: () => Promise<T>, deps: unknown[] = []): Li
  * scrambled values in the RTL UI on every page: «ظبط طريقه عرض الوقت
  * والتاريخ لانه مش مظبوط ف كل الصفحات»). All rules:
  *  - LATIN digits always, via `localeTag` (`ar-EG-u-nu-latn` for `ar`).
- *  - A stable shape in BOTH locales, zero-padded:
+ *  - A stable shape in BOTH locales, the DATE zero-padded and the clock's HOUR
+ *    not («04/10/2026 · 9:24 ص» — one shape everywhere):
  *      date       → DD/MM/YYYY            (14/10/2026)
- *      date+time  → DD/MM/YYYY · h:mm ص   (11/10/2026 · 09:18 ص)
+ *      date+time  → DD/MM/YYYY · h:mm ص   (11/10/2026 · 9:18 ص)
  *      time only  → h:mm ص / h:mm AM
  *  - NO per-row time zone name («غرينتش+3» reorders inside RTL text and
  *    reads as «3+») — the zone is stated once on the page, not per row.
@@ -102,28 +103,29 @@ export function formatDate(isoDate: string, locale: "ar" | "en"): string {
   return isolated(`${parts.day}/${parts.month}/${parts.year}`);
 }
 
-/** Zero-padded h:mm in 12-hour shape with the locale's day-period marker. */
-function paddedTimeParts(date: Date, locale: "ar" | "en"): { hour: string; minute: string; period: string } {
+/** h:mm in 12-hour shape with the locale's day-period marker. The HOUR is not
+ *  zero-padded ("4:00 م"); the MINUTE keeps its two digits ("9:05 ص"). */
+function timeParts(date: Date, locale: "ar" | "en"): { hour: string; minute: string; period: string } {
   const parts = new Intl.DateTimeFormat(localeTag(locale), {
     hour: "2-digit", minute: "2-digit", hour12: true, timeZone: CAIRO_TIME_ZONE,
   }).formatToParts(date).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
-  const paddedHour = String(Number(parts.hour)).padStart(2, "0");
-  // en-GB spells the day period lowercase ("am"); the brief's shape is "AM".
+  const hour = String(Number(parts.hour));
+  // en-GB spells the day period lowercase ("am"); the shared shape is "AM".
   const period = (parts.dayPeriod ?? "").toUpperCase();
-  return { hour: paddedHour, minute: parts.minute, period };
+  return { hour, minute: parts.minute, period };
 }
 
-/** DD/MM/YYYY · h:mm period — zero-padded, bidi-isolated, no zone token. */
+/** DD/MM/YYYY · h:mm period — bidi-isolated, no zone token. */
 export function formatDateTime(isoDate: string, locale: "ar" | "en"): string {
   const date = new Date(isoDate);
-  const time = paddedTimeParts(date, locale);
+  const time = timeParts(date, locale);
   const day = unwrapped(formatDate(isoDate, locale));
   return isolated(`${day} · ${time.hour}:${time.minute} ${time.period}`.trim());
 }
 
-/** h:mm period only — zero-padded, bidi-isolated, no zone token. */
+/** h:mm period only — bidi-isolated, no zone token. */
 export function formatTime(isoDate: string, locale: "ar" | "en"): string {
-  const time = paddedTimeParts(new Date(isoDate), locale);
+  const time = timeParts(new Date(isoDate), locale);
   return isolated(`${time.hour}:${time.minute} ${time.period}`.trim());
 }
 
@@ -157,7 +159,7 @@ export function formatWallClock(value: string, locale: "ar" | "en"): string {
   const parts = new Intl.DateTimeFormat(localeTag(locale), {
     hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "UTC",
   }).formatToParts(date).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
-  return isolated(`${String(Number(parts.hour)).padStart(2, "0")}:${parts.minute} ${(parts.dayPeriod ?? "").toUpperCase()}`);
+  return isolated(`${String(Number(parts.hour))}:${parts.minute} ${(parts.dayPeriod ?? "").toUpperCase()}`);
 }
 
 /** A single isolated time range; null represents a missing endpoint. */

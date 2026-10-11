@@ -37,12 +37,17 @@ check("1 · the ar and en date outputs are identical digits/order", arDate === e
 /* 2 — the shared date+time shape: DD/MM/YYYY · h:mm period. */
 const arDateTime = unwrap(formatDateTime("2026-10-11T06:18:00Z", "ar"));
 const enDateTime = unwrap(formatDateTime("2026-10-11T06:18:00Z", "en"));
-check("2 · formatDateTime(ar) unwrapped matches ^11/10/2026 · 09:18 ص$", /^11\/10\/2026 · 09:18 ص$/.test(arDateTime), JSON.stringify(arDateTime));
-check("2 · formatDateTime(en) unwrapped matches ^11/10/2026 · 09:18 AM$", /^11\/10\/2026 · 09:18 AM$/.test(enDateTime), JSON.stringify(enDateTime));
+check("2 · formatDateTime(ar) unwrapped matches ^11/10/2026 · 9:18 ص$", /^11\/10\/2026 · 9:18 ص$/.test(arDateTime), JSON.stringify(arDateTime));
+check("2 · formatDateTime(en) unwrapped matches ^11/10/2026 · 9:18 AM$", /^11\/10\/2026 · 9:18 AM$/.test(enDateTime), JSON.stringify(enDateTime));
 const arTime = unwrap(formatTime("2026-10-11T06:18:00Z", "ar"));
-check("2 · formatTime(ar) unwrapped matches ^09:18 ص$", /^09:18 ص$/.test(arTime), JSON.stringify(arTime));
+check("2 · formatTime(ar) unwrapped matches ^9:18 ص$", /^9:18 ص$/.test(arTime), JSON.stringify(arTime));
 const enTime = unwrap(formatTime("2026-10-11T06:18:00Z", "en"));
-check("2 · formatTime(en) unwrapped matches ^09:18 AM$", /^09:18 AM$/.test(enTime), JSON.stringify(enTime));
+check("2 · formatTime(en) unwrapped matches ^9:18 AM$", /^9:18 AM$/.test(enTime), JSON.stringify(enTime));
+/* the hour is not padded, but it must not be truncated either, and the minute keeps both digits */
+const noonAr = unwrap(formatTime("2026-10-11T09:42:00Z", "ar"));
+check("2 · a two-digit hour keeps both digits (12:42 م)", /^12:42 م$/.test(noonAr), JSON.stringify(noonAr));
+const paddedMinuteAr = unwrap(formatTime("2026-10-11T06:05:00Z", "ar"));
+check("2 · a single-digit minute keeps its two digits (9:05 ص)", /^9:05 ص$/.test(paddedMinuteAr), JSON.stringify(paddedMinuteAr));
 
 /* 3 — no Arabic-Indic digits, no invisible LRM/RLM, no zone token. */
 const NO_ARABIC_DIGITS = /[\u0660-\u0669]/;
