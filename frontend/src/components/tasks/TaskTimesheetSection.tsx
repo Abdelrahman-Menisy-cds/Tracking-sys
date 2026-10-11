@@ -1,15 +1,28 @@
-import { useMemo, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { Link } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import { formatDate } from "../../app/useMockList";
 import { EmptyState } from "../ui";
 import OperationalTable, { type OperationalColumn } from "../data/OperationalTable";
 import { formatElapsed } from "../../mock/taskTime";
-import { customWindow, thisMonthWindow, thisWeekWindow, todayWindow } from "../../mock/taskTimeWindows";
-import { timesheetRows, timesheetTotalSeconds, type TimesheetRow } from "../../mock/taskTimesheet";
+import { timesheetTotalSeconds, type TimesheetRow } from "../../mock/taskTimesheet";
 import type { TaskTimeEntry } from "../../mock/taskTime";
+import { entryInWindow, type ClockWindow } from "../../mock/taskTimeWindows";
+import TaskFilterToolbar, { type TaskFilterChip } from "./TaskFilterToolbar";
 
-type PeriodFilter = "today" | "week" | "month" | "custom";
+type PeriodFilter = "all" | "today" | "week" | "month" | "custom";
+type Setter<T> = Dispatch<SetStateAction<T>>;
+type Props = {
+  entries: TaskTimeEntry[]; rows: TimesheetRow[]; window: ClockWindow | null; allCount: number;
+  search: string; setSearch: Setter<string>;
+  period: PeriodFilter; setPeriod: Setter<PeriodFilter>;
+  employeeFilter: string; setEmployeeFilter: Setter<string>;
+  employeeChoices: { id: string; name: string }[];
+  customFrom: string; setCustomFrom: Setter<string>;
+  customTo: string; setCustomTo: Setter<string>;
+  customApplied: boolean; setCustomApplied: Setter<boolean>;
+  chips: TaskFilterChip[]; clearAll: () => void;
+};
 
 /**
  * Brief H2 — the «تايم شيت» tab: ONLY tasks with logged time, filtered by
@@ -18,64 +31,15 @@ type PeriodFilter = "today" | "week" | "month" | "custom";
  * no date arithmetic is inlined here. Stated rule the owner may disagree
  * with: an interval crossing midnight counts in full under the day it STARTED.
  */
-export default function TaskTimesheetSection({ entries }: { entries: TaskTimeEntry[] }) {
+export default function TaskTimesheetSection({ entries, rows, window, allCount, search, setSearch, period, setPeriod, employeeFilter, setEmployeeFilter, employeeChoices, customFrom, setCustomFrom, customTo, setCustomTo, setCustomApplied, chips, clearAll }: Props) {
   const { t, locale, role, employeeDirectory, tasks } = useApp();
   const isManager = role === "manager" || role === "hr";
 
-  const [nameFilter, setNameFilter] = useState("");
-  const [period, setPeriod] = useState<PeriodFilter>("today");
-  const [customFrom, setCustomFrom] = useState("");
-  const [customTo, setCustomTo] = useState("");
-  const [customApplied, setCustomApplied] = useState(false);
-  const [employeeFilter, setEmployeeFilter] = useState("ALL");
-
   const taskTitle = (taskId: string): string | undefined => tasks.find((task) => task.id === taskId)?.title;
 
-  /**
-   * Which employees this viewer may see. An employee is scoped to themselves
-   * and gets no filter at all; ONLY an entry's own employee_id is trusted.
-   */
-  const scopeEmployeeId = isManager ? (employeeFilter === "ALL" ? undefined : employeeFilter) : undefined;
-  const employeeChoices = useMemo(() => {
-    const seen = new Set<string>();
-    const list: { id: string; name: string }[] = [];
-    for (const entry of entries) {
-      if (!entry.ended_at || seen.has(entry.employee_id)) continue;
-      seen.add(entry.employee_id);
-      list.push({ id: entry.employee_id, name: employeeDirectory.find((who) => who.id === entry.employee_id)?.name.ar ?? entry.employee_id });
-    }
-    return list;
-  }, [entries, employeeDirectory]);
-
-  const window = useMemo<ReturnType<typeof thisWeekWindow> | null>(() => {
-    const now = Date.now();
-    if (period === "today") return todayWindow(now);
-    if (period === "week") return thisWeekWindow(now);
-    if (period === "month") return thisMonthWindow(now);
-    if (period === "custom" && customApplied && customFrom && customTo) {
-      return customWindow(Date.parse(`${customFrom}T00:00:00`), Date.parse(`${customTo}T00:00:00`));
-    }
-    return null; // custom picked but not applied yet → show the filtered-empty state
-  }, [period, customApplied, customFrom, customTo]);
-
-  const rowsBeforeName = useMemo(
-    () => (window ? timesheetRows(entries, window, taskTitle, scopeEmployeeId) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [entries, window, scopeEmployeeId, tasks],
-  );
-  const rows = useMemo(
-    () => rowsBeforeName.filter((row) => {
-      const query = nameFilter.trim().toLowerCase();
-      if (!query) return true;
-      const title = taskTitle(row.task_id) ?? "";
-      return title.toLowerCase().includes(query);
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rowsBeforeName, nameFilter, tasks],
-  );
   const totalSeconds = timesheetTotalSeconds(rows);
 
-  const hasAnyLogged = entries.some((entry) => entry.ended_at && taskTitle(entry.task_id) !== undefined);
+  const hasAnyLogged = allCount > 0;
 
   const columns: OperationalColumn<TimesheetRow>[] = [
     {
@@ -92,8 +56,8 @@ export default function TaskTimesheetSection({ entries }: { entries: TaskTimeEnt
           key: "employee",
           label: t("taskTimesheetEmployeeLabel"),
           render: (row: TimesheetRow) => {
-            const who = entries.find((entry) => entry.task_id === row.task_id && entry.ended_at)?.employee_id;
-            return <bdi>{employeeDirectory.find((entry) => entry.id === who)?.name.ar ?? who}</bdi>;
+            const ids = [...new Set(entries.filter((entry) => entry.task_id === row.task_id && entry.ended_at && window && entryInWindow(entry, window) && (employeeFilter === "ALL" || entry.employee_id === employeeFilter)).map((entry) => entry.employee_id))];
+            return <span>{ids.map((id, index) => <span key={id}>{index > 0 ? (locale === "ar" ? "، " : ", ") : null}<bdi>{employeeDirectory.find((entry) => entry.id === id)?.name[locale] ?? id}</bdi></span>)}</span>;
           },
         } satisfies OperationalColumn<TimesheetRow>]
       : []),
@@ -120,22 +84,25 @@ export default function TaskTimesheetSection({ entries }: { entries: TaskTimeEnt
 
   return (
     <section aria-label={t("taskTabTimesheet")} data-testid="timesheet-section">
-      <p className="page-meta">{t("taskTimesheetMidnightRule")}</p>
-
-      <div className="filter-toolbar">
-        <label className="field">
-          <span className="field-label">{t("taskTimesheetFilterTaskName")}</span>
-          <input
-            className="input"
-            type="search"
-            data-testid="timesheet-name-filter"
-            value={nameFilter}
-            onChange={(event) => setNameFilter(event.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">{t("taskTimesheetFilterPeriod")}</span>
+      <TaskFilterToolbar chips={chips} shown={rows.length} total={allCount} onClear={clearAll}>
+        <div className="field tasks-search-field">
+          <label className="field-label" htmlFor="timesheet-name-filter">{t("taskTimesheetFilterTaskName")}</label>
+          <div className="tasks-search-control">
+            <input
+              id="timesheet-name-filter"
+              className="input"
+              type="search"
+              data-testid="timesheet-name-filter"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            {search ? <button type="button" className="tasks-search-clear" aria-label={t("taskFilterClearSearch")} onClick={() => setSearch("")}>×</button> : null}
+          </div>
+        </div>
+        <div className="field">
+          <label className="field-label" htmlFor="timesheet-period-filter">{t("taskTimesheetFilterPeriod")}</label>
           <select
+            id="timesheet-period-filter"
             className="select"
             data-testid="timesheet-period-filter"
             value={period}
@@ -144,40 +111,46 @@ export default function TaskTimesheetSection({ entries }: { entries: TaskTimeEnt
               if (event.target.value !== "custom") setCustomApplied(false);
             }}
           >
+            <option value="all">{t("taskTimesheetPeriodAll")}</option>
             <option value="today">{t("taskTimesheetPeriodToday")}</option>
             <option value="week">{t("taskTimesheetPeriodWeek")}</option>
             <option value="month">{t("taskTimesheetPeriodMonth")}</option>
             <option value="custom">{t("taskTimesheetPeriodCustom")}</option>
           </select>
-        </label>
+        </div>
         {isManager ? (
-          <label className="field">
-            <span className="field-label">{t("taskTimesheetFilterEmployee")}</span>
+          <div className="field">
+            <label className="field-label" htmlFor="timesheet-employee-filter">{t("taskTimesheetFilterEmployee")}</label>
             <select
+              id="timesheet-employee-filter"
               className="select"
               data-testid="timesheet-employee-filter"
               value={employeeFilter}
               onChange={(event) => setEmployeeFilter(event.target.value)}
             >
-              <option value="ALL">{employeeChoices.length > 1 ? (locale === "ar" ? "كل الموظفين" : "All employees") : employeeChoices[0]?.name ?? "—"}</option>
+              <option value="ALL">{t("taskFilterAllEmployees")}</option>
               {employeeChoices.map((choice) => (
                 <option key={choice.id} value={choice.id}>{choice.name}</option>
               ))}
             </select>
-          </label>
+          </div>
         ) : null}
         {period === "custom" ? (
           <div className="field">
-            <span className="field-label">{t("taskTimesheetFromLabel")} / {t("taskTimesheetToLabel")}</span>
+            <span className="field-label">{t("taskTimesheetPeriodCustom")}</span>
             <div className="custom-range" data-testid="timesheet-custom-range">
+              <label className="field-label" htmlFor="timesheet-custom-from">{t("taskTimesheetFromLabel")}</label>
               <input
+                id="timesheet-custom-from"
                 className="input"
                 type="date"
                 data-testid="timesheet-custom-from"
                 value={customFrom}
                 onChange={(event) => { setCustomFrom(event.target.value); setCustomApplied(false); }}
               />
+              <label className="field-label" htmlFor="timesheet-custom-to">{t("taskTimesheetToLabel")}</label>
               <input
+                id="timesheet-custom-to"
                 className="input"
                 type="date"
                 data-testid="timesheet-custom-to"
@@ -199,9 +172,10 @@ export default function TaskTimesheetSection({ entries }: { entries: TaskTimeEnt
             </div>
           </div>
         ) : null}
-      </div>
+      </TaskFilterToolbar>
+      <p className="page-meta">{t("taskTimesheetMidnightRule")}</p>
 
-      {window && rows.length > 0 ? (
+      {rows.length > 0 ? (
         <div data-testid="timesheet-total">
           <strong>{t("taskTimesheetTotalLabel")}: </strong>
           <bdi dir="ltr">{formatElapsed(totalSeconds)}</bdi>
@@ -210,7 +184,7 @@ export default function TaskTimesheetSection({ entries }: { entries: TaskTimeEnt
 
       {rows.length === 0 ? (
         hasAnyLogged
-          ? <EmptyState message={t("taskTimesheetEmptyFiltered")} />
+          ? <EmptyState message={t("taskTimesheetEmptyFiltered")} action={<button type="button" className="btn btn-secondary" onClick={clearAll}>{t("taskFiltersClearAll")}</button>} />
           : <EmptyState message={t("taskTimesheetEmptyNothing")} />
       ) : (
         <OperationalTable

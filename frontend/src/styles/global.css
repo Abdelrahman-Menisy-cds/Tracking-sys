@@ -789,6 +789,26 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .is-running .task-timer-pulse { box-shadow: 0 0 0 3px var(--accent-soft); }
 @keyframes task-timer-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 @media (prefers-reduced-motion: reduce) { .is-running .task-timer-pulse { animation: none; } }
+
+/* ===== Brief H6 — task tabs and one filter grammar ===== */
+.tasks-tab-strip { overflow-x: auto; max-inline-size: 100%; margin-block-end: var(--sp-4); scrollbar-width: thin; }
+.tasks-tab-strip .role-segmented-option { flex: 0 0 auto; min-block-size: var(--control-min-h); display: inline-flex; align-items: center; gap: var(--sp-2); white-space: nowrap; padding-inline: var(--sp-3); }
+.tasks-tab-strip .nav-badge { margin-inline-start: var(--space-0); background: var(--surface); color: var(--text); }
+.tasks-tab-strip .is-selected .nav-badge { background: var(--on-accent); color: var(--accent); }
+.tasks-filter-panel { padding: var(--sp-4); margin-block-end: var(--sp-4); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-sm); background: var(--surface-subtle); }
+.tasks-filter-controls { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); align-items: end; gap: var(--sp-3); }
+.tasks-filter-controls .field { min-width: 0; }
+.tasks-search-control { position: relative; }
+.tasks-search-control .input { padding-inline-end: var(--control-min-h); }
+.tasks-search-clear, .tasks-chip-remove { display: inline-flex; align-items: center; justify-content: center; min-inline-size: var(--control-min-h); min-block-size: var(--control-min-h); padding: var(--space-0); border: var(--radius-none); border-radius: var(--radius-pill); background: transparent; color: var(--text); font: inherit; cursor: pointer; }
+.tasks-search-clear { position: absolute; inset-inline-end: var(--space-0); inset-block-start: var(--space-0); }
+.tasks-search-clear:focus-visible, .tasks-chip-remove:focus-visible { outline: var(--space-1) solid var(--focus-ring); outline-offset: var(--space-1); }
+.tasks-filter-chips { margin-block: var(--sp-3); }
+.tasks-filter-chips .filter-chip { padding-inline-start: var(--sp-3); }
+.tasks-result-count { font-variant-numeric: tabular-nums; }
+.tasks-filter-controls .custom-range { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.tasks-filter-controls .custom-range .input { flex: 1 1 130px; min-inline-size: 0; }
+@media (max-width: 599px) { .tasks-filter-controls { grid-template-columns: minmax(0, 1fr); } .tasks-tab-strip { margin-inline: calc(-1 * var(--sp-2)); } }
 .task-timer-clock { display: grid; gap: var(--sp-1); justify-items: start; }
 .task-timer-elapsed-value,
 .task-timer-total-value {

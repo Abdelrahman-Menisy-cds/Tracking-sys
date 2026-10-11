@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Link } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
 import { Banner, EmptyState } from "../components/ui";
@@ -11,10 +11,14 @@ import { TaskDemoBanner, TaskPriorityPill, TaskStatusPill } from "../components/
 import CreateTaskDialog from "../components/tasks/CreateTaskDialog";
 import AssignTaskDialog from "../components/tasks/AssignTaskDialog";
 import TaskTimesheetSection from "../components/tasks/TaskTimesheetSection";
+import TaskFilterToolbar, { type TaskFilterChip } from "../components/tasks/TaskFilterToolbar";
+import { customWindow, thisMonthWindow, thisWeekWindow, todayWindow } from "../mock/taskTimeWindows";
+import { timesheetRows } from "../mock/taskTimesheet";
 import type { TaskMock, TaskStatus } from "../mock/tasks";
 
 type TaskTab = "needs" | "mine" | "created" | "timesheet";
 type StatusFilter = TaskStatus | "ALL";
+type PeriodFilter = "all" | "today" | "week" | "month" | "custom";
 
 /**
  * /tasks — the tasks cycle screen. Scoped sections under tabs: for a manager
@@ -53,21 +57,55 @@ export default function TasksPage() {
 
   const [activeTab, setActiveTab] = useState<TaskTab>(isManager ? "needs" : "mine");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [search, setSearch] = useState("");
+  const [period, setPeriod] = useState<PeriodFilter>("today");
+  const [employeeFilter, setEmployeeFilter] = useState("ALL");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [customApplied, setCustomApplied] = useState(false);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [createOpen, setCreateOpen] = useState(false);
   const [assignTarget, setAssignTarget] = useState<TaskMock | null>(null);
   const [recent, setRecent] = useState<{ task: TaskMock; routed: boolean } | null>(null);
 
   const hasLoggedTime = timeEntries.length > 0;
+  const isTeamViewer = role === "manager" || role === "hr";
+  const employeeChoices = useMemo(() => {
+    const ids = [...new Set(timeEntries.filter((entry) => entry.ended_at).map((entry) => entry.employee_id))];
+    return ids.map((id) => ({ id, name: employeeDirectory.find((who) => who.id === id)?.name[locale] ?? id }));
+  }, [timeEntries, employeeDirectory, locale]);
+  const window = useMemo(() => {
+    const now = Date.now();
+    if (period === "all") return { fromMs: -Infinity, toMs: Infinity };
+    if (period === "today") return todayWindow(now);
+    if (period === "week") return thisWeekWindow(now);
+    if (period === "month") return thisMonthWindow(now);
+    if (customApplied && customFrom && customTo) return customWindow(Date.parse(`${customFrom}T00:00:00`), Date.parse(`${customTo}T00:00:00`));
+    return null;
+  }, [period, customApplied, customFrom, customTo]);
+  const timeTitle = (id: string) => tasks.find((task) => task.id === id)?.title;
+  const timeScope = isTeamViewer ? (employeeFilter === "ALL" ? undefined : employeeFilter) : myId;
+  const allTimeRows = timesheetRows(timeEntries, { fromMs: -Infinity, toMs: Infinity }, timeTitle, isTeamViewer ? undefined : myId);
+  const filteredTimeRows = window ? timesheetRows(timeEntries, window, timeTitle, timeScope)
+    .filter((row) => (timeTitle(row.task_id) ?? "").toLowerCase().includes(search.trim().toLowerCase())) : [];
+  const matchesTask = (task: TaskMock) => {
+    if (statusFilter !== "ALL" && task.status !== statusFilter) return false;
+    const query = search.trim().toLowerCase();
+    if (!query) return true;
+    return [task.title, findDirectoryEntry(task.created_by)?.name[locale], task.assignee ? findDirectoryEntry(task.assignee)?.name[locale] : ""]
+      .some((value) => value?.toLowerCase().includes(query));
+  };
   const tabs = useMemo(() => {
     const list: { id: TaskTab; label: string; count: number }[] = [];
-    if (isManager) list.push({ id: "needs", label: t("tasksNeedsAssignmentTitle"), count: needsAssignment.length });
-    list.push({ id: "mine", label: t("taskListMine"), count: myTasks.length });
-    if (myCapability.can_create_tasks) list.push({ id: "created", label: t("taskListCreated"), count: createdTasks.length });
+    if (isManager) list.push({ id: "needs", label: t("tasksNeedsAssignmentTitle"), count: needsAssignment.filter(matchesTask).length });
+    list.push({ id: "mine", label: t("taskListMine"), count: myTasks.filter(matchesTask).length });
+    if (myCapability.can_create_tasks) list.push({ id: "created", label: t("taskListCreated"), count: createdTasks.filter(matchesTask).length });
     // Brief H2 — the timesheet tab renders for any identity that can see
     // time: an employee their own logged time, a manager/HR the team's.
-    if (hasLoggedTime) list.push({ id: "timesheet", label: t("taskTabTimesheet"), count: 0 });
+    if (hasLoggedTime) list.push({ id: "timesheet", label: t("taskTabTimesheet"), count: filteredTimeRows.length });
     return list;
-  }, [isManager, myCapability.can_create_tasks, myTasks.length, createdTasks.length, needsAssignment.length, hasLoggedTime, t]);
+  // Counts intentionally derive from the same filter predicates as the active list.
+  }, [isManager, myCapability.can_create_tasks, myTasks, createdTasks, needsAssignment, hasLoggedTime, filteredTimeRows.length, search, statusFilter, locale, t]);
 
   const isAssignCapable = myCapability.can_assign_tasks;
 
@@ -121,7 +159,33 @@ export default function TasksPage() {
 
   const visibleTasks = (section: TaskTab): TaskMock[] => {
     const base = section === "needs" ? needsAssignment : section === "mine" ? myTasks : createdTasks;
-    return statusFilter === "ALL" ? base : base.filter((task) => task.status === statusFilter);
+    return base.filter(matchesTask);
+  };
+
+  const baseTasks = activeTab === "needs" ? needsAssignment : activeTab === "mine" ? myTasks : createdTasks;
+  const statusLabel = (status: TaskStatus) => t(status === "OPEN" ? "stOpen" : status === "IN_PROGRESS" ? "stInProgress" : status === "DONE" ? "stDone" : "stCancelled");
+  const clearAll = () => {
+    setSearch(""); setStatusFilter("ALL"); setPeriod("all"); setEmployeeFilter("ALL");
+    setCustomFrom(""); setCustomTo(""); setCustomApplied(false);
+  };
+  const chips: TaskFilterChip[] = [];
+  if (search.trim()) chips.push({ key: "search", label: `${t("taskFilterSearch")}: ${search.trim()}`, onRemove: () => setSearch("") });
+  if (activeTab !== "timesheet" && statusFilter !== "ALL") chips.push({ key: "status", label: `${t("status")}: ${statusLabel(statusFilter)}`, onRemove: () => setStatusFilter("ALL") });
+  if (activeTab === "timesheet") {
+    if (period !== "all") chips.push({ key: "period", label: `${t("taskTimesheetFilterPeriod")}: ${t(period === "today" ? "taskTimesheetPeriodToday" : period === "week" ? "taskTimesheetPeriodWeek" : period === "month" ? "taskTimesheetPeriodMonth" : "taskTimesheetPeriodCustom")}`, onRemove: () => { setPeriod("all"); setCustomFrom(""); setCustomTo(""); setCustomApplied(false); } });
+    if (employeeFilter !== "ALL") chips.push({ key: "employee", label: `${t("taskTimesheetFilterEmployee")}: ${employeeChoices.find((choice) => choice.id === employeeFilter)?.name ?? employeeFilter}`, onRemove: () => setEmployeeFilter("ALL") });
+  }
+  const onTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const forward = locale === "ar" ? "ArrowLeft" : "ArrowRight";
+    const backward = locale === "ar" ? "ArrowRight" : "ArrowLeft";
+    let next = index;
+    if (event.key === forward) next = (index + 1) % tabs.length;
+    else if (event.key === backward) next = (index - 1 + tabs.length) % tabs.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    else if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setActiveTab(tabs[index].id); return; }
+    else return;
+    event.preventDefault(); setActiveTab(tabs[next].id); tabRefs.current[tabs[next].id]?.focus();
   };
 
   const needsAttention = isManager && needsAssignment.length > 0;
@@ -129,7 +193,9 @@ export default function TasksPage() {
 
   return (
     <div className="page">
-      <PageHeader title={t("tasksTitle")} subtitle={t("tasksSubtitle")} />
+      <PageHeader title={t("tasksTitle")} subtitle={t("tasksSubtitle")} primaryAction={myCapability.can_create_tasks ? (
+        <button type="button" className="btn btn-primary" data-testid="create-task-open" onClick={() => setCreateOpen(true)}>{t("taskCreate")}</button>
+      ) : undefined} />
       <TaskDemoBanner />
       {needsAttention ? (
         <Banner tone="warning" role="status">{`${t("tasksNeedsAssignmentTitle")}: ${needsAssignment.length}`}</Banner>
@@ -142,58 +208,48 @@ export default function TasksPage() {
         </Banner>
       ) : null}
 
-      {myCapability.can_create_tasks ? (
-        <div className="form-actions">
-          <button type="button" className="btn btn-primary" data-testid="create-task-open" onClick={() => setCreateOpen(true)}>
-            {t("taskCreate")}
-          </button>
-        </div>
-      ) : (
-        <p className="page-meta">{t("taskCapabilityNote")}</p>
-      )}
-
-      <div className="role-segmented" role="tablist" aria-label={t("tasksTitle")}>
+      <div className="role-segmented tasks-tab-strip" role="tablist" aria-label={t("tasksTitle")}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             role="tab"
+            id={`tasks-tab-${tab.id}`}
+            aria-controls="tasks-tabpanel"
             aria-selected={activeTab === tab.id}
+            tabIndex={activeTab === tab.id ? 0 : -1}
+            ref={(node) => { tabRefs.current[tab.id] = node; }}
             className={`role-segmented-option${activeTab === tab.id ? " is-selected" : ""}`}
             onClick={() => setActiveTab(tab.id)}
+            onKeyDown={(event) => onTabKeyDown(event, tabs.indexOf(tab))}
           >
             <span>{tab.label}</span>
-            <span className="nav-badge" aria-hidden="true">{tab.count}</span>
+            <span className="nav-badge" aria-label={t(tab.id === "timesheet" ? "taskFilterEntriesCount" : "taskFilterTasksCount").replace("%s", String(tab.count))}>{tab.count}</span>
           </button>
         ))}
       </div>
 
-      <div className="filter-toolbar">
-        {activeTab !== "timesheet" ? (
-          <>
-            <label className="field">
-              <span className="field-label">{t("status")}</span>
-              <select
-                className="select"
-                value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-              >
-                <option value="ALL">{locale === "ar" ? "كل الحالات" : "All statuses"}</option>
-                {(["OPEN", "IN_PROGRESS", "DONE", "CANCELLED"] as TaskStatus[]).map((status) => (
-                  <option key={status} value={status}>{t(status === "OPEN" ? "stOpen" : status === "IN_PROGRESS" ? "stInProgress" : status === "DONE" ? "stDone" : "stCancelled")}</option>
-                ))}
-              </select>
-            </label>
-          </>
-        ) : null}
-      </div>
-
+      <div id="tasks-tabpanel" role="tabpanel" aria-labelledby={`tasks-tab-${activeTab}`} tabIndex={0}>
       {activeTab === "timesheet" ? (
-        <TaskTimesheetSection entries={timeEntries} />
-      ) : visibleTasks(activeTab).length === 0 ? (
+        <TaskTimesheetSection entries={timeEntries} rows={filteredTimeRows} window={window} allCount={allTimeRows.length} search={search} setSearch={setSearch} period={period} setPeriod={setPeriod} employeeFilter={employeeFilter} setEmployeeFilter={setEmployeeFilter} employeeChoices={employeeChoices} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} customApplied={customApplied} setCustomApplied={setCustomApplied} chips={chips} clearAll={clearAll} />
+      ) : <>
+        <TaskFilterToolbar chips={chips} shown={visibleTasks(activeTab).length} total={baseTasks.length} onClear={clearAll}>
+          <div className="field tasks-search-field">
+            <label className="field-label" htmlFor="tasks-search">{t("taskFilterSearch")}</label>
+            <div className="tasks-search-control"><input id="tasks-search" className="input" type="search" value={search} onChange={(event) => setSearch(event.target.value)} />
+              {search ? <button type="button" className="tasks-search-clear" aria-label={t("taskFilterClearSearch")} onClick={() => setSearch("")}>×</button> : null}</div>
+          </div>
+          <div className="field"><label className="field-label" htmlFor="tasks-status-filter">{t("status")}</label>
+            <select id="tasks-status-filter" className="select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
+              <option value="ALL">{t("taskFilterAllStatuses")}</option>
+              {(["OPEN", "IN_PROGRESS", "DONE", "CANCELLED"] as TaskStatus[]).map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}
+            </select>
+          </div>
+        </TaskFilterToolbar>
+      {visibleTasks(activeTab).length === 0 ? (
         <EmptyState
-          message={activeTab === "needs" ? t("taskEmptyRouted") : activeTab === "mine" ? t("taskEmptyMine") : t("taskEmptyCreated")}
-          action={activeTab === "created" && myCapability.can_create_tasks ? (
+          message={baseTasks.length > 0 ? t("taskFilterEmpty") : activeTab === "needs" ? t("taskEmptyRouted") : activeTab === "mine" ? t("taskEmptyMine") : t("taskEmptyCreated")}
+          action={baseTasks.length > 0 ? <button type="button" className="btn btn-secondary" onClick={clearAll}>{t("taskFiltersClearAll")}</button> : activeTab === "created" && myCapability.can_create_tasks ? (
             <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>{t("taskCreate")}</button>
           ) : undefined}
         />
@@ -204,6 +260,8 @@ export default function TasksPage() {
           records={visibleTasks(activeTab)}
         />
       )}
+      </>}
+      </div>
 
       {createOpen ? (
         <CreateTaskDialog
