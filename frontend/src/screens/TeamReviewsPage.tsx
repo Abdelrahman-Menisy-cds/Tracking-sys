@@ -199,7 +199,7 @@ export default function TeamReviewsPage() {
         {activeState.phase === "loading" ? <SkeletonRows rows={3} /> : null}
         {activeState.phase === "error" ? <ErrorState onRetry={activeState.retry} /> : null}
         {(activeState.phase === "empty" || (activeState.phase === "ready" && records.length === 0))
-          ? <EmptyState message={locale === "ar" ? "لا توجد عناصر بانتظار مراجعتك حاليًا." : "Nothing is currently awaiting your review."} action={<Link className="btn btn-secondary" to="/">{t("navHome")}</Link>} />
+          ? <EmptyState message={t("queueEmpty")} action={<Link className="btn btn-secondary" to="/">{t("navHome")}</Link>} />
           : null}
         {activeState.phase === "ready" && records.length > 0 && tab === "requests" ? (
           <OperationalTable
@@ -435,7 +435,7 @@ export function ReviewTimesheetDetailPage() {
               </div>
             ))}
           </dl>
-        ) : <EmptyState message={locale === "ar" ? "لا توجد إدخالات ضمن الاستجابة التجريبية." : "No entries are present in the demo response."} />}
+        ) : <EmptyState message={t("reviewEntriesEmpty")} />}
       </section>
       <section className="work-surface section" aria-labelledby="review-timesheet-history"><h2 id="review-timesheet-history">{t("history")}</h2><Timeline events={sheet.events} /></section>
       <Banner tone="info">{locale === "ar" ? "قرار سجل الوقت متاح من طابور المراجعة بعد فحص هذا الدليل." : "The timesheet decision is available from the review queue after inspecting this evidence."}</Banner>
