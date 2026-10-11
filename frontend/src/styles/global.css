@@ -288,6 +288,9 @@ button { cursor: pointer; }
 .btn-compact { min-height: 36px; padding-inline: var(--sp-3); }
 .section { margin-block-start: var(--sp-8); }
 .dashboard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-6); align-items: start; }
+.dashboard-grid > * { min-inline-size: 0; }
+.people-detail-page .role-segmented { flex-wrap: wrap; }
+.people-detail-page .role-segmented-option { flex: 1 1 min(100%, 9rem); min-inline-size: 0; }
 .dashboard-grid .section { margin-block-start: var(--space-0); }
 .compact-list { list-style: none; padding: var(--space-0); margin: var(--space-0); }
 .compact-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; padding: var(--sp-4); margin-inline: calc(-1 * var(--sp-4)); border-block-end: var(--timeline-width) solid var(--border-subtle); border-radius: var(--radius-sm); transition: background-color 160ms ease, transform 120ms ease; }

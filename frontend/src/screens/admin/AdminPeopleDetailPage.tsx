@@ -398,7 +398,7 @@ export default function AdminPeopleDetailPage() {
   const anySaving = saving || savingFile;
 
   return (
-    <div className="page">
+    <div className="page people-detail-page">
       <AdminNav />
       <PageHeader
         title={entry.name[locale]}
