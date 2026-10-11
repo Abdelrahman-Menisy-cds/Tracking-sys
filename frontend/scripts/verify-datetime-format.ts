@@ -26,6 +26,7 @@ const unwrap = (value: string): string => {
   check("4 · the value starts with LRI (\\u2066) and ends with PDI (\\u2069)", value.startsWith(LRI) && value.endsWith(PDI), JSON.stringify(value));
   return value.slice(1, -1);
 };
+const visible = (value: string): string => unwrap(value).replace(/[\u2066\u2069]/g, "").replace(/\u00a0/g, " ");
 
 /* 1 — the shared date shape: DD/MM/YYYY in both locales, same digits. */
 const arDate = unwrap(formatDate("2026-10-14T12:00:00Z", "ar"));
@@ -35,24 +36,24 @@ check("1 · formatDate(en) unwrapped matches ^14/10/2026$", /^14\/10\/2026$/.tes
 check("1 · the ar and en date outputs are identical digits/order", arDate === enDate);
 
 /* 2 — the shared date+time shape: DD/MM/YYYY · h:mm period. */
-const arDateTime = unwrap(formatDateTime("2026-10-11T06:18:00Z", "ar"));
-const enDateTime = unwrap(formatDateTime("2026-10-11T06:18:00Z", "en"));
+const arDateTime = visible(formatDateTime("2026-10-11T06:18:00Z", "ar"));
+const enDateTime = visible(formatDateTime("2026-10-11T06:18:00Z", "en"));
 check("2 · formatDateTime(ar) unwrapped matches ^11/10/2026 · 9:18 ص$", /^11\/10\/2026 · 9:18 ص$/.test(arDateTime), JSON.stringify(arDateTime));
 check("2 · formatDateTime(en) unwrapped matches ^11/10/2026 · 9:18 AM$", /^11\/10\/2026 · 9:18 AM$/.test(enDateTime), JSON.stringify(enDateTime));
-const arTime = unwrap(formatTime("2026-10-11T06:18:00Z", "ar"));
+const arTime = visible(formatTime("2026-10-11T06:18:00Z", "ar"));
 check("2 · formatTime(ar) unwrapped matches ^9:18 ص$", /^9:18 ص$/.test(arTime), JSON.stringify(arTime));
-const enTime = unwrap(formatTime("2026-10-11T06:18:00Z", "en"));
+const enTime = visible(formatTime("2026-10-11T06:18:00Z", "en"));
 check("2 · formatTime(en) unwrapped matches ^9:18 AM$", /^9:18 AM$/.test(enTime), JSON.stringify(enTime));
 /* the hour is not padded, but it must not be truncated either, and the minute keeps both digits */
-const noonAr = unwrap(formatTime("2026-10-11T09:42:00Z", "ar"));
+const noonAr = visible(formatTime("2026-10-11T09:42:00Z", "ar"));
 check("2 · a two-digit hour keeps both digits (12:42 م)", /^12:42 م$/.test(noonAr), JSON.stringify(noonAr));
-const paddedMinuteAr = unwrap(formatTime("2026-10-11T06:05:00Z", "ar"));
+const paddedMinuteAr = visible(formatTime("2026-10-11T06:05:00Z", "ar"));
 check("2 · a single-digit minute keeps its two digits (9:05 ص)", /^9:05 ص$/.test(paddedMinuteAr), JSON.stringify(paddedMinuteAr));
 
 /* 3 — no Arabic-Indic digits, no invisible LRM/RLM, no zone token. */
 const NO_ARABIC_DIGITS = /[\u0660-\u0669]/;
 const sample = [arDate, enDate, arDateTime, enDateTime, arTime, enTime,
-  unwrap(formatDate("2026-01-01T00:00:00Z", "ar")), unwrap(formatDateTime("2026-01-01T00:00:00Z", "en")),
+  unwrap(formatDate("2026-01-01T00:00:00Z", "ar")), visible(formatDateTime("2026-01-01T00:00:00Z", "en")),
   formatWeekdayOf("2026-10-11T06:18:00Z", "ar"), formatWeekdayIndex(5, "ar")];
 check("4 · EVERY shared output is isolate-wrapped (spot set was checked during unwrap)",
   sample.length >= 6);
@@ -124,6 +125,12 @@ const prayerDisplay = fs.readFileSync(path.join(srcRoot, "features", "prayer", "
 check("H8 · profile prayer clocks use the canonical wall-clock display", /\{formatWallClock\(formatPrayerMinutes\(/.test(prayerDisplay)
   && !/>\s*\{formatPrayerMinutes\(/.test(prayerDisplay));
 const formatSource = fs.readFileSync(path.join(srcRoot, "app", "useMockList.ts"), "utf8");
+check("H11 · timeRun binds the numeric clock and period with no-break space",
+  /return `\$\{parts\.hour\}:\$\{parts\.minute\}\\u00a0\$\{parts\.period\}`/.test(formatSource));
+check("H11 · date-time binds date, separator and clock on one line",
+  /unwrapped\(formatDate\(isoDate, locale\)\)\}\\u00a0·\\u00a0\$\{timeRun\(time\)\}/.test(formatSource));
+check("H11 · composed ranges retain endpoint isolation",
+  !/unwrapped\(format(?:Time|DateTime|WallClock)\(/.test(formatSource));
 for (const name of ["weekInterval", "formatDateRange", "formatTimeRange", "formatDateTimeRange", "formatWallClockRange"]) {
   const body = formatSource.split(`export function ${name}(`)[1]?.split(/\nexport function /)[0] ?? "";
   check(`H8 · ${name} isolates the composed range`, /return isolated\(/.test(body));

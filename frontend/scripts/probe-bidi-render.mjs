@@ -18,6 +18,7 @@ const PORT = 9663;
 // literals below reach the page exactly as written here.
 function audit() {
   const ZW = /[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g;
+  const IS_ZW = /[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/;
   const RE = /\d{1,2}[\/.:]\d{2}|[\u0621-\u064A]{2,}\s*\d{4}|\d{1,2}\s*[\u0621-\u064A]+\s*\d{4}|\d+\s*[سصمد]\b/;
   const main = document.querySelector("main") || document.querySelector("[role=main]");
   if (!main) return [];
@@ -33,7 +34,7 @@ function audit() {
     while ((n = walk.nextNode())) {
       const s = n.data;
       for (let i = 0; i < s.length; i++) {
-        if (ZW.test(s[i])) continue;
+        if (IS_ZW.test(s[i])) continue;
         const r = document.createRange();
         r.setStart(n, i);
         r.setEnd(n, i + 1);

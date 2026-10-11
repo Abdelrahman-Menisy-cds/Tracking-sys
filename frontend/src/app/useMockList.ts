@@ -115,18 +115,22 @@ function timeParts(date: Date, locale: "ar" | "en"): { hour: string; minute: str
   return { hour, minute: parts.minute, period };
 }
 
+/** Keep the day period on the same rendered line as its clock. */
+function timeRun(parts: { hour: string; minute: string; period: string }): string {
+  return `${parts.hour}:${parts.minute}\u00a0${parts.period}`;
+}
+
 /** DD/MM/YYYY · h:mm period — bidi-isolated, no zone token. */
 export function formatDateTime(isoDate: string, locale: "ar" | "en"): string {
   const date = new Date(isoDate);
   const time = timeParts(date, locale);
-  const day = unwrapped(formatDate(isoDate, locale));
-  return isolated(`${day} · ${time.hour}:${time.minute} ${time.period}`.trim());
+  return isolated(`${unwrapped(formatDate(isoDate, locale))}\u00a0·\u00a0${timeRun(time)}`);
 }
 
 /** h:mm period only — bidi-isolated, no zone token. */
 export function formatTime(isoDate: string, locale: "ar" | "en"): string {
   const time = timeParts(new Date(isoDate), locale);
-  return isolated(`${time.hour}:${time.minute} ${time.period}`.trim());
+  return isolated(timeRun(time));
 }
 
 /** The weekday NAME of a fixed calendar date (0 = Sunday … 6 = Saturday)
@@ -159,25 +163,25 @@ export function formatWallClock(value: string, locale: "ar" | "en"): string {
   const parts = new Intl.DateTimeFormat(localeTag(locale), {
     hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "UTC",
   }).formatToParts(date).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
-  return isolated(`${String(Number(parts.hour))}:${parts.minute} ${(parts.dayPeriod ?? "").toUpperCase()}`);
+  return isolated(timeRun({ hour: String(Number(parts.hour)), minute: parts.minute, period: (parts.dayPeriod ?? "").toUpperCase() }));
 }
 
 /** A single isolated time range; null represents a missing endpoint. */
 export function formatTimeRange(fromIso: string | null, toIso: string | null, locale: "ar" | "en"): string {
-  return isolated(`${fromIso ? unwrapped(formatTime(fromIso, locale)) : "—"} → ${toIso ? unwrapped(formatTime(toIso, locale)) : "—"}`);
+  return isolated(`${fromIso ? formatTime(fromIso, locale) : "—"} → ${toIso ? formatTime(toIso, locale) : "—"}`);
 }
 
 export function formatDateTimeRange(fromIso: string, toIso: string, locale: "ar" | "en"): string {
-  return isolated(`${unwrapped(formatDateTime(fromIso, locale))} → ${unwrapped(formatDateTime(toIso, locale))}`);
+  return isolated(`${formatDateTime(fromIso, locale)} → ${formatDateTime(toIso, locale)}`);
 }
 
 export function formatWallClockRange(from: string, to: string | null, locale: "ar" | "en"): string {
-  return isolated(`${unwrapped(formatWallClock(from, locale))} → ${to ? unwrapped(formatWallClock(to, locale)) : "—"}`);
+  return isolated(`${formatWallClock(from, locale)} → ${to ? formatWallClock(to, locale) : "—"}`);
 }
 
 /** Numeric dates in dense rows and schedule validity ranges. */
 export function formatDateRange(fromIso: string, toIso: string | null, locale: "ar" | "en"): string {
-  return isolated(`${unwrapped(formatDate(fromIso, locale))} → ${toIso ? unwrapped(formatDate(toIso, locale)) : "—"}`);
+  return isolated(`${formatDate(fromIso, locale)} → ${toIso ? formatDate(toIso, locale) : "—"}`);
 }
 
 export function weekInterval(weekStart: string, locale: "ar" | "en"): string {
