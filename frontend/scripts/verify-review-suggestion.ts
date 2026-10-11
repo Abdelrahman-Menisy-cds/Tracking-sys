@@ -9,7 +9,8 @@
  * Exits non-zero on any failure. No browser, no server, no extra dependency.
  */
 import { attendanceSchedules, directoryLeaveBalances, leaveBalanceSummary, reviewedTeamDaysFor, type AttendanceDay, type LeaveBalance } from "../src/mock/attendance";
-import { teamRequests, type RequestMock } from "../src/mock/data";
+import { team, teamRequests, type RequestMock } from "../src/mock/data";
+import { allDemoTasks, type TaskMock } from "../src/mock/tasks";
 import { parseDemoRequestSpan, suggestReviewDecision, SUGGESTION_WINDOW_DAYS, type DecisionSuggestion } from "../src/app/reviewSuggestion";
 
 let failed = false;
@@ -58,6 +59,11 @@ const thinPeers = [
 const run = (over: Partial<Parameters<typeof suggestReviewDecision>[0]>): DecisionSuggestion =>
   suggestReviewDecision({
     request: annualWeek,
+    // No deadlines by default: the attendance scenarios below isolate their own signal, and
+    // the real-queue check at the end runs the real fixtures.
+    tasks: [],
+    departmentIds: team.map((member) => member.id),
+    departmentName: team.find((member) => member.id === requester)?.department ?? null,
     schedules: attendanceSchedules,
     requesterDays: loadedDays,
     teamDays: healthyPeers,
@@ -134,13 +140,69 @@ for (const request of teamRequests) {
     requesterDays: reviewedTeamDaysFor([request.requester_id]),
     teamDays,
     leaveBalances: directoryLeaveBalances(anchorOf(request).slice(0, 4)),
+    tasks: allDemoTasks,
+    departmentIds: requesters.filter((id) => id !== request.requester_id),
+    departmentName: team.find((member) => member.id === request.requester_id)?.department ?? null,
   });
   console.log(`  ${request.id} ${request.requester_id} «${request.title}» → ${suggestion.verdict} / ${suggestion.confidence} · evidence ${suggestion.evidenceDays}d · ${suggestion.reasons.length} reasons`);
   for (const reason of suggestion.reasons) console.log(`      [${reason.kind}] ${reason.textAr}`);
   check(`${request.id} has seeded evidence (${suggestion.evidenceDays} days)`, suggestion.evidenceDays >= 3, suggestion.evidenceDays);
   const requesterBalance = directoryLeaveBalances(anchorOf(request).slice(0, 4)).find((item) => item.employee === request.requester_id && item.leave_type === "ANNUAL");
   check(`${request.id} requester has an annual balance record`, Boolean(requesterBalance), requesterBalance ? leaveBalanceSummary(requesterBalance).remaining : null);
+  check(`${request.id} reports its own deadlines`, suggestion.reasons.some((reason) => reason.kind === "TASKS"), suggestion.reasons.map((reason) => reason.kind));
+  check(`${request.id} reports the department's load`, suggestion.reasons.some((reason) => reason.kind === "DEPARTMENT"), suggestion.reasons.map((reason) => reason.kind));
 }
+
+/* ------------------------------------------------------------------ *
+ * 9. Deadlines: a task due INSIDE the requested span is the signal a
+ *    manager acts on, and the department's own load is reported with it.
+ * ------------------------------------------------------------------ */
+/** A deadline relative to a GIVEN request's own anchor — the demo's requests do not share one. */
+const dueFor = (request: RequestMock, days: number) => {
+  const date = new Date(`${anchorOf(request)}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+};
+const task = (id: string, assignee: string | null, status: TaskMock["status"], priority: TaskMock["priority"], due: string | null): TaskMock => ({
+  id,
+  title: `مهمة ${id}`,
+  description: "",
+  created_by: "m1",
+  assignee,
+  routed_to_manager: assignee === null ? "m1" : null,
+  status,
+  priority,
+  ...(due === null ? {} : { due_date: due }),
+  created_at: `${at(ANCHOR, 1)}T09:00:00Z`,
+  events: [],
+});
+const tasksReasonOf = (suggestion: DecisionSuggestion) => suggestion.reasons.find((reason) => reason.kind === "TASKS")?.textAr ?? "";
+const sickDays = teamRequests.find((request) => /مرضية/.test(request.title)) ?? annualWeek;
+
+const highInside = run({ tasks: [task("x-1", requester, "OPEN", "HIGH", dueFor(annualWeek, 3))] });
+check("annual leave + a high-priority deadline inside the span → REVIEW", highInside.verdict === "REVIEW", highInside.verdict);
+check("...and the reason reports the collision", tasksReasonOf(highInside).includes("1 مستحقة"), tasksReasonOf(highInside));
+
+const mediumInside = run({ tasks: [task("x-2", requester, "OPEN", "MEDIUM", dueFor(annualWeek, 2))] });
+check("annual leave + any deadline inside the span → REVIEW", mediumInside.verdict === "REVIEW", mediumInside.verdict);
+
+const outsideSpan = run({ tasks: [task("x-3", requester, "OPEN", "MEDIUM", dueFor(annualWeek, 40))] });
+check("a deadline beyond the span is not a collision", outsideSpan.verdict === "APPROVE", outsideSpan.verdict);
+check("...and the reason says so", tasksReasonOf(outsideSpan).includes("0 مستحقة"), tasksReasonOf(outsideSpan));
+
+const sickMedium = run({ request: sickDays, tasks: [task("x-4", sickDays.requester_id, "OPEN", "MEDIUM", dueFor(sickDays, 1))] });
+check("a sick day cannot be rescheduled around a deadline — reported, not REVIEWed", sickMedium.verdict !== "REVIEW", sickMedium.verdict);
+const sickHigh = run({ request: sickDays, tasks: [task("x-5", sickDays.requester_id, "OPEN", "HIGH", dueFor(sickDays, 1))] });
+check("...but a high-priority one still needs a human", sickHigh.verdict === "REVIEW", sickHigh.verdict);
+
+const department = run({ tasks: [task("x-6", "e4", "OPEN", "MEDIUM", dueFor(annualWeek, 2)), task("x-7", null, "OPEN", "LOW", dueFor(annualWeek, 3))] });
+const departmentReason = department.reasons.find((reason) => reason.kind === "DEPARTMENT");
+check("the department reason names the department", Boolean(departmentReason?.textAr.includes("العمليات")), departmentReason?.textAr);
+check("the department reason is rendered in English too", Boolean(departmentReason?.textEn.includes("Operations")), departmentReason?.textEn);
+
+const e2Open = allDemoTasks.filter((item) => item.assignee === "e2" && item.status !== "DONE" && item.status !== "CANCELLED");
+check("the demo carries open tasks for the queued requester", e2Open.length >= 2, e2Open.length);
+check("...including a high-priority deadline", e2Open.some((item) => item.priority === "HIGH"), e2Open.map((item) => item.priority));
 
 console.log(failed ? "\nFAILED" : "\nPASSED");
 process.exit(failed ? 1 : 0);

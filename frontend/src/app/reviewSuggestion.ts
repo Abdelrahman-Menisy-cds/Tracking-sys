@@ -1,10 +1,11 @@
 import { dict } from "../i18n/dict";
 import { leaveBalanceSummary, type AttendanceDay, type LeaveBalance, type WorkSchedule } from "../mock/attendance";
 import type { RequestMock } from "../mock/data";
+import type { TaskMock, TaskStatus } from "../mock/tasks";
 
 export type SuggestionVerdict = "APPROVE" | "REJECT" | "REVIEW";
 export type SuggestionConfidence = "HIGH" | "MEDIUM" | "LOW";
-export type SuggestionReasonKind = "SCHEDULE" | "WORKLOAD" | "COVERAGE" | "BALANCE";
+export type SuggestionReasonKind = "SCHEDULE" | "WORKLOAD" | "COVERAGE" | "BALANCE" | "TASKS" | "DEPARTMENT";
 export interface SuggestionReason {
   kind: SuggestionReasonKind;
   textAr: string;
@@ -23,6 +24,12 @@ export interface ReviewSuggestionInput {
   requesterDays: AttendanceDay[];
   teamDays: AttendanceDay[];
   leaveBalances: LeaveBalance[];
+  /** Open work, so the request can be weighed against real deadlines. */
+  tasks: TaskMock[];
+  /** Directory ids of the rest of the requester's department. */
+  departmentIds: string[];
+  /** The requester's department, named in the reason. */
+  departmentName: { ar: string; en: string } | null;
 }
 
 export type RequestedSpan =
@@ -71,7 +78,7 @@ function reason(kind: SuggestionReasonKind, key: StringKey, values: (string | nu
   return { kind, textAr: fill(dict.ar[key], values), textEn: fill(dict.en[key], valuesEn) };
 }
 
-export function suggestReviewDecision({ request, schedules, requesterDays, teamDays, leaveBalances }: ReviewSuggestionInput): DecisionSuggestion {
+export function suggestReviewDecision({ request, schedules, requesterDays, teamDays, leaveBalances, tasks, departmentIds, departmentName }: ReviewSuggestionInput): DecisionSuggestion {
   const anchor = (request.submitted_at ?? request.created_at).slice(0, 10);
   const start = new Date(`${anchor}T00:00:00Z`);
   start.setUTCDate(start.getUTCDate() - (SUGGESTION_WINDOW_DAYS - 1));
@@ -129,7 +136,36 @@ export function suggestReviewDecision({ request, schedules, requesterDays, teamD
   const fullDays = span.kind === "FULL_DAYS" ? span.days : null;
   const shortOfBalance = annual && fullDays !== null && (remaining === null || remaining < fullDays);
 
-  // ---- Reasons (2-3, each carrying the numbers it was derived from) ----
+  // ---- Tasks: what the request collides with, and whether the department can absorb it ----
+  // The demo's requests carry no dates, so the request is read as starting at its own anchor:
+  // a full-day span covers that many days, a part-day is that same day.
+  const openStatuses: TaskStatus[] = ["OPEN", "IN_PROGRESS"];
+  const spanEnd = (() => {
+    const end = new Date(`${anchor}T00:00:00Z`);
+    end.setUTCDate(end.getUTCDate() + (span.kind === "FULL_DAYS" ? span.days : 0));
+    return end.toISOString().slice(0, 10);
+  })();
+  const isOpen = (task: TaskMock) => openStatuses.includes(task.status);
+  const dueInSpan = (task: TaskMock) => Boolean(task.due_date && task.due_date >= anchor && task.due_date <= spanEnd);
+  const isOverdue = (task: TaskMock) => Boolean(task.due_date && task.due_date < anchor);
+
+  const mine = tasks.filter((task) => task.assignee === request.requester_id && isOpen(task));
+  const mineDue = mine.filter(dueInSpan);
+  const mineOverdue = mine.filter(isOverdue);
+  const mineHigh = mineDue.filter((task) => task.priority === "HIGH").length;
+
+  // The department's pool is the rest of the team's open work plus whatever is routed to the
+  // manager and still unassigned — work that exists and has nobody on it.
+  const departmentPool = tasks.filter(
+    (task) =>
+      isOpen(task) &&
+      task.assignee !== request.requester_id &&
+      (task.assignee === null ? task.routed_to_manager !== null : departmentIds.includes(task.assignee)),
+  );
+  const departmentDue = departmentPool.filter(dueInSpan);
+  const departmentUnassigned = departmentPool.filter((task) => task.assignee === null).length;
+
+  // ---- Reasons (the decision-bearing signals first, each carrying its numbers) ----
   const reasons: SuggestionReason[] = [];
   if (annual) {
     reasons.push(
@@ -138,6 +174,20 @@ export function suggestReviewDecision({ request, schedules, requesterDays, teamD
         : reason("BALANCE", "reviewSuggestionBalance", [remaining, fullDays ?? 0]),
     );
   }
+  // The requester's own deadlines come first: this is the signal a manager acts on.
+  reasons.push(
+    mine.length === 0
+      ? reason("TASKS", "reviewSuggestionRequesterTasksNone", [0])
+      : reason("TASKS", "reviewSuggestionRequesterTasks", [mine.length, mineDue.length, mineOverdue.length, mineHigh]),
+  );
+  reasons.push(
+    reason(
+      "DEPARTMENT",
+      "reviewSuggestionDepartmentTasks",
+      [departmentName?.ar ?? dict.ar.reviewSuggestionDepartmentFallback, departmentPool.length, departmentDue.length, departmentUnassigned],
+      [departmentName?.en ?? dict.en.reviewSuggestionDepartmentFallback, departmentPool.length, departmentDue.length, departmentUnassigned],
+    ),
+  );
   if (differs && own && organization) {
     reasons.push(
       reason("SCHEDULE", "reviewSuggestionScheduleDifference", [
@@ -163,12 +213,19 @@ export function suggestReviewDecision({ request, schedules, requesterDays, teamD
     ),
   );
 
+  // The dialog shows a short set, ordered above by decision weight — a manager reads four.
+  const shown = reasons.slice(0, 4);
+
   // ---- Verdict: named rules, no hidden weighting ----
   // Positive: the requester is carrying a real load, or the team is in good shape.
   const loaded = expected > 0 && worked >= expected * 1.1;
   const teamHealthy = presenceRatio !== null && presenceRatio >= 0.75;
   const teamThin = presenceRatio !== null && presenceRatio <= 0.25;
   const enoughEvidence = measured.length >= 3 || observed >= 3;
+  // A deadline inside the requested span is what a manager actually acts on: a high-priority
+  // one always needs a human, and any collision on planned annual leave does too. A sick day
+  // cannot be rescheduled around a deadline, so there the collision stays a reported fact.
+  const severeCollision = mineHigh > 0 || (mineDue.length > 0 && annual);
 
   let verdict: SuggestionVerdict;
   if (shortOfBalance) {
@@ -176,6 +233,8 @@ export function suggestReviewDecision({ request, schedules, requesterDays, teamD
   } else if (span.kind === "FULL_DAYS" && teamThin) {
     verdict = "REJECT";
   } else if (span.kind === "UNKNOWN" || observed === 0) {
+    verdict = "REVIEW";
+  } else if (severeCollision) {
     verdict = "REVIEW";
   } else if (teamHealthy && (loaded || measured.length >= 3)) {
     verdict = "APPROVE";
@@ -188,12 +247,12 @@ export function suggestReviewDecision({ request, schedules, requesterDays, teamD
 
   const conflict = loaded && presenceRatio !== null && presenceRatio < 0.75;
   if (conflict && verdict !== "REJECT") {
-    const last = reasons[reasons.length - 1];
-    reasons[reasons.length - 1] = { ...last, textAr: `${last.textAr} ${dict.ar.reviewSuggestionConflict}`, textEn: `${last.textEn} ${dict.en.reviewSuggestionConflict}` };
+    const index = Math.max(0, shown.findIndex((item) => item.kind === "COVERAGE"));
+    shown[index] = { ...shown[index], textAr: `${shown[index].textAr} ${dict.ar.reviewSuggestionConflict}`, textEn: `${shown[index].textEn} ${dict.en.reviewSuggestionConflict}` };
   }
 
   const confidence: SuggestionConfidence =
     verdict === "REVIEW" || span.kind === "UNKNOWN" || !enoughEvidence ? "LOW" : measured.length >= 5 && observed >= 5 ? "HIGH" : "MEDIUM";
 
-  return { verdict, confidence, reasons, evidenceDays: measured.length };
+  return { verdict, confidence, reasons: shown, evidenceDays: measured.length };
 }

@@ -10,6 +10,7 @@ import { formatDate, formatDateTime, formatMinutes, useMockList, weekInterval } 
 import {
   mockFetch,
   pickName,
+  team,
   teamRequests,
   type RequestMock,
   type RequestStatus,
@@ -17,6 +18,7 @@ import {
   type TimesheetStatus,
 } from "../mock/data";
 import { attendanceSchedules, directoryLeaveBalances, reviewedTeamDaysFor } from "../mock/attendance";
+import { allDemoTasks } from "../mock/tasks";
 import { suggestReviewDecision, type DecisionSuggestion } from "../app/reviewSuggestion";
 import {
   Banner,
@@ -50,6 +52,10 @@ function suggestionFor(request: RequestMock): DecisionSuggestion {
     requesterDays: reviewedTeamDaysFor([request.requester_id]),
     teamDays: REVIEWED_TEAM_DAYS,
     leaveBalances: directoryLeaveBalances(anchor.slice(0, 4)),
+    // Deadlines: the requester's own open tasks, and the rest of the department's.
+    tasks: allDemoTasks,
+    departmentIds: REVIEWED_REQUESTERS.filter((id) => id !== request.requester_id),
+    departmentName: team.find((member) => member.id === request.requester_id)?.department ?? null,
   });
 }
 

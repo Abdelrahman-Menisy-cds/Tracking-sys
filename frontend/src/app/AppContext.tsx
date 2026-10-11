@@ -61,7 +61,7 @@ import {
 } from "../mock/attendance";
 import {
   DEFAULT_TASK_CAPABILITY,
-  demoTasks,
+  allDemoTasks,
   taskCapabilitiesById,
   type TaskCapability,
   type TaskEventMock,
@@ -205,11 +205,11 @@ function storeSessionTasks(tasks: TaskMock[]): void {
 function initialSessionTasks(): TaskMock[] {
   const sessionTasks = readSessionTasks();
   const sessionById = new Map(sessionTasks.map((task) => [task.id, task]));
-  const fixtureIds = new Set(demoTasks.map((task) => task.id));
+  const fixtureIds = new Set(allDemoTasks.map((task) => task.id));
   // Session copies of fixture tasks OVERRIDE the fixture row: an assignee
   // change made earlier in the session must survive a reload, otherwise a
   // reassignment silently reverts to the seeded assignee.
-  const fixtures = cloneFixture(demoTasks).map((task) => sessionById.get(task.id) ?? task);
+  const fixtures = cloneFixture(allDemoTasks).map((task) => sessionById.get(task.id) ?? task);
   const extras = sessionTasks.filter((task) => !fixtureIds.has(task.id));
   return [...fixtures, ...extras];
 }

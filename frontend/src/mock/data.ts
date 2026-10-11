@@ -183,9 +183,9 @@ export const demoUser: Record<Role, DemoUserProfile> = {
 
 /** Team members for manager/HR demo scope. */
 export const team = [
-  { id: "e2", name: { ar: "أحمد سعيد", en: "Ahmed Saeed" } },
-  { id: "e3", name: { ar: "نور الدين", en: "Nour Eldin" } },
-  { id: "e4", name: { ar: "سلمى فؤاد", en: "Salma Fouad" } },
+  { id: "e2", name: { ar: "أحمد سعيد", en: "Ahmed Saeed" }, department: { ar: "العمليات", en: "Operations" } },
+  { id: "e3", name: { ar: "نور الدين", en: "Nour Eldin" }, department: { ar: "العمليات", en: "Operations" } },
+  { id: "e4", name: { ar: "سلمى فؤاد", en: "Salma Fouad" }, department: { ar: "العمليات", en: "Operations" } },
 ];
 
 const att = (id: string, name: string, type: string, kb: number, scan: AttachmentMock["scan_status"], daysAgo: number): AttachmentMock => ({

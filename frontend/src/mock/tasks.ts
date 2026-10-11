@@ -182,5 +182,55 @@ export const demoTasks: TaskMock[] = [
   },
 ];
 
+/**
+ * Open work for the team members who appear in the manager's review queue. A manager
+ * deciding on leave needs to know what deadlines the request collides with and whether
+ * the rest of the department can absorb them, so the demo carries real tasks for those
+ * three people instead of leaving the queue's requesters with an empty workload. These
+ * are ordinary fixtures — /tasks lists them, nothing is special-cased for the suggestion.
+ */
+function reviewTeamTask(
+  id: string,
+  title: string,
+  description: string,
+  assignee: string,
+  status: TaskStatus,
+  priority: TaskPriority,
+  dueInDays: number | null,
+  createdDaysAgo: number,
+): TaskMock {
+  const events: TaskEventMock[] = [tee(`${id}-ev-1`, "CREATE", "m1", "", createdDaysAgo)];
+  events.push(tee(`${id}-ev-2`, "ASSIGN", "m1", "", createdDaysAgo, { assigned: assignee }));
+  return {
+    id,
+    title,
+    description,
+    created_by: "m1",
+    assignee,
+    routed_to_manager: null,
+    status,
+    priority,
+    ...(dueInDays === null ? {} : { due_date: isoDate(dueInDays) }),
+    created_at: iso(createdDaysAgo, 9),
+    events,
+  };
+}
+
+export const reviewTeamTasks: TaskMock[] = [
+  // e2 asked for a week of annual leave: two deadlines land inside that week.
+  reviewTeamTask("t-6101", "تسليم تقرير تشغيل الفرع", "تجميع أرقام الفرع لشهر أكتوبر وتسليمها للإدارة الإقليمية.", "e2", "OPEN", "HIGH", 4, 6),
+  reviewTeamTask("t-6102", "مطابقة فواتير الموردين", "مطابقة فواتير سبتمبر مع أوامر الشراء وإغلاق الفروقات.", "e2", "IN_PROGRESS", "MEDIUM", 2, 8),
+  reviewTeamTask("t-6103", "تحديث دليل الإجراءات", "إضافة التعديلات الأخيرة على إجراءات الاستلام والتسليم.", "e2", "OPEN", "LOW", 12, 4),
+  // e3 asked for a 30-minute exit: the nearest deadline is well beyond it.
+  reviewTeamTask("t-6111", "مراجعة طلبات الاشتراك", "مراجعة طلبات الاشتراك الجديدة والرد على الاستفسارات المعلّقة.", "e3", "OPEN", "MEDIUM", 9, 5),
+  reviewTeamTask("t-6112", "تدقيق بيانات العملاء", "تدقيق بيانات العملاء المكرّرة قبل تحديث قاعدة البيانات.", "e3", "IN_PROGRESS", "LOW", 15, 7),
+  // e4 asked for two sick days: one deadline falls inside them.
+  reviewTeamTask("t-6121", "تجهيز عرض العميل الجديد", "تجهيز العرض الفني والمالي لاجتماع العميل الأسبوع القادم.", "e4", "OPEN", "MEDIUM", 1, 3),
+  reviewTeamTask("t-6122", "أرشفة مراسلات الربع الثالث", "أرشفة المراسلات الرسمية وربطها بملفات العقود.", "e4", "DONE", "LOW", -3, 10),
+];
+
+/** Every task the demo ships: the brief-C seed plus the review queue's own open work. */
+export const allDemoTasks: TaskMock[] = [...demoTasks, ...reviewTeamTasks];
+
 /** The demo user's utility — re-used so the creator/assignee rows localize. */
 export type { DemoUserProfile };
