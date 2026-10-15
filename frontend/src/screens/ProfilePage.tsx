@@ -5,6 +5,7 @@ import PageHeader from "../components/layout/PageHeader";
 import { Banner } from "../components/ui";
 import { UserIcon } from "../components/icons";
 import PrayerDhikrSettings from "../features/prayer/PrayerDhikrSettings";
+import AssistantSettingsPanel from "../features/assistant/AssistantSettingsPanel";
 import { identityEmployeeId } from "../mock/attendance";
 
 /**
@@ -58,6 +59,8 @@ export default function ProfilePage() {
         </dl>
       </section>
       {isMuslim ? <PrayerDhikrSettings employeeId={identityEmployeeId(role)} isMuslim={isMuslim} /> : null}
+      {/* H18: the employee links their OWN provider here — no presets, per the owner. */}
+      <AssistantSettingsPanel />
     </div>
   );
 }

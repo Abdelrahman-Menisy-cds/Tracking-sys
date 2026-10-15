@@ -289,6 +289,34 @@ button { cursor: pointer; }
 .section { margin-block-start: var(--sp-8); }
 .dashboard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-6); align-items: start; }
 .dashboard-grid > * { min-inline-size: 0; }
+/* Settings page: cards share one baseline — equal heights, with each card's
+   last block pushed to its bottom edge so the space reads as deliberate. */
+.settings-grid { align-items: stretch; }
+.settings-grid > .work-surface { display: flex; flex-direction: column; }
+.settings-grid > .work-surface > :last-child { margin-block-start: auto; }
+/* Ten-column leave table: give it the width it needs and keep every cell on one
+   line. The wrapper already scrolls, so nothing is lost off-screen. */
+.table-wide table { min-width: 1120px; }
+.table-wide th, .table-wide td { white-space: nowrap; }
+/* Status pills inside a wide table stay on one line too, so every row is the
+   same height and the columns read as one grid. */
+.table-wide .pill { white-space: nowrap; }
+/* First-run tour: a spotlight ring on the real control plus a coach-mark card.
+   The ring is a transparent box with a huge shadow, which dims everything else
+   without needing an overlay per element or an SVG mask. */
+.tour-layer { position: fixed; inset: var(--space-0); z-index: 60; pointer-events: none; }
+.tour-spotlight { position: fixed; border-radius: var(--radius-surface); box-shadow: 0 0 0 9999px color-mix(in srgb, var(--text-strong) 55%, transparent); outline: var(--timeline-width) solid var(--accent); transition: top 200ms ease, left 200ms ease, width 200ms ease, height 200ms ease; }
+.tour-card { position: fixed; display: grid; gap: var(--sp-2); padding: var(--sp-5); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--elevation-3, var(--elevation-1)); pointer-events: auto; }
+.tour-card:focus-visible { outline: var(--timeline-width) solid var(--accent); outline-offset: var(--space-1); }
+.tour-step { color: var(--text-muted); font-size: var(--font-size-sm); font-variant-numeric: tabular-nums; }
+.tour-title { font-size: var(--font-size-md); }
+.tour-body { margin: var(--space-0); color: var(--text-muted); }
+.tour-dots { display: flex; gap: var(--sp-1); }
+.tour-dot { inline-size: 8px; block-size: 8px; border-radius: var(--radius-pill); background: var(--border-subtle); }
+.tour-dot.active { background: var(--accent); }
+.tour-actions { display: flex; align-items: center; gap: var(--sp-2); margin-block-start: var(--sp-2); }
+.tour-actions-spacer { flex: 1 1 auto; }
+
 .people-detail-page .role-segmented { flex-wrap: wrap; }
 .people-detail-page .role-segmented-option { flex: 1 1 min(100%, 9rem); min-inline-size: 0; }
 .dashboard-grid .section { margin-block-start: var(--space-0); }
@@ -553,7 +581,7 @@ html[dir="rtl"] .profile-menu-item { justify-content: flex-start; }
 .applied-filters { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; margin-block-end: var(--sp-4); }
 .filter-chip { display: inline-flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); border: var(--timeline-width) solid var(--border-subtle); border-radius: var(--radius-pill); background: var(--surface-subtle); font-size: var(--font-size-sm); }
 .filter-panel { padding: var(--sp-page-inner, var(--sp-4)); margin-block-end: var(--sp-4); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: var(--surface-subtle); }
-.filter-panel .filter-toolbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: var(--sp-3); align-items: end; margin-block-end: var(--sp-3); }
+.filter-panel .filter-toolbar { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: var(--sp-3); align-items: stretch; margin-block-end: var(--sp-3); }
 .filter-panel .filter-toolbar .field { margin: var(--space-0); min-width: 0; }
 .filter-panel .filter-panel-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4); margin-block-end: var(--sp-3); }
 .filter-panel .filter-panel-heading h2 { margin-block-end: var(--space-0); font-size: var(--font-size-md); }
@@ -940,4 +968,114 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
   .task-timer-hero { grid-template-columns: 1fr; align-items: start; }
   .task-timer-total-box { justify-items: start; }
   .task-timer-elapsed-value, .task-timer-total-value { font-size: var(--font-size-xl, var(--font-size-2xl)); }
+}
+
+/* ===== H17 — the company profile: onboarding screen, shared form, settings widget ===== */
+/* Per-field refusals render under their field on the company form too. The
+   .new-request-page rule stays for that screen; this is the unscoped twin. */
+.request-inline-error { display: block; margin-block-start: var(--sp-2); color: var(--danger-strong); font-weight: 700; }
+/* The onboarding panel reuses the login layout (.login-page/.login-panel) but is
+   wider: it carries a 12-field form plus the missing-fields summary. */
+.company-onboarding-panel { max-inline-size: 860px; inline-size: 100%; }
+.company-onboarding-meta { margin-block-end: var(--sp-4); }
+.company-signout { flex: 0 0 auto; }
+.company-signed-as { margin-block-start: var(--sp-2); }
+.company-form-loading {
+  display: flex; align-items: center; gap: var(--sp-3);
+  min-block-size: 160px; color: var(--text-muted);
+}
+.company-form { display: grid; gap: var(--sp-6); }
+.company-form-group { border: var(--radius-none); padding: var(--space-0); margin: var(--space-0); display: grid; gap: var(--sp-4); }
+.company-form-group > legend { padding: var(--space-0); margin-block-end: var(--sp-2); color: var(--text-muted); text-transform: none; }
+.company-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2) var(--sp-6); }
+.company-form-grid .field { margin-block-end: var(--sp-3); min-inline-size: 0; }
+.company-required-instructions { margin-block-end: var(--sp-2); }
+.company-logo-row { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.company-logo-preview { inline-size: 72px; block-size: 72px; object-fit: contain; background: var(--surface-subtle); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-sm); padding: var(--sp-1); }
+.company-logo-none { display: inline-flex; align-items: center; justify-content: center; inline-size: 72px; block-size: 72px; border: var(--timeline-width) dashed var(--border-control); border-radius: var(--radius-sm); color: var(--text-muted); font-size: var(--font-size-xs); text-align: center; }
+/* Settings widget: the identity read-out. */
+.company-widget-identity { display: flex; align-items: center; gap: var(--sp-4); margin-block-end: var(--sp-4); }
+.company-widget-logo { inline-size: 64px; block-size: 64px; object-fit: contain; background: var(--surface-subtle); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-sm); padding: var(--sp-1); }
+.company-widget-logo-none { display: inline-flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: var(--font-size-xs); }
+.company-widget-name { font-size: var(--font-size-lg); }
+.company-widget-facts { margin-block: var(--space-0); }
+.company-form-compact .company-form-grid { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 720px) {
+  .company-form-compact .company-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 719px) {
+  .company-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .company-onboarding-panel { padding: var(--sp-4); }
+}
+
+/* ═══ Brief H18 — مدام عفاف assistant: launcher, chat panel, settings ═══ */
+
+/* Floating launcher — bottom INLINE-END corner (RTL-aware via logical props). */
+.assistant-launcher-wrap { position: fixed; inset-block-end: var(--sp-6); inset-inline-end: var(--sp-6); z-index: 50; }
+.assistant-launcher { display: inline-flex; align-items: center; justify-content: center; inline-size: 64px; block-size: 64px; padding: var(--sp-1); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-pill); background: var(--surface); box-shadow: var(--elevation-3); cursor: pointer; transition: opacity 160ms ease, transform 120ms ease, box-shadow 160ms ease; }
+.assistant-launcher-face { inline-size: 100%; block-size: 100%; object-fit: cover; border-radius: var(--radius-pill); }
+.assistant-launcher:hover { transform: translateY(-2px); }
+.assistant-launcher-muted { opacity: 0.38; cursor: not-allowed; box-shadow: var(--elevation-1); }
+.assistant-launcher-muted:hover, .assistant-launcher-muted:focus-visible { transform: none; opacity: 0.55; }
+/* The hover/focus hint: appears over the launcher, carries the settings link. */
+.assistant-launcher-hint { position: absolute; inset-block-end: calc(100% + var(--sp-3)); inset-inline-end: 0; display: none; max-inline-size: min(320px, calc(100vw - 48px)); padding: var(--sp-3) var(--sp-4); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--elevation-3); font-size: var(--font-size-xs); text-align: start; z-index: 51; }
+.assistant-launcher-hint { display: grid; gap: var(--sp-2); opacity: 0; pointer-events: none; transition: opacity 160ms ease; }
+.assistant-launcher-wrap:hover .assistant-launcher-hint, .assistant-launcher-wrap:focus-within .assistant-launcher-hint { opacity: 1; pointer-events: auto; }
+.assistant-launcher-hint-link { justify-self: start; font-weight: 700; }
+
+/* Chat side panel — docks to the launcher corner, above the floating button. */
+.assistant-backdrop { position: fixed; inset: 0; z-index: 48; background: var(--overlay-scrim); }
+.assistant-panel { position: fixed; inset-block: 0; inset-inline-end: 0; z-index: 52; display: flex; flex-direction: column; inline-size: min(420px, 100vw); border: var(--timeline-width) solid var(--card-border); background: var(--surface); box-shadow: var(--elevation-3); }
+.assistant-header { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-4); border-block-end: var(--timeline-width) solid var(--card-border); }
+.assistant-face { inline-size: 36px; block-size: 36px; object-fit: cover; border-radius: var(--radius-pill); }
+.assistant-header-text { display: grid; min-inline-size: 0; flex: 1; }
+.assistant-provider-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assistant-transcript { flex: 1; display: grid; gap: var(--sp-3); align-content: start; padding: var(--sp-4); overflow-y: auto; background: var(--surface-inset); }
+.assistant-message { max-inline-size: 88%; }
+.assistant-message-user { justify-self: var(--justify-end, end); padding: var(--sp-3) var(--sp-4); border: var(--timeline-width) solid var(--accent-border, var(--card-border)); border-radius: var(--radius-surface); background: var(--accent-soft, var(--surface)); }
+.assistant-message-assistant { justify-self: start; padding: var(--sp-3) var(--sp-4); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--elevation-1); }
+.assistant-message-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* H20 — the markdown renderer's elements: lists sit tight inside the bubble. */
+.assistant-md-para { margin: 0 0 var(--sp-2); }
+.assistant-md-para:last-child, .assistant-md-list:last-child { margin-block-end: 0; }
+.assistant-md-list { margin: 0 0 var(--sp-2); padding-inline-start: var(--sp-5); }
+.assistant-md-list li { margin-block: var(--sp-1); }
+.assistant-inline-code { font-family: var(--font-mono, monospace); font-size: var(--font-size-xs, 0.85em); padding-inline: 0.3em; border-radius: var(--radius-surface, 4px); background: var(--surface-inset); border: var(--timeline-width) solid var(--card-border); }
+.assistant-typing { color: var(--text-muted); font-style: italic; }
+.assistant-empty { text-align: center; margin-block: var(--sp-6); }
+.assistant-error { margin: 0; padding: var(--sp-2) var(--sp-3); border: var(--timeline-width) solid var(--danger-border); border-radius: var(--radius-surface); background: var(--danger-soft); color: var(--danger-strong); font-size: var(--font-size-xs); }
+/* The confirmation card: nothing runs until تأكيد. */
+.assistant-action-card { display: grid; gap: var(--sp-2); justify-items: start; margin-block-start: var(--sp-2); padding: var(--sp-3); border: var(--timeline-width) solid var(--warning-border); border-inline-start: var(--space-1) solid var(--warning); border-radius: var(--radius-surface); background: var(--warning-soft); }
+.assistant-action-name { font-family: var(--font-mono, monospace); font-size: var(--font-size-xs); }
+.assistant-action-args { display: grid; gap: var(--sp-1); margin: 0; }
+.assistant-action-arg { display: flex; gap: var(--sp-2); }
+.assistant-action-arg dt { color: var(--text-muted); min-inline-size: 40%; }
+.assistant-action-arg dd { margin: 0; }
+.assistant-composer { display: flex; align-items: flex-end; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-block-start: var(--timeline-width) solid var(--card-border); }
+.assistant-composer-input { flex: 1; resize: none; min-block-size: var(--control-min-h); }
+
+/* Employee-facing settings widget + HR per-employee widget share these. */
+.assistant-active-toggle { display: flex; align-items: center; gap: var(--sp-2); }
+
+/* ═══ H19 — the three-way mode picker and subscription login panel ═══ */
+.assistant-mode-picker { display: grid; gap: var(--sp-2); margin: 0 0 var(--sp-4); padding: var(--sp-3); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: var(--surface-inset); }
+.assistant-mode-picker .role-segmented { max-inline-size: 100%; }
+.assistant-mode-picker .role-segmented-option { min-inline-size: min(100%, 9rem); white-space: nowrap; }
+.assistant-sub-panel { display: grid; gap: var(--sp-3); margin-block-start: var(--sp-2); }
+.assistant-sub-state { font-weight: 700; }
+.assistant-sub-flow { display: grid; gap: var(--sp-3); margin-block-start: var(--sp-2); }
+.assistant-sub-code { max-inline-size: 16rem; font-family: var(--font-mono, monospace); letter-spacing: 0.08em; }
+.assistant-sub-link { justify-self: start; font-weight: 700; }
+/* H21c — the import button demoted to a small secondary control under the
+   primary device-login button, and the code island's copy affordance. */
+.assistant-sub-secondary-actions { justify-content: start; }
+.assistant-sub-secondary-actions .btn { min-height: auto; }
+.btn-sm { min-height: auto; padding-block: var(--sp-1); font-size: 0.85em; }
+@media (max-width: 1023px) {
+  .assistant-mode-picker .role-segmented { flex-wrap: wrap; }
+  .assistant-mode-picker .role-segmented-option { flex: 1 1 min(100%, 9rem); }
+}
+@media (max-width: 1023px) {
+  .assistant-panel { inset-block: auto; block-size: 100dvh; inline-size: 100vw; }
+  .assistant-launcher-wrap { inset-block-end: var(--sp-4); inset-inline-end: var(--sp-4); }
 }

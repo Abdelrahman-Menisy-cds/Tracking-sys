@@ -34,6 +34,9 @@ _PATH_DUMMY_VALUES = {
     "target_id": "1",
     "notification_id": "1",
     "category": "requests",
+    # H16 paths: <int:department_id>, <int:grant_id> — same dummy shape.
+    "department_id": "1",
+    "grant_id": "1",
 }
 
 

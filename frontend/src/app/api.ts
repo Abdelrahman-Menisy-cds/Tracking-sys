@@ -27,15 +27,18 @@ export type ApiFailureKind =
 export class ApiError extends Error {
   readonly kind: ApiFailureKind;
   readonly status: number;
+  /** The backend's own error-envelope code, e.g. "flow_expired" (H24). */
+  readonly code?: string;
   /** Per-field messages from the server's error envelope, e.g. {password: ["…"]} (H15b). */
   readonly fields?: Record<string, string[]>;
 
-  constructor(kind: ApiFailureKind, status: number, message: string, fields?: Record<string, string[]>) {
+  constructor(kind: ApiFailureKind, status: number, message: string, fields?: Record<string, string[]>, code?: string) {
     super(message);
     this.name = "ApiError";
     this.kind = kind;
     this.status = status;
     this.fields = fields;
+    this.code = code;
   }
 }
 
@@ -67,7 +70,7 @@ async function ensureCsrfToken(): Promise<string | null> {
 }
 
 type RequestOptions = {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   /** Give up after this long. A hanging request must not look like a slow success. */
   timeoutMs?: number;
@@ -75,12 +78,21 @@ type RequestOptions = {
   acceptLanguage?: string;
 };
 
-/** The signed-in account as the server describes it. */
+/**
+ * The signed-in account as the server describes it.
+ *
+ * `needs_company_profile` (Story H17) is true while the organisation has not
+ * completed its profile; the routing gate reads it. It is an OPTIONAL flag:
+ * an older backend omits it, and the gate must fail OPEN, so consumers treat
+ * a missing value exactly like "no onboarding owed".
+ */
 export interface ServerIdentity {
   id: number;
   email: string;
   full_name: string;
   role: string;
+  /** H17: absent on an older backend — treat exactly like false (fail open). */
+  needs_company_profile?: boolean;
 }
 
 /**
@@ -196,9 +208,11 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   // Prefer the backend's own error envelope: {"error": {"code", "message"}}.
   let message = `Request failed (${response.status}).`;
+  let code: string | undefined;
   let fields: Record<string, string[]> | undefined;
   try {
-    const payload = (await response.json()) as { error?: { message?: string; fields?: Record<string, string[]> } };
+    const payload = (await response.json()) as { error?: { code?: string; message?: string; fields?: Record<string, string[]> } };
+    if (payload?.error?.code) code = payload.error.code;
     if (payload?.error?.message) message = payload.error.message;
     // A validation failure names the field(s); without this the caller can only print the
     // generic sentence («Validation failed.») and the operator never learns what to fix.
@@ -207,12 +221,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     /* a non-JSON error body is not worth guessing at */
   }
 
-  if (response.status === 401) throw new ApiError("unauthenticated", 401, message, fields);
+  if (response.status === 401) throw new ApiError("unauthenticated", 401, message, fields, code);
   // The permission matrix returns 404 for a non-HR caller (no existence disclosure),
   // so 404 here means "not allowed", not "missing".
   if (response.status === 403 || response.status === 404) {
-    throw new ApiError("forbidden", response.status, message, fields);
+    throw new ApiError("forbidden", response.status, message, fields, code);
   }
-  if (response.status >= 500) throw new ApiError("server", response.status, message, fields);
-  throw new ApiError("invalid", response.status, message, fields);
+  if (response.status >= 500) throw new ApiError("server", response.status, message, fields, code);
+  throw new ApiError("invalid", response.status, message, fields, code);
 }

@@ -35,7 +35,13 @@ class SignupSerializer(serializers.Serializer):
 
 
 class CurrentUserSerializer(serializers.Serializer):
-    """Authoritative identity and preference representation for /auth/me."""
+    """Authoritative identity and preference representation for /auth/me.
+
+    ``needs_company_profile`` (Story H17) is the onboarding gate the frontend
+    reads: True when the organisation's company profile is missing or still
+    has a blank required field. Computed against the singleton row, HR or not,
+    because the gate is about THE organisation, not the caller's role.
+    """
 
     id = serializers.IntegerField(read_only=True, source="pk")
     email = serializers.EmailField(read_only=True)
@@ -45,6 +51,17 @@ class CurrentUserSerializer(serializers.Serializer):
     preferred_locale = serializers.CharField(read_only=True)
     appearance = serializers.CharField(read_only=True)
     timezone_display = serializers.CharField(read_only=True)
+    needs_company_profile = serializers.SerializerMethodField()
+
+    def get_needs_company_profile(self, user) -> bool:
+        from accounts.company_serializers import merged_missing_required
+        from accounts.models import CompanyProfile
+
+        try:
+            profile = CompanyProfile.objects.get(pk=1)
+        except CompanyProfile.DoesNotExist:
+            return True
+        return bool(merged_missing_required(profile, {}))
 
 
 class CurrentUserUpdateSerializer(serializers.Serializer):

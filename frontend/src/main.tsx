@@ -18,6 +18,7 @@ import AdminOverviewPage from "./screens/admin/AdminOverviewPage";
 import AdminSettingsPage from "./screens/admin/AdminSettingsPage";
 import AdminPeoplePage, { AdminPeopleDetailPage } from "./screens/admin/AdminPeoplePage";
 import AdminAnnouncementsPage from "./screens/admin/AdminAnnouncementsPage";
+import OnboardingCompanyPage from "./screens/OnboardingCompanyPage";
 import TasksPage from "./screens/TasksPage";
 import TaskDetailPage from "./screens/TaskDetailPage";
 
@@ -47,6 +48,10 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          {/* H17: the onboarding step is a real route of its own. While the gate
+              holds, AppShell renders it INSTEAD of the shell; with the flag false
+              this element exists for direct visits without a session redirect. */}
+          <Route path="/onboarding/company" element={<OnboardingCompanyPage />} />
           <Route element={<RequireSession />}>
             <Route path="/" element={<HomePage />} />
             <Route path="/requests" element={<MyRequestsPage />} />

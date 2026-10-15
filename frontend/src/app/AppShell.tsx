@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useApp, type Appearance, type DemoFixture } from "./AppContext";
 import type { Locale, Role } from "../i18n/dict";
 import BrandLockup from "../components/brand/BrandLockup";
+import TourGuide, { TOUR_START_EVENT } from "../features/tour/TourGuide";
+import AssistantLauncher from "../features/assistant/AssistantLauncher";
+import OnboardingCompanyPage from "../screens/OnboardingCompanyPage";
 import {
   ActivityIcon,
   BellIcon,
@@ -12,6 +15,7 @@ import {
   DocumentIcon,
   GlobeIcon,
   HomeIcon,
+  InfoIcon,
   LogoutIcon,
   MoonIcon,
   SunIcon,
@@ -21,6 +25,32 @@ import { demoUser } from "../mock/data";
 import { ClockAction } from "../screens/AttendancePage";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), select:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** The one route the company gate does not divert: the onboarding step itself. */
+export const COMPANY_ONBOARDING_PATH = "/onboarding/company";
+
+/**
+ * The H17 mandatory gate, evaluated in one place so every route shares it.
+ *
+ * - "locked": the identity still owes the company profile AND the address is
+ *   already /onboarding/company → render ONLY that screen (no rail, no
+ *   header, no tour), with sign-out as the sole escape.
+ * - "divert": onboarding is owed and the Address is inside the app → swap the
+ *   route for /onboarding/company.
+ * - null: flag absent/false or the boot probe still pending → the app behaves
+ *   exactly as before (fail open; a missing flag must never brick it), and
+ *   the onboarding route, once completed, redirects home.
+ */
+function companyGateState(
+  needsCompanyProfile: boolean | undefined,
+  sessionChecked: boolean,
+  pathname: string,
+): "locked" | "divert" | null {
+  if (needsCompanyProfile !== true) return null;
+  if (!sessionChecked) return null;
+  if (pathname === COMPANY_ONBOARDING_PATH) return "locked";
+  return "divert";
+}
 
 export default function AppShell() {
   const {
@@ -199,6 +229,21 @@ export default function AppShell() {
   const localizedName = activeUser.name[locale as Locale];
   const localizedRole = roleOptions.find((option) => option.value === role)?.label ?? t("roleEmployee");
 
+  // H17: the gate is decided BEFORE any shell chrome mounts, so the rail, the
+  // header and the tour never exist while the onboarding step is still owed.
+  const { needsCompanyProfile, sessionChecked } = useApp();
+  const gate = companyGateState(needsCompanyProfile, sessionChecked, location.pathname);
+  if (gate === "locked") {
+    return (
+      <>
+        <a href="#main-content" className="skip-link">{t("skipToMain")}</a>
+        <div className="demo-banner" role="note">{t("demoLabel")}</div>
+        <OnboardingCompanyPage />
+      </>
+    );
+  }
+  if (gate === "divert") return <Navigate to={COMPANY_ONBOARDING_PATH} replace />;
+
   return (
     <>
       <a href="#main-content" className="skip-link">{t("skipToMain")}</a>
@@ -349,7 +394,11 @@ export default function AppShell() {
                       <UserIcon />
                       {t("account")}
                     </button>
-                    <button ref={(element) => { profileMenuItemsRef.current[1] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/login"); }}>
+                    <button ref={(element) => { profileMenuItemsRef.current[1] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); window.dispatchEvent(new Event(TOUR_START_EVENT)); }}>
+                      <InfoIcon />
+                      {t("tourStart")}
+                    </button>
+                    <button ref={(element) => { profileMenuItemsRef.current[2] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/login"); }}>
                       <LogoutIcon />
                       {t("signOut")}
                     </button>
@@ -361,6 +410,11 @@ export default function AppShell() {
           <main id="main-content"><Outlet /></main>
         </div>
       </div>
+      <TourGuide />
+      {/* H18: the floating مدام عفاف button sits beside the tour, one instance for
+          the whole shell — the onboarding gate above returns before this, so it
+          never floats over the company onboarding screen. */}
+      <AssistantLauncher />
     </>
   );
 }

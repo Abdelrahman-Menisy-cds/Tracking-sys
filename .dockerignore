@@ -1,0 +1,42 @@
+# H29 — keep the image small and secret-free. Everything here either cannot
+# run inside a container (tests, dev caches), would leak credentials (.env,
+# auth.json), or would break the "one service, one image" contract (venvs,
+# docs, the dev database) by being huge and useless there.
+
+# --- secrets — NEVER baked into the image ----------------------------------
+.env
+.env.*
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+backend/.venv/
+.venv/
+**/auth.json
+**/auth.lock
+
+# --- dev machine artifacts -------------------------------------------------
+.git/
+.gitignore
+.pytest_cache/
+.hermes/
+.claude/
+.agents/
+node_modules/
+frontend/node_modules/
+frontend/dist/
+*.sqlite3
+*.sqlite3.bak-*
+backend/db.sqlite3
+backend/db.sqlite3.bak-h16
+backend/logs/
+backend/shots/
+shots/
+attachments/
+docs/
+*_brief-*.md
+brief-*.md
+2026-*.png
+h13-*.png
+logo.png
+Employee_Requests_and_Time_Tracking_System.pdf

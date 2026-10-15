@@ -3,10 +3,16 @@ Django==5.2.6
 djangorestframework==3.18.1
 python-dotenv==1.2.3
 psycopg==3.3.5
+# Assistant config: API keys encrypted at rest (Story H18)
+cryptography
 # OpenAPI schema generation dependencies (DRF's openapi module asserts on
 # these; backend/.venv was missing them for the schema endpoint tests).
 uritemplate
 inflection
+
+# Serving: Railway's one service runs gunicorn (H29); python:3.11-slim has no
+# gunicorn preinstalled, so it must be declared here.
+gunicorn==23.0.0
 
 # Test tooling
 pytest==9.1.1

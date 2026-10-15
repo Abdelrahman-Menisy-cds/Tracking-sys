@@ -6,6 +6,7 @@ import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../../
 import OperationalTable, { type OperationalColumn } from "../../components/data/OperationalTable";
 import PageHeader from "../../components/layout/PageHeader";
 import AdminNav from "./AdminNav";
+import OrgDepartmentsPanel from "./OrgDepartmentsPanel";
 export { default as AdminPeopleDetailPage } from "./AdminPeopleDetailPage";
 
 /**
@@ -148,6 +149,11 @@ export default function AdminPeoplePage() {
       <AdminNav />
       <PageHeader title={t("adminPeopleTitle")} subtitle={t("adminPeopleSubtitle")} />
       <Banner tone="info">{t("adminDemoBoundary")}</Banner>
+
+      {/* Departments and their people live on the employees page, not on the
+          organisation settings page: this is where an HR admin comes to manage
+          people, so the management surface has to be here. */}
+      <OrgDepartmentsPanel />
 
       <section className="section" aria-labelledby="people-roster">
         <div className="section-heading">

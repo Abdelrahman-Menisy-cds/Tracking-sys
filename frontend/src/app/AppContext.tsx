@@ -295,6 +295,13 @@ interface AppState {
   appearance: Appearance;
   setAppearance: (appearance: Appearance) => void;
   resolvedTheme: "light" | "dark";
+  /**
+   * H17 — the server's own word ("this session still owes the company
+   * profile"). Strictly `true`/`false`/undefined: undefined (older backend,
+   * or the boot probe not answered yet) fails OPEN, so the gate never bricks
+   * the app on a missing flag.
+   */
+  needsCompanyProfile: boolean | undefined;
   myRequestItems: RequestMock[];
   teamRequestItems: RequestMock[];
   myTimesheetItems: TimesheetMock[];
@@ -1282,6 +1289,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRole,
     serverAccount,
     sessionChecked,
+    needsCompanyProfile: serverAccount?.needs_company_profile === true,
     adoptSession,
     capabilities,
     appearance,

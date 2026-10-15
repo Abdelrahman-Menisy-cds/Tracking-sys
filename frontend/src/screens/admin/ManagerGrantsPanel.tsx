@@ -9,6 +9,7 @@ import {
   type ServerEmployee,
   type ServerGrant,
 } from "../../app/orgApi";
+import OperationalTable, { type OperationalColumn } from "../../components/data/OperationalTable";
 import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../../components/ui";
 
 /**
@@ -21,6 +22,9 @@ import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../../
  * The employee file on this screen is still fed by the demo directory, whose
  * emails do not exist on the server — so when the email does not resolve we say
  * so and let HR pick the real account instead of pretending to know.
+ *
+ * House primitives only: `.section`/`.section-heading`, `.work-surface`,
+ * `.form-grid`, `.field`/`.select`, and `OperationalTable` for the history.
  */
 
 const SCOPES = ["requests", "timesheets", "attendance", "reports"] as const;
@@ -32,6 +36,14 @@ const scopeKey = {
   reports: "adminGrantsScopeReports",
 } as const;
 
+type GrantRow = {
+  id: string;
+  manager: string;
+  scope: string;
+  active: boolean;
+  grant: ServerGrant;
+};
+
 export default function ManagerGrantsPanel({ employeeEmail }: { employeeEmail?: string | null }) {
   const { t, locale } = useApp();
   const [employees, setEmployees] = useState<ServerEmployee[] | null>(null);
@@ -39,7 +51,7 @@ export default function ManagerGrantsPanel({ employeeEmail }: { employeeEmail?: 
   const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
   const [pickedId, setPickedId] = useState<string>("");
-  const [draft, setDraft] = useState({ manager: "", scope: "requests" as (typeof SCOPES)[number], reason: "" });
+  const [draft, setDraft] = useState({ manager: "", scope: "requests" as (typeof SCOPES)[number] });
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -78,14 +90,49 @@ export default function ManagerGrantsPanel({ employeeEmail }: { employeeEmail?: 
     return employees?.find((candidate) => candidate.id === id) ?? null;
   }, [resolved, pickedId, employees]);
 
-  const managers = useMemo(() => (employees ?? []).filter((person) => person.role === "MANAGER"), [employees]);
+  const managers = useMemo(() => (employees ?? []).filter((entry) => entry.role === "MANAGER"), [employees]);
 
-  const mine = useMemo(
-    () => grants.filter((grant) => grant.employee_id === person?.id),
-    [grants, person],
-  );
-  const live = mine.filter((grant) => grant.is_active);
-  const revoked = mine.filter((grant) => !grant.is_active);
+  const mine = useMemo(() => grants.filter((grant) => grant.employee_id === person?.id), [grants, person]);
+
+  const rows: GrantRow[] = mine.map((grant) => ({
+    id: String(grant.id),
+    manager: grant.manager_name,
+    scope: t(scopeKey[grant.scope as (typeof SCOPES)[number]] ?? "adminGrantsScopeRequests"),
+    active: grant.is_active,
+    grant,
+  }));
+
+  const columns: OperationalColumn<GrantRow>[] = [
+    { key: "manager", label: t("adminGrantsManager"), render: (row) => <span>{row.manager}</span> },
+    { key: "scope", label: t("adminGrantsScope"), render: (row) => <span className="page-meta">{row.scope}</span> },
+    {
+      key: "state",
+      label: t("adminGrantsActive"),
+      render: (row) => (
+        <StatusPill
+          tone={row.active ? "success" : "neutral"}
+          label={row.active ? t("adminGrantsActive") : t("adminGrantsInactive")}
+          icon={row.active ? "approved" : "cancelled"}
+        />
+      ),
+    },
+    {
+      key: "action",
+      label: t("adminGrantsRevoke"),
+      render: (row) =>
+        row.active ? (
+          <button
+            className="btn btn-danger-quiet btn-compact"
+            type="button"
+            onClick={() => dropGrant(row.grant)}
+          >
+            {t("adminGrantsRevoke")}
+          </button>
+        ) : (
+          <span className="page-meta">—</span>
+        ),
+    },
+  ];
 
   const addGrant = async () => {
     if (!person) return;
@@ -98,7 +145,7 @@ export default function ManagerGrantsPanel({ employeeEmail }: { employeeEmail?: 
     setProblem(null);
     try {
       await createGrant({ manager: Number(draft.manager), employee: person.id, scope: draft.scope }, locale);
-      setDraft({ manager: "", scope: "requests", reason: "" });
+      setDraft({ manager: "", scope: "requests" });
       await reload();
       setNotice(t("adminGrantsSaved"));
     } catch (failure) {
@@ -121,108 +168,88 @@ export default function ManagerGrantsPanel({ employeeEmail }: { employeeEmail?: 
   };
 
   return (
-    <section className="panel" aria-label={t("adminGrantsTitle")}>
-      <header className="panel-head">
-        <div>
-          <h2 className="panel-title">{t("adminGrantsTitle")}</h2>
-          <p className="panel-subtitle">{t("adminGrantsSubtitle")}</p>
-        </div>
-      </header>
+    <section className="section" aria-labelledby="hr-grants-heading">
+      <div className="section-heading">
+        <h2 id="hr-grants-heading">{t("adminGrantsTitle")}</h2>
+      </div>
+      <p className="page-meta">{t("adminGrantsSubtitle")}</p>
 
-      {notice && <Banner tone="success">{notice}</Banner>}
-      {problem && <Banner tone="error">{problem}</Banner>}
-      {phase === "loading" && <SkeletonRows rows={2} />}
-      {phase === "error" && <ErrorState onRetry={() => setAttempt((n) => n + 1)} />}
+      {notice ? <Banner tone="success">{notice}</Banner> : null}
+      {problem ? <Banner tone="error" role="alert">{problem}</Banner> : null}
+      {phase === "loading" ? <SkeletonRows rows={2} /> : null}
+      {phase === "error" ? <ErrorState onRetry={() => setAttempt((n) => n + 1)} /> : null}
 
-      {phase === "ready" && !resolved && (
-        <>
+      {phase === "ready" && !resolved ? (
+        <div className="work-surface" style={{ marginBlockStart: "var(--sp-4)" }}>
           <Banner tone="info">{t("adminGrantsNoRealAccount")}</Banner>
-          <label className="field">
-            <span className="field-label">{t("adminOrgAddEmployee")}</span>
-            <select className="input" value={pickedId} onChange={(event) => setPickedId(event.target.value)}>
-              <option value="">—</option>
-              {(employees ?? []).map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.full_name || person.email}
-                  {person.department_name_ar ? ` — ${person.department_name_ar}` : ""}
+          <label className="field" style={{ marginBlockEnd: "var(--sp-3)" }}>
+            <span className="field-label">{t("adminGrantsPickEmployee")}</span>
+            <select className="select" value={pickedId} onChange={(event) => setPickedId(event.target.value)}>
+              <option value="">{t("adminGrantsChoose")}</option>
+              {(employees ?? []).map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.full_name || entry.email}
+                  {entry.department_name_ar ? ` — ${entry.department_name_ar}` : ""}
                 </option>
               ))}
             </select>
           </label>
-        </>
-      )}
+        </div>
+      ) : null}
 
-      {phase === "ready" && person && (
+      {phase === "ready" && person ? (
         <>
-          <label className="field">
-            <span className="field-label">{t("adminGrantsManager")}</span>
-            <select
-              className="input"
-              value={draft.manager}
-              onChange={(event) => setDraft({ ...draft, manager: event.target.value })}
-            >
-              <option value="">—</option>
-              {managers.map((manager) => (
-                <option key={manager.id} value={manager.id}>
-                  {manager.full_name || manager.email}
-                  {manager.department_name_ar ? ` — ${manager.department_name_ar}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span className="field-label">{t("adminGrantsScope")}</span>
-            <select
-              className="input"
-              value={draft.scope}
-              onChange={(event) =>
-                setDraft({ ...draft, scope: event.target.value as (typeof SCOPES)[number] })
-              }
-            >
-              {SCOPES.map((scope) => (
-                <option key={scope} value={scope}>
-                  {t(scopeKey[scope])}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span className="field-label">{t("adminGrantsReason")}</span>
-            <input
-              className="input"
-              value={draft.reason}
-              onChange={(event) => setDraft({ ...draft, reason: event.target.value })}
-            />
-          </label>
-          <button
-            className="btn btn-primary"
-            type="button"
-            disabled={saving || !draft.manager}
-            onClick={addGrant}
-          >
-            {saving ? t("adminOrgPending") : t("adminGrantsAdd")}
-          </button>
+          <div className="work-surface" style={{ marginBlockStart: "var(--sp-4)" }}>
+            <div className="form-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+              <label className="field" style={{ marginBlockEnd: "var(--sp-3)" }}>
+                <span className="field-label">{t("adminGrantsManager")}</span>
+                <select
+                  className="select"
+                  value={draft.manager}
+                  onChange={(event) => setDraft({ ...draft, manager: event.target.value })}
+                >
+                  <option value="">{t("adminGrantsChoose")}</option>
+                  {managers.map((manager) => (
+                    <option key={manager.id} value={manager.id}>
+                      {manager.full_name || manager.email}
+                      {manager.department_name_ar ? ` — ${manager.department_name_ar}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="field" style={{ marginBlockEnd: "var(--sp-3)" }}>
+                <span className="field-label">{t("adminGrantsScope")}</span>
+                <select
+                  className="select"
+                  value={draft.scope}
+                  onChange={(event) =>
+                    setDraft({ ...draft, scope: event.target.value as (typeof SCOPES)[number] })
+                  }
+                >
+                  {SCOPES.map((scope) => (
+                    <option key={scope} value={scope}>
+                      {t(scopeKey[scope])}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="form-actions">
+              <button className="btn btn-primary" type="button" disabled={saving} onClick={addGrant}>
+                {saving ? t("adminOrgPending") : t("adminGrantsAdd")}
+              </button>
+            </div>
+          </div>
 
-          {live.length === 0 && revoked.length === 0 ? (
+          {rows.length === 0 ? (
             <EmptyState message={t("adminGrantsNone")} />
           ) : (
-            <ul className="request-list">
-              {[...live, ...revoked].map((grant) => (
-                <li key={grant.id} className="request-row">
-                  <span>{grant.manager_name}</span>
-                  <StatusPill tone={grant.is_active ? "success" : "neutral"} label={grant.is_active ? t("adminGrantsActive") : t("adminGrantsInactive")} />
-                  <span className="text-muted">{t(scopeKey[grant.scope as (typeof SCOPES)[number]] ?? "adminGrantsScopeRequests")}</span>
-                  {grant.is_active && (
-                    <button className="btn btn-secondary" type="button" onClick={() => dropGrant(grant)}>
-                      {t("adminGrantsRevoke")}
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <div style={{ marginBlockStart: "var(--sp-4)" }}>
+              <OperationalTable caption={t("adminGrantsTitle")} columns={columns} records={rows} />
+            </div>
           )}
         </>
-      )}
+      ) : null}
     </section>
   );
 }

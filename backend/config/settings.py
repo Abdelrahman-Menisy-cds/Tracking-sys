@@ -18,6 +18,12 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-only-insecure-key-change-me")
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
 
+# Story H18: the assistant's key at rest. The Fernet key comes from
+# ASSISTANT_SECRET_KEY when set; otherwise a stable fallback is DERIVED from
+# SECRET_KEY (see accounts/assistant_crypto.py) so a demo run works with no
+# configuration. Recommended anywhere beyond a demo: set this explicitly.
+ASSISTANT_SECRET_KEY = os.getenv("ASSISTANT_SECRET_KEY", "")
+
 INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -27,6 +33,9 @@ INSTALLED_APPS = [
     "rest_framework",
     # Project apps
     "accounts",
+    # H30 plan §3.2: the isolation foundation — anchors, TenantManager,
+    # TenantMiddleware. No models by design; see tenants/apps.py.
+    "tenants",
     "notifications",
     "reqs",
     "timesheets",
@@ -50,6 +59,10 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    # H30 plan §3.2: the tenant anchor stamps request.company AFTER the user
+    # exists; pass-through while User.company is nullable — the NULL-company
+    # denial self-arms once the FK is hard (tenants/middleware.py).
+    "tenants.middleware.TenantMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -73,12 +86,26 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# PostgreSQL is the approved database. SQLite is an explicit local fallback.
+# PostgreSQL is the approved dev database. SQLite is an explicit fallback:
+# dev convenience, pytest, and the H29 one-service container plan (Django +
+# the SPA on Railway without a second database service).
 if os.getenv("DJANGO_USE_SQLITE", "0") == "1":
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
+            # DJANGO_SQLITE_PATH lets the container point the file at something
+            # that actually survives a redeploy — a mounted Railway volume at
+            # /data — instead of an ephemeral path inside the image layer.
+            "NAME": os.getenv("DJANGO_SQLITE_PATH", str(BASE_DIR / "db.sqlite3")),
+            "CONN_HEALTH_CHECKS": True,
+            # Two gunicorn workers must not corrupt/lock the same file: WAL
+            # lets readers proceed while one writer holds the write lock, and
+            # `timeout` becomes sqlite3.connect(timeout=), i.e. the busy
+            # timeout, so a contention window waits instead of erroring.
+            "OPTIONS": {
+                "timeout": 20,
+                "init_command": "PRAGMA journal_mode=WAL",
+            },
         }
     }
 else:
@@ -119,13 +146,15 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ---------------------------------------------------------------------------
 # Media storage: PRIVATE attachment store (Story 2.2).
-# MEDIA_ROOT is the on-disk base for attachment bytes, declared explicitly
-# (not environment-derived) so the private store location cannot drift.
-# NOTE: no MEDIA_URL is configured and no public media route is served —
-# attachments are only delivered through AttachmentDownloadView, which
-# re-checks ownership and scan status before serving bytes via safe_join.
+# MEDIA_ROOT is the on-disk base for attachment bytes. Default is the repo
+# layout for local dev; on a Railway deploy the container sets
+# DJANGO_MEDIA_ROOT under the mounted volume (/data) so uploaded attachments
+# survive redeploys exactly like the SQLite file does. No MEDIA_URL is
+# configured and no public media route is served — attachments are only
+# delivered through AttachmentDownloadView, which re-checks ownership and
+# scan status before serving bytes via safe_join.
 # ---------------------------------------------------------------------------
-MEDIA_ROOT = BASE_DIR / "attachments"
+MEDIA_ROOT = Path(os.getenv("DJANGO_MEDIA_ROOT", str(BASE_DIR / "attachments")))
 
 # Keep multipart-body memory buffers consistent with the 10 MB per-file
 # attachment limit (larger bodies spill to temp files instead of RAM).

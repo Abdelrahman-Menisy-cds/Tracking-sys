@@ -148,6 +148,8 @@ def test_me_patch_persists_permitted_profile_preferences_and_returns_authoritati
         "preferred_locale": "en",
         "appearance": "dark",
         "timezone_display": "Africa/Cairo",
+        # Story H17: /auth/me now carries the company-profile onboarding gate.
+        "needs_company_profile": True,
     }
     active_user.refresh_from_db()
     assert active_user.full_name == "صباح فؤاد"

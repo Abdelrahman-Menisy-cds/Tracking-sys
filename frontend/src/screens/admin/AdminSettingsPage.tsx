@@ -10,7 +10,7 @@ import PageHeader from "../../components/layout/PageHeader";
 import AdjustLeaveDialog, { leaveTypeKeys } from "./AdjustLeaveDialog";
 import ScheduleEditorDialog from "./ScheduleEditorDialog";
 import AdminNav from "./AdminNav";
-import OrgDepartmentsPanel from "./OrgDepartmentsPanel";
+import { CompanyProfilePanel } from "./CompanyProfilePanel";
 import { ChevronDownIcon, EditIcon, FilterIcon, InfoIcon, SearchIcon, TrashIcon } from "../../components/icons";
 import type { Dict, Locale } from "../../i18n/dict";
 import type {
@@ -92,7 +92,6 @@ export default function AdminSettingsPage() {
       <AdminNav />
       <PageHeader title={t("adminNavSettings")} subtitle={t("adminSubtitle")} />
       <Banner tone="info">{t("adminDemoBoundary")}</Banner>
-      <OrgDepartmentsPanel />
       {phase === "loading" ? (
         <section className="work-surface" aria-busy="true">
           <SkeletonRows rows={3} />
@@ -131,7 +130,7 @@ function SettingsBody({
   canHolidays: boolean;
 }) {
   return (
-    <div className="dashboard-grid">
+    <div className="dashboard-grid settings-grid">
       {canSchedule ? <ScheduleCard today={today} t={t} locale={locale} orgSchedules={schedules} /> : null}
       {canHolidays ? <HolidaysCard t={t} locale={locale} today={today} /> : null}
       {canLeave ? (
@@ -139,6 +138,11 @@ function SettingsBody({
           <LeaveSection />
         </div>
       ) : null}
+      {/* H17 — the company identity: its own widget card, full width, server-backed
+          (GET/PATCH /company) while the sibling fixtures stay mock. */}
+      <div style={{ gridColumn: "1 / -1" }}>
+        <CompanyProfilePanel t={t} locale={locale} />
+      </div>
     </div>
   );
 }
@@ -456,13 +460,13 @@ function LeaveSection() {
           action={<button type="button" className="btn btn-secondary" onClick={clearAllFilters}>{t("attendanceClearAllFilters")}</button>}
         />
       ) : (
-        <>
+        <div className="table-wide">
           <OperationalTable
             caption={`${t("adminSettingsLeaveTitle")} — ${new Intl.NumberFormat(locale).format(filtered.length)}`}
             columns={columns}
             records={filtered.map((row) => ({ ...row, id: `${row.employee}-${row.leave_type}-${row.period}` }))}
           />
-        </>
+        </div>
       )}
 
       {adjustTarget ? (
@@ -613,18 +617,24 @@ function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; local
         />
       ) : (
         <>
-          <ul className="compact-list" style={{ marginBlockStart: "var(--sp-2)" }}>
-            {upcoming.map((holiday) => (
-              <HolidayRow
-                key={holiday.id}
-                holiday={holiday}
-                t={t}
-                locale={locale}
-                onEdit={() => setDialog({ kind: "edit", target: holiday })}
-                onDelete={() => setDialog({ kind: "delete", target: holiday })}
-              />
-            ))}
-          </ul>
+          {upcoming.length > 0 ? (
+            <ul className="compact-list" style={{ marginBlockStart: "var(--sp-2)" }}>
+              {upcoming.map((holiday) => (
+                <HolidayRow
+                  key={holiday.id}
+                  holiday={holiday}
+                  t={t}
+                  locale={locale}
+                  onEdit={() => setDialog({ kind: "edit", target: holiday })}
+                  onDelete={() => setDialog({ kind: "delete", target: holiday })}
+                />
+              ))}
+            </ul>
+          ) : (
+            <p className="page-meta" style={{ marginBlockStart: "var(--sp-2)" }}>
+              {t("adminSettingsHolidaysNoneUpcoming")}
+            </p>
+          )}
           {pastCount > 0 ? (
             <details style={{ marginBlockStart: "var(--sp-3)" }}>
               <summary className="page-meta" style={{ cursor: "pointer", paddingBlock: "var(--sp-2)" }}>

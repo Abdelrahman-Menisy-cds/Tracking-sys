@@ -9,6 +9,7 @@ import AdjustLeaveDialog, { leaveTypeKeys, type AdjustLeaveOutcome } from "./Adj
 import ScheduleEditorDialog from "./ScheduleEditorDialog";
 import AdminNav from "./AdminNav";
 import ManagerGrantsPanel from "./ManagerGrantsPanel";
+import EmployeeAssistantPanel from "../../features/assistant/EmployeeAssistantPanel";
 import type { LeaveBalance, WorkSchedule } from "../../mock/attendance";
 import {
   type EmployeeDirectoryEntry,
@@ -401,7 +402,6 @@ export default function AdminPeopleDetailPage() {
   return (
     <div className="page people-detail-page">
       <AdminNav />
-      {role === "hr" ? <ManagerGrantsPanel employeeEmail={base?.email ?? null} /> : null}
       <PageHeader
         title={entry.name[locale]}
         subtitle={<span>{t("adminPeopleEmploymentSubtitle")} · <bdi dir="ltr">{entry.employee_number}</bdi> · {entry.department[locale]}</span>}
@@ -714,6 +714,8 @@ export default function AdminPeopleDetailPage() {
           />
         </section>
       ) : null}
+      {role === "hr" ? <ManagerGrantsPanel employeeEmail={base?.email ?? null} /> : null}
+      {role === "hr" ? <EmployeeAssistantPanel employeeEmail={base?.email ?? null} /> : null}
     </div>
   );
 }

@@ -228,6 +228,60 @@ class ManagerGrant(models.Model):
         return f"{self.manager_id}->{self.employee_id}:{self.scope}"
 
 
+class CompanyProfile(models.Model):
+    """Organization-wide company identity, ONE row for the whole org (Story H17).
+
+    Singleton precedent: ``timesheets.TimezoneConfig`` — a single forced row
+    (``CheckConstraint(id == 1)``) rather than “one row per something”, because
+    the record describes THE organisation, not a member of a population. The
+    first successful save creates that row; every later save updates it, so
+    there is never a second row to reconcile.
+
+    Required fields (name/activity/address/phone) stay blank-forbidden at the
+    model level AND are re-checked as a merged set by the view, so a PATCH
+    that would blank one is refused at the API boundary too. Optional fields
+    (email/website/logo …) are blank by design — the owner asked for only a
+    subset up front. ``logo_data_url`` keeps the resized data: URL produced by
+    the frontend; the server validates its shape and size but never decodes
+    or serves it (the SPA renders it directly).
+    """
+
+    REQUIRED_FIELDS = ("name", "activity", "address", "phone")
+
+    name = models.CharField(max_length=200)
+    activity = models.CharField(max_length=200)
+    address = models.CharField(max_length=300)
+    phone = models.CharField(max_length=32)
+
+    email = models.EmailField(blank=True, default="")
+    website = models.URLField(blank=True, default="")
+    logo_data_url = models.TextField(blank=True, default="")
+    commercial_register = models.CharField(max_length=64, blank=True, default="")
+    tax_card = models.CharField(max_length=64, blank=True, default="")
+    contact_name = models.CharField(max_length=120, blank=True, default="")
+    contact_role = models.CharField(max_length=120, blank=True, default="")
+    contact_phone = models.CharField(max_length=32, blank=True, default="")
+
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="company_profile_updates",
+    )
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(id=1), name="chk_company_profile_singleton"),
+        ]
+        verbose_name = "company profile"
+        verbose_name_plural = "company profile"
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class SubscriptionCode(models.Model):
     """Self-service signup code for HR accounts (Story H14).
 
@@ -279,6 +333,45 @@ class SubscriptionCode(models.Model):
         )
 
 
+class PendingDeviceFlow(models.Model):
+    """H28 — the in-app subscription device-login flow, persisted.
+
+    The flow used to live in django.core.cache (locmem): process memory, so
+    every server restart destroyed a flow the owner was mid-way through
+    approving (measured: poll answered 409 no_pending_flow after the
+    dev-server restart). The row IS that state now, keyed by user (one
+    pending flow per account), so a restart loses nothing.
+
+    ``device_code_or_id`` is the SECRET the provider's poll needs (opencode:
+    device_code; codex: device_auth_id) — server-side only, never in any
+    response; ``user_code`` is the display code the SPA already shows.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pending_device_flow",
+    )
+    provider = models.CharField(max_length=32)
+    device_code_or_id = models.CharField(max_length=512)
+    user_code = models.CharField(max_length=64, blank=True, default="")
+    user_email = models.CharField(max_length=254, blank=True, default="")
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "pending device flow"
+        verbose_name_plural = "pending device flows"
+
+    def __str__(self) -> str:
+        return f"flow:{self.user_id} ({self.provider})"
+
+    @classmethod
+    def expired_pks(cls):
+        return list(cls.objects.filter(expires_at__lt=timezone.now()).values_list("pk", flat=True))
+
+
 class AuditEvent(models.Model):
     """Append-only, HR-created audit record for employee administration.
 
@@ -309,3 +402,96 @@ class AuditEvent(models.Model):
 
     def __str__(self) -> str:
         return f"{self.action} on {self.subject_id} by {self.actor_id} at {self.occurred_at:%Y-%m-%dT%H:%M:%SZ}"
+
+
+class AssistantConfig(models.Model):
+    """Per-user provider link for the «مدام عفاف» assistant (Story H18).
+
+    ONE row per user (the settings live on the employee's /profile and HR's
+    /admin/people/<id>; there is never a reason for a second row). The API key
+    is stored ENCRYPTED AT REST (cryptography.fernet; see
+    assistant_crypto.py) and is NEVER returned by any endpoint — responses
+    carry only ``api_key_hint``. Whoever supplied the key is kept in
+    ``api_key_set_by`` so ``key_source`` can be derived honestly:
+
+      * key set through the user's own /profile PUT -> "self"
+      * key set by HR in the employee's file        -> "hr"
+
+    The owner's rule: the employee cannot READ an HR-set key, but MAY replace
+    it. A replacement (self PUT) overwrites the ciphertext and re-marks the
+    row "self" — the old key's origin no longer exists to disclose.
+
+    ``is_active`` is the single switch that gates chat/test: HR toggles it
+    (``enabled_by_hr`` records that they did). ``is_configured`` is derived,
+    not stored: base_url + model + a key present.
+
+    No provider presets anywhere: plain OpenAI-compatible free-form endpoint
+    fields, per the owner's explicit decision.
+    """
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="assistant_config",
+    )
+    base_url = models.URLField(blank=True, default="")
+    api_key_ciphertext = models.BinaryField(blank=True, default=b"")
+    api_key_hint = models.CharField(max_length=32, blank=True, default="")
+    api_key_set_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assistant_keys_set",
+    )
+    model = models.CharField(max_length=120, blank=True, default="")
+    is_active = models.BooleanField(default=False)
+    enabled_by_hr = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # --- Story H19: subscription link (opencode / Codex), not just a key ---
+    # Exactly ONE credential per row: linking a subscription clears the
+    # api-key fields and vice versa. The credential material (a provider key
+    # blob {"key","type"} or an oauth set {"access","refresh","expires"})
+    # is stored encrypted with the same Fernet pipeline as the API key
+    # (assistant_crypto), never returned by any endpoint (only the hint),
+    # never logged, never in AuditEvent (booleans only).
+    subscription_provider = models.CharField(max_length=32, blank=True, default="")
+    subscription_ciphertext = models.BinaryField(blank=True, default=b"")
+    subscription_hint = models.CharField(max_length=64, blank=True, default="")
+    subscription_cred_type = models.CharField(max_length=8, blank=True, default="")
+    subscription_source = models.CharField(max_length=16, blank=True, default="")
+    subscription_expires = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "assistant config"
+        verbose_name_plural = "assistant configs"
+
+    def __str__(self) -> str:
+        owner_id = getattr(self, "user_id", None)
+        return f"assistant:{owner_id} ({'active' if self.is_active else 'inactive'})"
+
+    @property
+    def key_source(self):
+        """'"self"' | '"hr"' | None, derived from who set the key."""
+        if self.api_key_ciphertext or self.api_key_hint:
+            if self.api_key_set_by_id is None:
+                return None
+            # Derive from WHO the config belongs to, not the setter's role: an
+            # HR user linking their OWN key must read "self" (brief H18).
+            return "self" if self.api_key_set_by_id == self.user_id else "hr"
+        return None
+
+    @property
+    def is_configured(self) -> bool:
+        """base_url and model present and a key stored (brief table) — OR,
+        subscription mode (H19): provider + model + an encrypted credential."""
+        if self.subscription_provider:
+            return bool(self.model and self.subscription_ciphertext)
+        return bool(self.base_url and self.model and (self.api_key_ciphertext or self.api_key_hint))
+
+    @property
+    def mode(self) -> str:
+        """'subscription' when a provider is linked, else 'api' (derived —
+        one source of truth, no extra flag)."""
+        return "subscription" if self.subscription_provider else "api"

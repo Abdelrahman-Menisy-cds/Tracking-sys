@@ -29,6 +29,7 @@ from django.views.decorators.http import require_GET
 from rest_framework import serializers
 from rest_framework.schemas.openapi import AutoSchema, SchemaGenerator
 
+from accounts.company_serializers import CompanyProfileReadSerializer, CompanyProfileWriteSerializer
 from accounts.employee_serializers import (
     EmployeeCreateSerializer,
     EmployeeReadSerializer,
@@ -66,6 +67,7 @@ def _component(serializer, name):
 # Response item components (read shapes).
 EMPLOYEE_READ = _component(EmployeeReadSerializer(), "EmployeeRead")
 CURRENT_USER = _component(CurrentUserSerializer(), "CurrentUser")
+COMPANY_PROFILE = _component(CompanyProfileReadSerializer(), "CompanyProfile")
 NOTIFICATION = _component(NotificationSerializer(), "Notification")
 EMPLOYEE_REQUEST = _component(reqs_serializers.EmployeeRequestSerializer(), "EmployeeRequest")
 REQUEST_TYPE = _component(reqs_serializers.RequestTypeSerializer(), "RequestType")
@@ -83,6 +85,7 @@ SIGNUP_EMAIL_IN_USE = {
     "required": ["outcome"],
 }
 CURRENT_USER_UPDATE_REQUEST = _component(CurrentUserUpdateSerializer(partial=True), "CurrentUserUpdateRequest")
+COMPANY_PROFILE_UPDATE_REQUEST = _component(CompanyProfileWriteSerializer(partial=True), "CompanyProfileUpdateRequest")
 EMPLOYEE_CREATE_REQUEST = _component(EmployeeCreateSerializer(), "EmployeeCreateRequest")
 EMPLOYEE_UPDATE_REQUEST = _component(EmployeeUpdateSerializer(partial=True), "EmployeeUpdateRequest")
 DRAFT_CREATE_REQUEST = _component(reqs_serializers.DraftCreateSerializer(), "DraftCreateRequest")
@@ -329,6 +332,346 @@ class MeSchema(AccountsSchema):
         "patch": {
             **_json_response("200", "Profile updated.", _data_envelope(_object_ref("CurrentUser"))),
             **_error_response("409", "version_conflict: the saved appearance changed since the client last saw it."),
+        },
+    }
+
+
+class CompanySchema(_ViewSchema):
+    request_bodies = {
+        "patch": _body(_object_ref("CompanyProfileUpdateRequest")),
+    }
+    responses = {
+        # CompanyProfileView.get/patch: {"data": {"profile": CompanyProfile|null,
+        # "needs_profile": bool}} — Story H17.
+        "get": {
+            **_json_response("200", "Company profile read; profile is null when the organisation has not saved one yet.", {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "profile": {"nullable": True, "oneOf": [_object_ref("CompanyProfile")]},
+                            "needs_profile": {"type": "boolean"},
+                        },
+                        "required": ["profile", "needs_profile"],
+                    },
+                },
+            }),
+            **_error_response("403", "permission_denied: company data is available to HR only."),
+        },
+        "patch": {
+            **_json_response("200", "Company profile updated (200 with the same shape as GET).", {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "profile": {"nullable": True, "oneOf": [_object_ref("CompanyProfile")]},
+                            "needs_profile": {"type": "boolean"},
+                        },
+                        "required": ["profile", "needs_profile"],
+                    },
+                },
+            }),
+            **_error_response("400", "validation_error: the merged result would miss a required field, or a field value is invalid (fields carries the per-field errors)."),
+            **_error_response("403", "permission_denied: company data is available to HR only."),
+        },
+    }
+
+
+_ASSISTANT_CONFIG_ITEM = {
+    "title": "AssistantConfigRead",
+    "type": "object",
+    # The key itself NEVER appears; only the hint and its origin. Story H18.
+    # H19 adds the subscription fields (mode, provider, source...) — the
+    # token material never appears anywhere in the shape, only the hint.
+    "properties": {
+        "is_configured": {"type": "boolean"},
+        "is_active": {"type": "boolean"},
+        "base_url": {"type": "string"},
+        "model": {"type": "string"},
+        "key_hint": {"type": "string"},
+        "key_source": {"nullable": True, "type": "string", "enum": ["self", "hr", None]},
+        "can_replace_key": {"type": "boolean"},
+        "mode": {"type": "string", "enum": ["api", "subscription"]},
+        "subscription_provider": {"type": "string", "description": "'opencode' | 'codex' when linked, '' in api mode."},
+        "subscription_hint": {"type": "string"},
+        "subscription_cred_type": {"type": "string", "description": "'key' | 'oauth' when linked, '' otherwise."},
+        "subscription_source": {"type": "string", "description": "'device' (the in-app login flow) | 'local' (imported from this machine's CLI login)."},
+        "subscription_expires": {"nullable": True, "type": "string", "format": "date-time", "description": "oauth only; a KEY credential does not expire."},
+    },
+    "required": ["is_configured", "is_active", "base_url", "model", "key_hint", "key_source", "can_replace_key", "mode", "subscription_provider", "subscription_hint", "subscription_cred_type", "subscription_source", "subscription_expires"],
+}
+
+_ASSISTANT_CONFIG_WRITE = {
+    "title": "AssistantConfigWrite",
+    "type": "object",
+    "properties": {
+        "base_url": {"type": "string", "format": "uri"},
+        "model": {"type": "string"},
+        # write-only in practice: documented but never returned.
+        "api_key": {"type": "string", "description": "Stored encrypted at rest; never returned."},
+        "mode": {"type": "string", "enum": ["api", "subscription"], "description": "api (default): base_url/model required. subscription: links the picked provider from this machine's local CLI login."},
+        "subscription_provider": {"nullable": True, "type": "string", "enum": ["opencode", "codex", None], "description": "With mode=subscription only. No other presets exist (owner's rule)."},
+    },
+    "required": ["base_url", "model"],
+}
+
+_ASSISTANT_SUBSCRIPTION_START = {
+    "title": "AssistantSubscriptionStart",
+    "type": "object",
+    "properties": {
+        "provider": {"type": "string", "enum": ["opencode", "codex"]},
+    },
+    "required": ["provider"],
+}
+
+_ASSISTANT_SUBSCRIPTION_FLOW = {
+    "title": "AssistantSubscriptionFlow",
+    "type": "object",
+    "description": "The device-login job: approve the user code at the link; the server stores the token server-side only.",
+    "properties": {
+        "provider": {"type": "string"},
+        "verification_uri": {"nullable": True, "type": "string"},
+        "user_code": {"nullable": True, "type": "string"},
+        "interval": {"type": "integer"},
+        "expires_in": {"type": "integer"},
+    },
+    "required": ["provider", "interval", "expires_in"],
+}
+
+_ASSISTANT_SUBSCRIPTION_POLL = {
+    "title": "AssistantSubscriptionPollResult",
+    "type": "object",
+    "properties": {
+        "status": {"type": "string", "enum": ["pending", "linked"]},
+        "additionalProperties": True,
+    },
+    "required": ["status"],
+}
+
+_ASSISTANT_SUBSCRIPTION_CAPABILITY = {
+    "title": "AssistantSubscriptionCapability",
+    "type": "object",
+    "description": "What this provider honestly supports: the local-CLI import is the primary link path; an in-app login exists only where the provider itself offers one (fix-up 4: no invented /oauth/* calls).",
+    "properties": {
+        "provider": {"type": "string"},
+        "import_available": {"type": "boolean"},
+        "login_flow_available": {"type": "boolean"},
+    },
+    "required": ["provider", "import_available", "login_flow_available"],
+}
+
+_ASSISTANT_SUBSCRIPTION_MODELS = {
+    "title": "AssistantSubscriptionModels",
+    "type": "object",
+    "properties": {
+        "supported": {"type": "boolean", "description": "false when the provider exposes no listing endpoint (then type the model id)."},
+        "models": {"type": "array", "items": {"type": "string"}},
+        "detail": {"type": "string"},
+    },
+    "required": ["supported", "models", "detail"],
+}
+
+_ASSISTANT_HR_WRITE = {
+    "title": "AssistantEmployeeWrite",
+    "type": "object",
+    "properties": {
+        "base_url": {"type": "string", "format": "uri"},
+        "model": {"type": "string"},
+        "api_key": {"type": "string", "description": "Stored encrypted at rest; never returned."},
+        "is_active": {"type": "boolean", "description": "HR's activation toggle."},
+    },
+}
+
+_ASSISTANT_TEST_RESULT = {
+    "title": "AssistantTestResult",
+    "type": "object",
+    "properties": {
+        "ok": {"type": "boolean"},
+        "latency_ms": {"type": "integer"},
+        "detail": {"type": "string", "description": "On failure: the provider's own status and message, or a classified connection symptom (dns/connect/tls/timeout), always naming the exact URL used."},
+    },
+    "required": ["ok", "latency_ms", "detail"],
+}
+
+_ASSISTANT_CHAT_REPLY = {
+    "title": "AssistantChatReply",
+    "type": "object",
+    "properties": {
+        "reply": {"type": "string"},
+        "pending_action": {
+            "nullable": True,
+            "type": "object",
+            "properties": {
+                "token": {"type": "string", "description": "Opaque signed confirmation token."},
+                "name": {"type": "string", "description": "The write tool, e.g. create_request."},
+                "args": {"type": "object"},
+            },
+            "required": ["token", "name", "args"],
+        },
+        "tool_trace": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "tool": {"type": "string"},
+                    "immediate": {"type": "boolean"},
+                    "pending": {"type": "boolean"},
+                    "refused": {"type": "boolean"},
+                },
+            },
+        },
+    },
+    "required": ["reply", "pending_action", "tool_trace"],
+}
+
+_ASSISTANT_CONFIRM_RESULT = {
+    "title": "AssistantConfirmResult",
+    "type": "object",
+    "properties": {
+        "result": {"type": "object", "description": "The write's own result payload."},
+        "tool": {"type": "string"},
+    },
+    "required": ["result", "tool"],
+}
+
+
+class AssistantConfigSchema(_ViewSchema):
+    """GET/PUT /api/v1/assistant/config (the caller's own config)."""
+
+    request_bodies = {"put": _body(_object_ref("AssistantConfigWrite"))}
+    responses = {
+        "get": {
+            **_json_response("200", "The caller's own assistant config; the key (and any subscription token) is never returned.", _data_envelope(_ASSISTANT_CONFIG_ITEM)),
+        },
+        "put": {
+            **_json_response("200", "Config saved (the read shape is returned). With mode=subscription the picked provider is linked from this machine's local CLI login; one credential per row, so the previous subscription/api key is cleared.", _data_envelope(_ASSISTANT_CONFIG_ITEM)),
+            **_error_response("409", "no_local_login: no local CLI login exists for the picked provider on this machine."),
+            **_error_response("422", "Validation failed (bad base_url/model, an unknown provider, or a protected field)."),
+        },
+    }
+
+
+class AssistantSubscriptionCapabilitySchema(_ViewSchema):
+    """GET /api/v1/assistant/subscription/capability?provider=<slug> — the
+    honest capability set for one provider (import always; in-app login
+    only when the provider itself offers one)."""
+
+    responses = {
+        "get": {
+            **_json_response("200", "The provider's capability set: import_available and login_flow_available.", _data_envelope(_ASSISTANT_SUBSCRIPTION_CAPABILITY)),
+            **_error_response("422", "unknown_provider: pick opencode or codex."),
+            **_error_response("401", "Authentication required."),
+        },
+    }
+
+
+class AssistantSubscriptionImportSchema(_ViewSchema):
+    """POST /api/v1/assistant/subscription/import — link the local CLI login."""
+
+    request_bodies = {"post": _body(_object_ref("AssistantSubscriptionStart"))}
+    responses = {
+        "post": {
+            **_json_response("200", "Linked from this machine's CLI login; the read shape says subscription_source=\"local\". No secret in any field.", _data_envelope(_ASSISTANT_SUBSCRIPTION_POLL)),
+            **_error_response("409", "no_local_login: the provider's CLI was never logged in on this machine."),
+            **_error_response("422", "unknown_provider: pick opencode or codex."),
+        },
+    }
+
+
+class AssistantSubscriptionStartSchema(_ViewSchema):
+    """POST /api/v1/assistant/subscription/start — begin the provider's own
+    device flow (H21): the user_code + approval URL the SPA shows; the
+    device_code stays server-side."""
+
+    request_bodies = {"post": _body(_object_ref("AssistantSubscriptionStart"))}
+    responses = {
+        "post": {
+            **_json_response("200", "The device flow started: approve the user_code at verification_uri (NOT opened anywhere else); expires_in seconds of runway, poll at interval seconds.", _data_envelope(_ASSISTANT_SUBSCRIPTION_FLOW)),
+            **_error_response("409", "no_login_flow: this provider has no in-app login (codex); provider_unreachable / provider_error: the provider's own failure, scrubbed."),
+            **_error_response("422", "unknown_provider: pick opencode or codex."),
+        },
+    }
+
+
+class AssistantSubscriptionPollSchema(_ViewSchema):
+    """POST /api/v1/assistant/subscription/poll — one poll turn."""
+
+    request_bodies = {"post": _body(_object_ref("AssistantSubscriptionStart"))}
+    responses = {
+        "post": {
+            **_json_response("200", "pending until approved; on approval the credential is stored ENCRYPTED and the row read shape returns (subscription_source=\"device\"). No token in any field.", _data_envelope(_ASSISTANT_SUBSCRIPTION_POLL)),
+            **_error_response("409", "no_active_flow / flow_expired / no_login_flow: start the flow again; provider_unreachable / provider_error: the provider's own failure, scrubbed."),
+            **_error_response("422", "unknown_provider: pick opencode or codex."),
+        },
+    }
+
+
+class AssistantSubscriptionModelsSchema(_ViewSchema):
+    """GET /api/v1/assistant/subscription/models — the offered models."""
+
+    responses = {
+        "get": {
+            **_json_response("200", "The models the linked subscription offers (the user picks one). supported=false honestly reports a provider with no listing endpoint.", _data_envelope(_ASSISTANT_SUBSCRIPTION_MODELS)),
+            **_error_response("409", "not_configured / not linked."),
+        },
+    }
+
+
+class AssistantTestSchema(_ViewSchema):
+    """POST /api/v1/assistant/test — the Test button."""
+
+    responses = {
+        "post": {
+            **_json_response("200", "The connection result: ok + latency, or the provider's own status/message.", _data_envelope(_ASSISTANT_TEST_RESULT)),
+            **_error_response("409", "not_configured: no base URL/key/model yet, or key_unreadable: the server secret cannot open the stored key."),
+        },
+    }
+
+
+class AssistantHRConfigSchema(_ViewSchema):
+    """GET/PUT /api/v1/employees/{target_id}/assistant (HR only)."""
+
+    request_bodies = {"put": _body(_object_ref("AssistantEmployeeWrite"))}
+    responses = {
+        "get": {
+            **_json_response("200", "The employee's assistant config; the key is never returned.", _data_envelope(_ASSISTANT_CONFIG_ITEM)),
+            **_error_response("403", "permission_denied: HR only."),
+            **_error_response("404", "Not found."),
+        },
+        "put": {
+            **_json_response("200", "The employee's assistant config updated (audited).", _data_envelope(_ASSISTANT_CONFIG_ITEM)),
+            **_error_response("403", "permission_denied: HR only."),
+            **_error_response("404", "Not found."),
+            **_error_response("422", "Validation failed; fields carries the per-field errors."),
+        },
+    }
+
+
+class AssistantChatSchema(_ViewSchema):
+    """POST /api/v1/assistant/chat — the conversation turn."""
+
+    responses = {
+        "post": {
+            **_json_response("200", "One assistant turn: the reply, an optional pending write action, and the tool trace.", _data_envelope(_ASSISTANT_CHAT_REPLY)),
+            **_error_response("409", "not_configured / inactive / key_unreadable / provider_error: the chat cannot run."),
+            **_error_response("422", "Validation failed: malformed or client-supplied-credential body."),
+        },
+    }
+
+
+class AssistantConfirmSchema(_ViewSchema):
+    """POST /api/v1/assistant/actions/{token}/confirm — run one confirmed write."""
+
+    responses = {
+        "post": {
+            **_json_response("200", "The confirmed write's result (audited).", _data_envelope(_ASSISTANT_CONFIRM_RESULT)),
+            **_error_response("400", "invalid_token / tampered / unknown_tool."),
+            **_error_response("403", "user_mismatch / permission_denied."),
+            **_error_response("404", "not_found: the action's target no longer exists."),
+            **_error_response("409", "expired / already_used / unsupported_tool."),
+            **_error_response("422", "validation_error: the arguments are no longer valid."),
         },
     }
 
@@ -901,7 +1244,7 @@ def _attach_schema(view_cls, schema_cls):
 
 
 def _wire_schemas():
-    from accounts import employee_views, views as accounts_views
+    from accounts import assistant_views, company_views, employee_views, views as accounts_views
     from notifications import views as notification_views
     from reqs import attachment_views, views as reqs_views
     from review import report_views, views as review_views
@@ -912,8 +1255,19 @@ def _wire_schemas():
     _attach_schema(accounts_views.SignupView, SignupSchema)
     _attach_schema(accounts_views.LogoutView, AccountsSchema)
     _attach_schema(accounts_views.MeView, MeSchema)
+    _attach_schema(company_views.CompanyProfileView, CompanySchema)
     _attach_schema(employee_views.EmployeeListView, EmployeeSchema)
     _attach_schema(employee_views.EmployeeDetailView, EmployeeDetailSchema)
+    _attach_schema(assistant_views.AssistantConfigView, AssistantConfigSchema)
+    _attach_schema(assistant_views.AssistantTestView, AssistantTestSchema)
+    _attach_schema(assistant_views.AssistantChatView, AssistantChatSchema)
+    _attach_schema(assistant_views.AssistantActionConfirmView, AssistantConfirmSchema)
+    _attach_schema(assistant_views.AssistantHRConfigView, AssistantHRConfigSchema)
+    _attach_schema(assistant_views.AssistantSubscriptionCapabilityView, AssistantSubscriptionCapabilitySchema)
+    _attach_schema(assistant_views.AssistantSubscriptionImportView, AssistantSubscriptionImportSchema)
+    _attach_schema(assistant_views.AssistantSubscriptionStartView, AssistantSubscriptionStartSchema)
+    _attach_schema(assistant_views.AssistantSubscriptionPollView, AssistantSubscriptionPollSchema)
+    _attach_schema(assistant_views.AssistantSubscriptionModelsView, AssistantSubscriptionModelsSchema)
 
     _attach_schema(reqs_views.RequestListView, RequestListSchema)
     _attach_schema(reqs_views.RequestDetailView, RequestDetailSchema)

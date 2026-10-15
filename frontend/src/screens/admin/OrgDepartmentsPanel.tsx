@@ -10,20 +10,24 @@ import {
   type ServerDepartment,
   type ServerEmployee,
 } from "../../app/orgApi";
+import OperationalTable, { type OperationalColumn } from "../../components/data/OperationalTable";
 import { Banner, Dialog, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../../components/ui";
 
 /**
  * Departments and the people inside them — Story H16, the HR surface.
  *
- * This panel is the one place HR asked for: add a department, name the manager
- * who owns it, and add an employee or a manager INSIDE a department. It talks to
- * the real `/departments` and `/employees` endpoints, so what HR types here is
- * what the rest of the system enforces — unlike the roster tables on the other
- * admin screens, which still render demo fixtures.
+ * Built from the house primitives only, so it reads like the roster screens it
+ * sits next to: `.section` + `.section-heading` for the block, `.work-surface`
+ * for each card, `.form-grid` + `.field` + `.select` for the forms, and
+ * `OperationalTable` for every list of people.
+ *
+ * Both create flows are dialogs opened from the section heading — the page
+ * itself stays a readable list of departments instead of a form that is always
+ * open whether or not anyone is adding something.
  *
  * The owner's rule is enforced twice on purpose: the backend refuses a manager
  * from another department, and the "reports to" picker here only ever offers
- * members of the department that is selected, so the mistake is hard to make and
+ * members of the selected department, so the mistake is hard to make and
  * impossible to keep.
  */
 
@@ -48,6 +52,19 @@ function describeFailure(failure: unknown, fallback: string): string {
   return fallback;
 }
 
+type MemberRow = { id: string; name: string; role: ServerEmployee["role"]; manager: string };
+
+const EMPTY_DEPARTMENT = { code: "", name_ar: "", name_en: "" };
+const EMPTY_EMPLOYEE = {
+  full_name: "",
+  email: "",
+  role: "EMPLOYEE" as "EMPLOYEE" | "MANAGER",
+  department: "",
+  manager: "",
+  job_title: "",
+  employee_number: "",
+};
+
 export default function OrgDepartmentsPanel() {
   const { t, locale } = useApp();
   const [departments, setDepartments] = useState<ServerDepartment[] | null>(null);
@@ -56,19 +73,14 @@ export default function OrgDepartmentsPanel() {
   const [attempt, setAttempt] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
-
-  const [departmentDraft, setDepartmentDraft] = useState({ code: "", name_ar: "", name_en: "" });
-  const [employeeOpen, setEmployeeOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [employeeDraft, setEmployeeDraft] = useState({
-    full_name: "",
-    email: "",
-    role: "EMPLOYEE" as "EMPLOYEE" | "MANAGER",
-    department: "" as string,
-    manager: "" as string,
-    job_title: "",
-    employee_number: "",
-  });
+
+  const [departmentOpen, setDepartmentOpen] = useState(false);
+  const [departmentDraft, setDepartmentDraft] = useState(EMPTY_DEPARTMENT);
+  const [departmentError, setDepartmentError] = useState<string | null>(null);
+
+  const [employeeOpen, setEmployeeOpen] = useState(false);
+  const [employeeDraft, setEmployeeDraft] = useState(EMPTY_EMPLOYEE);
   const [employeeIssue, setEmployeeIssue] = useState<FieldIssue>(null);
 
   const reload = useCallback(async () => {
@@ -107,11 +119,51 @@ export default function OrgDepartmentsPanel() {
     return membersOf(departmentId).filter((person) => person.id !== Number(employeeDraft.manager));
   }, [employeeDraft.department, employeeDraft.manager, membersOf]);
 
+  const memberColumns: OperationalColumn<MemberRow>[] = [
+    { key: "employee", label: t("employee"), render: (row) => <span>{row.name}</span> },
+    {
+      key: "role",
+      label: t("adminOrgRole"),
+      render: (row) => (
+        <StatusPill
+          tone={row.role === "MANAGER" ? "info" : "neutral"}
+          label={row.role === "MANAGER" ? t("adminOrgRoleManager") : t("adminOrgRoleEmployee")}
+          icon={row.role === "MANAGER" ? "approved" : "draft"}
+        />
+      ),
+    },
+    {
+      key: "manager",
+      label: t("adminOrgManagerOfEmployee"),
+      render: (row) => <span className="page-meta">{row.manager}</span>,
+    },
+  ];
+
+  const openDepartmentDialog = () => {
+    setDepartmentError(null);
+    setDepartmentDraft(EMPTY_DEPARTMENT);
+    setNotice(null);
+    setProblem(null);
+    setDepartmentOpen(true);
+  };
+
+  const openEmployeeDialog = () => {
+    setEmployeeIssue(null);
+    setEmployeeDraft(EMPTY_EMPLOYEE);
+    setNotice(null);
+    setProblem(null);
+    setEmployeeOpen(true);
+  };
+
   const addDepartment = async () => {
-    if (!departmentDraft.code.trim() || !departmentDraft.name_ar.trim()) return;
+    if (!departmentDraft.code.trim() || !departmentDraft.name_ar.trim()) {
+      setDepartmentError(t("adminOrgDepartmentRequired"));
+      return;
+    }
     setSaving(true);
     setNotice(null);
     setProblem(null);
+    setDepartmentError(null);
     try {
       await createDepartment(
         {
@@ -121,11 +173,14 @@ export default function OrgDepartmentsPanel() {
         },
         locale,
       );
-      setDepartmentDraft({ code: "", name_ar: "", name_en: "" });
+      setDepartmentDraft(EMPTY_DEPARTMENT);
+      setDepartmentOpen(false);
       await reload();
       setNotice(t("adminOrgCreated"));
     } catch (failure) {
-      setProblem(describeFailure(failure, t("errorNetwork")));
+      const issue = firstFieldIssue(failure);
+      if (issue) setDepartmentError(`${issue.field}: ${issue.message}`);
+      else setProblem(describeFailure(failure, t("errorNetwork")));
     } finally {
       setSaving(false);
     }
@@ -135,11 +190,7 @@ export default function OrgDepartmentsPanel() {
     setNotice(null);
     setProblem(null);
     try {
-      await updateDepartment(
-        department.id,
-        { manager: managerId ? Number(managerId) : null },
-        locale,
-      );
+      await updateDepartment(department.id, { manager: managerId ? Number(managerId) : null }, locale);
       await reload();
     } catch (failure) {
       setProblem(describeFailure(failure, t("errorNetwork")));
@@ -164,15 +215,7 @@ export default function OrgDepartmentsPanel() {
         locale,
       );
       setEmployeeOpen(false);
-      setEmployeeDraft({
-        full_name: "",
-        email: "",
-        role: "EMPLOYEE",
-        department: "",
-        manager: "",
-        job_title: "",
-        employee_number: "",
-      });
+      setEmployeeDraft(EMPTY_EMPLOYEE);
       await reload();
       setNotice(t("adminOrgCreated"));
     } catch (failure) {
@@ -184,148 +227,176 @@ export default function OrgDepartmentsPanel() {
     }
   };
 
+  const employeeErrorFor = (field: string) =>
+    employeeIssue?.field === field ? employeeIssue.message : null;
+
   return (
-    <section className="panel" aria-label={t("adminOrgTitle")}>
-      <header className="panel-head">
-        <div>
-          <h2 className="panel-title">{t("adminOrgTitle")}</h2>
-          <p className="panel-subtitle">{t("adminOrgSubtitle")}</p>
-        </div>
-        <div className="panel-actions">
+    <section className="section" aria-labelledby="hr-org-heading">
+      <div className="section-heading">
+        <h2 id="hr-org-heading">{t("adminOrgTitle")}</h2>
+        <div className="row-actions">
           <button className="btn btn-secondary" type="button" onClick={() => setAttempt((n) => n + 1)}>
             {t("retry")}
           </button>
-          <button className="btn btn-primary" type="button" onClick={() => setEmployeeOpen(true)}>
+          <button className="btn btn-secondary" type="button" onClick={openDepartmentDialog}>
+            {t("adminOrgAddDepartment")}
+          </button>
+          <button className="btn btn-primary" type="button" onClick={openEmployeeDialog}>
             {t("adminOrgAddEmployee")}
           </button>
         </div>
-      </header>
-
-      {notice && <Banner tone="success">{notice}</Banner>}
-      {problem && <Banner tone="error">{problem}</Banner>}
-
-      <div className="field-row">
-        <label className="field">
-          <span className="field-label">{t("adminOrgCode")}</span>
-          <input
-            className="input"
-            dir="ltr"
-            value={departmentDraft.code}
-            onChange={(event) => setDepartmentDraft({ ...departmentDraft, code: event.target.value })}
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">{t("adminOrgNameAr")}</span>
-          <input
-            className="input"
-            value={departmentDraft.name_ar}
-            onChange={(event) => setDepartmentDraft({ ...departmentDraft, name_ar: event.target.value })}
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">{t("adminOrgNameEn")}</span>
-          <input
-            className="input"
-            dir="ltr"
-            value={departmentDraft.name_en}
-            onChange={(event) => setDepartmentDraft({ ...departmentDraft, name_en: event.target.value })}
-          />
-        </label>
-        <button
-          className="btn btn-secondary"
-          type="button"
-          disabled={saving || !departmentDraft.code.trim() || !departmentDraft.name_ar.trim()}
-          onClick={addDepartment}
-        >
-          {saving ? t("adminOrgPending") : t("adminOrgAddDepartment")}
-        </button>
       </div>
+      <p className="page-meta">{t("adminOrgSubtitle")}</p>
 
-      {phase === "loading" && <SkeletonRows rows={3} />}
-      {phase === "error" && <ErrorState onRetry={() => setAttempt((n) => n + 1)} />}
-      {phase === "ready" && departments && departments.length === 0 && (
+      {notice ? <Banner tone="success">{notice}</Banner> : null}
+      {problem ? <Banner tone="error" role="alert">{problem}</Banner> : null}
+
+      {phase === "loading" ? <SkeletonRows rows={3} /> : null}
+      {phase === "error" ? <ErrorState onRetry={() => setAttempt((n) => n + 1)} /> : null}
+      {phase === "ready" && departments && departments.length === 0 ? (
         <EmptyState message={t("adminOrgNoDepartments")} />
-      )}
+      ) : null}
 
-      {phase === "ready" &&
-        departments?.map((department) => (
-          <article className="panel" key={department.id}>
-            <header className="panel-head">
-              <h3 className="panel-title">
-                {locale === "ar" ? department.name_ar : department.name_en || department.name_ar}
-                <span dir="ltr"> ({department.code})</span>
-              </h3>
-              <StatusPill
-                tone={department.is_active ? "success" : "neutral"}
-                label={`${t("adminOrgMemberCount")}: ${department.member_count}`}
-              />
-            </header>
-
-            <label className="field">
-              <span className="field-label">{t("adminOrgManager")}</span>
-              <select
-                className="input"
-                value={department.manager_id ?? ""}
-                onChange={(event) => assignManager(department, event.target.value)}
-              >
-                <option value="">{t("adminOrgNoManager")}</option>
-                {managers.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.full_name || person.email}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <ul className="request-list">
-              {membersOf(department.id).map((person) => (
-                <li key={person.id} className="request-row">
-                  <span>{person.full_name || person.email}</span>
+      {phase === "ready"
+        ? departments?.map((department) => {
+            const members: MemberRow[] = membersOf(department.id).map((person) => ({
+              id: String(person.id),
+              name: person.full_name || person.email,
+              role: person.role,
+              manager: person.manager_name ?? t("adminOrgNoManagerOfEmployee"),
+            }));
+            return (
+              <div className="work-surface" key={department.id} style={{ marginBlockStart: "var(--sp-4)" }}>
+                <div className="section-heading">
+                  <h3>
+                    {locale === "ar" ? department.name_ar : department.name_en || department.name_ar}{" "}
+                    <span className="page-meta" dir="ltr">
+                      ({department.code})
+                    </span>
+                  </h3>
                   <StatusPill
-                    tone="info"
-                    label={person.role === "MANAGER" ? t("adminOrgRoleManager") : t("adminOrgRoleEmployee")}
+                    tone={department.is_active ? "success" : "neutral"}
+                    label={`${t("adminOrgMemberCount")}: ${department.member_count}`}
+                    icon="approved"
                   />
-                  <span className="text-muted">
-                    {person.manager_name ?? t("adminOrgNoManagerOfEmployee")}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </article>
-        ))}
+                </div>
 
-      {employeeOpen && (
+                <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+                  <span className="field-label">{t("adminOrgManager")}</span>
+                  <select
+                    className="select"
+                    value={department.manager_id ?? ""}
+                    onChange={(event) => assignManager(department, event.target.value)}
+                  >
+                    <option value="">{t("adminOrgNoManager")}</option>
+                    {managers.map((person) => (
+                      <option key={person.id} value={person.id}>
+                        {person.full_name || person.email}
+                        {person.department_name_ar ? ` — ${person.department_name_ar}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {members.length > 0 ? (
+                  <OperationalTable caption={t("adminOrgMembers")} columns={memberColumns} records={members} />
+                ) : null}
+              </div>
+            );
+          })
+        : null}
+
+      {departmentOpen ? (
         <Dialog
-          title={t("adminOrgAddEmployee")}
-          description={t("adminOrgSubtitle")}
+          title={t("adminOrgAddDepartment")}
+          description={t("adminOrgAddDepartmentHint")}
           busy={saving}
-          onClose={() => setEmployeeOpen(false)}
+          onClose={() => setDepartmentOpen(false)}
         >
-          {employeeIssue && <Banner tone="error">{`${employeeIssue.field}: ${employeeIssue.message}`}</Banner>}
-          <label className="field">
+          <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+            <span className="field-label">{t("adminOrgCode")}</span>
+            <input
+              className="input"
+              dir="ltr"
+              autoFocus
+              placeholder="OPS"
+              value={departmentDraft.code}
+              aria-invalid={departmentError ? "true" : undefined}
+              onChange={(event) => setDepartmentDraft({ ...departmentDraft, code: event.target.value })}
+            />
+          </label>
+
+          <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+            <span className="field-label">{t("adminOrgNameAr")}</span>
+            <input
+              className="input"
+              placeholder="العمليات"
+              value={departmentDraft.name_ar}
+              aria-invalid={departmentError ? "true" : undefined}
+              onChange={(event) => setDepartmentDraft({ ...departmentDraft, name_ar: event.target.value })}
+            />
+          </label>
+
+          <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
+            <span className="field-label">{t("adminOrgNameEn")}</span>
+            <input
+              className="input"
+              dir="ltr"
+              placeholder="Operations"
+              value={departmentDraft.name_en}
+              onChange={(event) => setDepartmentDraft({ ...departmentDraft, name_en: event.target.value })}
+            />
+          </label>
+
+          {departmentError ? (
+            <span className="field-error" role="alert">{departmentError}</span>
+          ) : null}
+
+          <div className="dialog-actions">
+            <button className="btn btn-secondary" type="button" onClick={() => setDepartmentOpen(false)}>
+              {t("cancel")}
+            </button>
+            <button className="btn btn-primary" type="button" disabled={saving} onClick={addDepartment}>
+              {saving ? t("adminOrgPending") : t("adminOrgAddDepartment")}
+            </button>
+          </div>
+        </Dialog>
+      ) : null}
+
+      {employeeOpen ? (
+        <Dialog title={t("adminOrgAddEmployee")} busy={saving} onClose={() => setEmployeeOpen(false)}>
+          <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
             <span className="field-label">{t("adminOrgFullName")}</span>
             <input
               className="input"
               value={employeeDraft.full_name}
-              aria-invalid={employeeIssue?.field === "full_name" ? "true" : undefined}
+              aria-invalid={employeeErrorFor("full_name") ? "true" : undefined}
               onChange={(event) => setEmployeeDraft({ ...employeeDraft, full_name: event.target.value })}
             />
+            {employeeErrorFor("full_name") ? (
+              <span className="field-error" role="alert">{employeeErrorFor("full_name")}</span>
+            ) : null}
           </label>
-          <label className="field">
+
+          <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
             <span className="field-label">{t("signupEmailLabel")}</span>
             <input
               className="input"
               dir="ltr"
               type="email"
               value={employeeDraft.email}
-              aria-invalid={employeeIssue?.field === "email" ? "true" : undefined}
+              aria-invalid={employeeErrorFor("email") ? "true" : undefined}
               onChange={(event) => setEmployeeDraft({ ...employeeDraft, email: event.target.value })}
             />
+            {employeeErrorFor("email") ? (
+              <span className="field-error" role="alert">{employeeErrorFor("email")}</span>
+            ) : null}
           </label>
-          <label className="field">
+
+          <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
             <span className="field-label">{t("adminOrgRole")}</span>
             <select
-              className="input"
+              className="select"
               value={employeeDraft.role}
               onChange={(event) =>
                 setEmployeeDraft({ ...employeeDraft, role: event.target.value as "EMPLOYEE" | "MANAGER" })
@@ -335,30 +406,36 @@ export default function OrgDepartmentsPanel() {
               <option value="MANAGER">{t("adminOrgRoleManager")}</option>
             </select>
           </label>
-          <label className="field">
+
+          <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
             <span className="field-label">{t("adminOrgDepartment")}</span>
             <select
-              className="input"
+              className="select"
               value={employeeDraft.department}
-              aria-invalid={employeeIssue?.field === "department" ? "true" : undefined}
+              aria-invalid={employeeErrorFor("department") ? "true" : undefined}
               onChange={(event) =>
                 setEmployeeDraft({ ...employeeDraft, department: event.target.value, manager: "" })
               }
             >
-              <option value="">{t("adminOrgNoManager")}</option>
+              <option value="">{t("adminOrgNoDepartment")}</option>
               {departments?.map((department) => (
                 <option key={department.id} value={department.id}>
                   {locale === "ar" ? department.name_ar : department.name_en || department.name_ar}
                 </option>
               ))}
             </select>
+            {employeeErrorFor("department") ? (
+              <span className="field-error" role="alert">{employeeErrorFor("department")}</span>
+            ) : null}
           </label>
-          <label className="field">
+
+          <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
             <span className="field-label">{t("adminOrgManagerOfEmployee")}</span>
             <select
-              className="input"
+              className="select"
               value={employeeDraft.manager}
-              aria-invalid={employeeIssue?.field === "manager" ? "true" : undefined}
+              disabled={!employeeDraft.department}
+              aria-invalid={employeeErrorFor("manager") ? "true" : undefined}
               onChange={(event) => setEmployeeDraft({ ...employeeDraft, manager: event.target.value })}
             >
               <option value="">{t("adminOrgNoManagerOfEmployee")}</option>
@@ -368,9 +445,13 @@ export default function OrgDepartmentsPanel() {
                 </option>
               ))}
             </select>
-            {!employeeDraft.department && <span className="field-hint">{t("adminOrgSubtitle")}</span>}
+            <span className="field-hint">{t("adminOrgManagerSameDepartmentHint")}</span>
+            {employeeErrorFor("manager") ? (
+              <span className="field-error" role="alert">{employeeErrorFor("manager")}</span>
+            ) : null}
           </label>
-          <label className="field">
+
+          <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
             <span className="field-label">{t("adminOrgJobTitle")}</span>
             <input
               className="input"
@@ -378,7 +459,8 @@ export default function OrgDepartmentsPanel() {
               onChange={(event) => setEmployeeDraft({ ...employeeDraft, job_title: event.target.value })}
             />
           </label>
-          <label className="field">
+
+          <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
             <span className="field-label">{t("adminOrgEmployeeNumber")}</span>
             <input
               className="input"
@@ -390,19 +472,14 @@ export default function OrgDepartmentsPanel() {
 
           <div className="dialog-actions">
             <button className="btn btn-secondary" type="button" onClick={() => setEmployeeOpen(false)}>
-              {t("adminOrgCancel")}
+              {t("cancel")}
             </button>
-            <button
-              className="btn btn-primary"
-              type="button"
-              disabled={saving || !employeeDraft.email.trim()}
-              onClick={addEmployee}
-            >
+            <button className="btn btn-primary" type="button" disabled={saving} onClick={addEmployee}>
               {saving ? t("adminOrgPending") : t("adminOrgSave")}
             </button>
           </div>
         </Dialog>
-      )}
+      ) : null}
     </section>
   );
 }
