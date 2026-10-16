@@ -129,15 +129,16 @@ def merged_missing_required(profile, validated_data):
 def apply_profile_update(*, profile, validated_data, actor, request_id=""):
     """Apply a merged partial update + append the audit event, atomically.
 
-    Singleton semantics follow ``TimezoneConfig``: exactly one row at pk=1.
-    Returns ``(profile, event)`` where ``event`` is None when nothing changed.
-    Callers run this inside ``transaction.atomic``; a raise rolls everything
-    back, so a rejected update stores nothing.
+    Per-company semantics since H30 §2.4: ``profile=None`` creates the
+    caller's company's row (the company OneToOne replaces the pk=1
+    singleton). Returns ``(profile, event)`` where ``event`` is None when
+    nothing changed. Callers run this inside ``transaction.atomic``; a raise
+    rolls everything back, so a rejected update stores nothing.
     """
     before = {field: getattr(profile, field) for field in _AUDIT_FIELDS} if profile is not None else None
 
     if profile is None:
-        profile = CompanyProfile(pk=1)
+        profile = CompanyProfile(company=actor.company)
     for field, value in validated_data.items():
         setattr(profile, field, value)
     profile.updated_by = actor
@@ -152,6 +153,7 @@ def apply_profile_update(*, profile, validated_data, actor, request_id=""):
     event = None
     if changed:
         event = AuditEvent.objects.create(
+            company=actor.company,
             actor=actor,
             subject=actor,
             action="company_profile.updated",

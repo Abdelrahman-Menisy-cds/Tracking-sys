@@ -30,12 +30,13 @@ from accounts.assistant_chat import assistant_chat, confirm_action
 from accounts.models import AssistantConfig, AuditEvent, EmployeeProfile, User
 from reqs.models import EmployeeRequest, RequestType
 from timesheets.models import Timesheet
+from tenants.context import default_company
 
 User = User
 
 
 def _mk_user(email, role=User.Role.EMPLOYEE, **kw):
-    return User.objects.create_user(email=email, password="pass-12345678", role=role, **kw)
+    return User.objects.create_user(company=default_company(), email=email, password="pass-12345678", role=role, **kw)
 
 
 @pytest.fixture(autouse=True)
@@ -72,7 +73,7 @@ def _post(client, token, path, body):
 
 
 def _configured(user, *, base_url="https://api.example.com/v1", model="test-model", is_active=True, key="sk-live-abcdef123456"):
-    AssistantConfig.objects.create(
+    AssistantConfig.objects.create(company=default_company(), 
         user=user,
         base_url=base_url,
         model=model,
@@ -164,7 +165,7 @@ def test_hr_key_is_hinted_not_readable_and_employee_will_replace_it(client_csrf)
     client, token = client_csrf
     hr = _mk_user("h18.hr@example.com", role=User.Role.HR)
     employee = _mk_user("h18.emp@example.com")
-    EmployeeProfile.objects.create(user=employee, employee_number="E-18")
+    EmployeeProfile.objects.create(company=default_company(), user=employee, employee_number="E-18")
     client.force_login(hr)
 
     hr_key = "sk-hr-provided-a1b2c3"
@@ -216,7 +217,7 @@ def test_employee_and_manager_get_403_on_hr_assistant_endpoints(client_csrf):
     client, token = client_csrf
     employee = _mk_user("h18.emp2@example.com")
     manager = _mk_user("h18.mgr@example.com", role=User.Role.MANAGER)
-    EmployeeProfile.objects.create(user=employee, manager=manager, employee_number="E-19")
+    EmployeeProfile.objects.create(company=default_company(), user=employee, manager=manager, employee_number="E-19")
 
     for caller in (employee, manager):
         client.force_login(caller)
@@ -890,7 +891,7 @@ def test_manager_read_queue_scope_only(client_csrf):
 
     manager = _mk_user("h18.queue.mgr@example.com", role=User.Role.MANAGER)
     employee = _mk_user("h18.queue.emp@example.com")
-    EmployeeProfile.objects.create(user=employee, manager=manager, employee_number="E-20")
+    EmployeeProfile.objects.create(company=default_company(), user=employee, manager=manager, employee_number="E-20")
     from accounts.assistant_tools import read_review_queue
 
     result = read_review_queue(manager, {})
@@ -984,7 +985,7 @@ def test_leave_balance_counts_approved_requests_per_leave_type():
     from reqs.decision_services import decide_request
 
     manager = _mk_user("h20.mgr@example.com", role=User.Role.MANAGER)
-    EmployeeProfile.objects.create(user=user, manager=manager, employee_number="H20-1")
+    EmployeeProfile.objects.create(company=default_company(), user=user, manager=manager, employee_number="H20-1")
     submitted = submit_request(requester=user, request_obj=d1, version=d1.version)
     decide_request(
         reviewer=manager,

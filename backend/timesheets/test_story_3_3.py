@@ -31,6 +31,7 @@ from timesheets.models import (
     TimezoneConfig,
 )
 from timesheets.test_story_3_2 import MONDAY, Story32Base
+from tenants.context import default_company
 
 REJECT_REASON = "Hours do not match the approved schedule."
 RETURN_REASON = "Please correct Tuesday's hours."
@@ -48,15 +49,15 @@ def _payload_hash(*, timesheet_id, version, action, comment) -> str:
 class Story33Base(Story32Base):
     def setUp(self):
         super().setUp()
-        self.manager = User.objects.create_user(
+        self.manager = User.objects.create_user(company=default_company(), 
             email="mgr@example.com", password="pass-12345678", role=User.Role.MANAGER
         )
-        self.hr = User.objects.create_user(
+        self.hr = User.objects.create_user(company=default_company(), 
             email="hr@example.com", password="pass-12345678", role=User.Role.HR
         )
-        EmployeeProfile.objects.create(user=self.user, manager=self.manager)
+        EmployeeProfile.objects.create(company=default_company(), user=self.user, manager=self.manager)
         # Only the owner's direct manager and HR may decide this sheet.
-        self.stranger = User.objects.create_user(
+        self.stranger = User.objects.create_user(company=default_company(), 
             email="stranger@example.com", password="pass-12345678", role=User.Role.MANAGER
         )
         self.sheet = self.create_sheet(entries=self.default_entries(), user=self.user)

@@ -37,10 +37,11 @@ from rest_framework.test import APIClient, APITestCase
 from accounts.models import AuditEvent, EmployeeProfile, User
 from reqs.models import EmployeeRequest, RequestType
 from timesheets.models import TimeEntry, Timesheet
+from tenants.context import default_company
 
 
 def _mk_user(email, role=User.Role.EMPLOYEE, active=True, **kw):
-    u = User.objects.create_user(email=email, password="pass-12345678", role=role, **kw)
+    u = User.objects.create_user(company=default_company(), email=email, password="pass-12345678", role=role, **kw)
     u.is_active = active
     u.save(update_fields=["is_active"])
     return u
@@ -58,8 +59,8 @@ class ReportBase(APITestCase):
         self.other_mgr = _mk_user("mgr2@example.com", role=User.Role.MANAGER)
         self.hr = _mk_user("hr@example.com", role=User.Role.HR)
         self.plain = _mk_user("plain@example.com")
-        EmployeeProfile.objects.create(user=self.employee, manager=self.manager, employee_number="E-001")
-        EmployeeProfile.objects.create(user=self.employee2, manager=self.other_mgr, employee_number="E-002")
+        EmployeeProfile.objects.create(company=default_company(), user=self.employee, manager=self.manager, employee_number="E-001")
+        EmployeeProfile.objects.create(company=default_company(), user=self.employee2, manager=self.other_mgr, employee_number="E-002")
 
         self.rtype = RequestType.objects.create(name="Equipment", requires_manager_approval=True)
         self.submitted = EmployeeRequest.objects.create(
@@ -163,7 +164,7 @@ class TestMetadataAndDeterminism(ReportBase):
         self.auth_manager()
         from timesheets.models import TimezoneConfig
 
-        TimezoneConfig.objects.update_or_create(pk=1, defaults={"name": "Africa/Cairo"})
+        TimezoneConfig.objects.update_or_create(company=default_company(), defaults={"name": "Africa/Cairo"})
         params = {"date_from": "2000-01-01", "date_to": "2100-01-01"}
         for kind in ("rows", "totals", "dashboard"):
             meta = self.client.get(self.url(kind), params).json()["meta"]
@@ -184,7 +185,7 @@ class TestMetadataAndDeterminism(ReportBase):
     def test_deterministic_rows_order(self):
         # two in-scope requests; ordering must be stable across calls
         e3 = _mk_user("emp3@example.com")
-        EmployeeProfile.objects.create(user=e3, manager=self.manager, employee_number="E-003")
+        EmployeeProfile.objects.create(company=default_company(), user=e3, manager=self.manager, employee_number="E-003")
         EmployeeRequest.objects.create(
             requester=e3, request_type=self.rtype, title="Buddy laptop",
             status=EmployeeRequest.Status.PENDING_MANAGER, manager_at_submission=self.manager,
@@ -375,7 +376,7 @@ class TestOrgTimezoneDateBoundary(ReportBase):
         super().setUp()
         from timesheets.models import TimezoneConfig
 
-        TimezoneConfig.objects.update_or_create(pk=1, defaults={"name": self.ORG_TZ})
+        TimezoneConfig.objects.update_or_create(company=default_company(), defaults={"name": self.ORG_TZ})
         # UTC 2026-03-10 12:00 -> Kiritimati local 2026-03-11 02:00 (org date 03-11,
         # but UTC date 03-10: the old submitted_at__date filter missed this row).
         self.in_local_day = EmployeeRequest.objects.create(

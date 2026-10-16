@@ -12,9 +12,10 @@ plain client.patch without the token gets the 403 CSRF envelope.
 import pytest
 from django.contrib.auth import get_user_model
 
-from accounts.models import AuditEvent, CompanyProfile
+from accounts.models import AuditEvent, Company, CompanyProfile
 from accounts.tests import _csrf, anon_client  # noqa: F401 — shared pytest fixture
 from django.core.cache import cache
+from tenants.context import default_company
 
 User = get_user_model()
 
@@ -52,7 +53,7 @@ OPTIONAL_FIELDS = {
 def _login_as(client, role):
     """Sign a fresh role-typed user in through the real session flow."""
     email = f"{role.lower()}-company@example.com"
-    User.objects.create_user(email=email, password=PASSWORD, role=role)
+    User.objects.create_user(company=default_company(), email=email, password=PASSWORD, role=role)
     token = _csrf(client)
     response = client.post(
         "/api/v1/auth/login",
@@ -281,3 +282,88 @@ def test_rejected_update_writes_no_audit_event(hr_client):
     assert _patch(hr_client, {"name": "غير مكتمل"}).status_code == 400  # incomplete
 
     assert not AuditEvent.objects.filter(action="company_profile.updated").exists()
+
+
+# ---------------------------------------------------------------------------
+# H30 R1 (§2.4 / §8.1): per-company reads replace the pk=1 singleton
+# ---------------------------------------------------------------------------
+
+
+def _company_with_hr(slug, name):
+    """A company plus its founding HR (the §2.2 one-user-one-company shape)."""
+    company = Company.objects.create(slug=slug, name=name)
+    hr = User.objects.create_user(
+        email=f"{slug}-hr@example.com", password=PASSWORD, role=User.Role.HR, company=company
+    )
+    return company, hr
+
+
+def _login_user(client, email):
+    """Sign an existing user in through the real session flow."""
+    token = _csrf(client)
+    response = client.post(
+        "/api/v1/auth/login",
+        {"email": email, "password": PASSWORD},
+        format="json",
+        HTTP_X_CSRFTOKEN=token,
+    )
+    assert response.status_code == 200, response.data
+    return client
+
+
+@pytest.mark.django_db
+def test_profiles_are_scoped_per_company(anon_client):
+    """Two companies hold two independent profiles; each HR reads and writes
+    only their own company's row (the pk=1 read is gone)."""
+    company_a, hr_a = _company_with_hr("a-co", "شركة أ")
+    company_b, hr_b = _company_with_hr("b-co", "شركة ب")
+
+    client_a = _login_user(anon_client, hr_a.email)
+    assert _patch(client_a, dict(REQUIRED_FIELDS, name="شركة أ")).status_code == 200
+    client_b = _login_user(anon_client, hr_b.email)
+    assert _patch(client_b, dict(REQUIRED_FIELDS, name="شركة ب")).status_code == 200
+
+    assert CompanyProfile.objects.count() == 2
+    assert CompanyProfile.objects.get(company=company_a).name == "شركة أ"
+    assert CompanyProfile.objects.get(company=company_b).name == "شركة ب"
+
+    response = _login_user(anon_client, hr_a.email).get(BASE)
+    assert response.data["data"]["profile"]["name"] == "شركة أ"
+    response = _login_user(anon_client, hr_b.email).get(BASE)
+    assert response.data["data"]["profile"]["name"] == "شركة ب"
+
+
+@pytest.mark.django_db
+def test_needs_company_profile_gate_is_per_company(anon_client):
+    """The /auth/me onboarding gate is the caller's company's gate: completing
+    A's profile must not flip B's."""
+    company_a, hr_a = _company_with_hr("a-co", "شركة أ")
+    _company_with_hr("b-co", "شركة ب")
+
+    client_a = _login_user(anon_client, hr_a.email)
+    assert client_a.get("/api/v1/auth/me").data["data"]["needs_company_profile"] is True
+    assert _patch(client_a, dict(REQUIRED_FIELDS)).status_code == 200
+    assert client_a.get("/api/v1/auth/me").data["data"]["needs_company_profile"] is False
+
+    client_b = _login_user(anon_client, f"b-co-hr@example.com")
+    assert client_b.get("/api/v1/auth/me").data["data"]["needs_company_profile"] is True
+
+
+@pytest.mark.django_db
+def test_timezone_config_reads_are_per_company():
+    """organization_timezone resolves the CALLER's company's row (defaulting
+    UTC when absent), not a global singleton (H30 §2.4 / §8.1)."""
+    from review.reports import organization_timezone
+    from timesheets.models import TimezoneConfig
+
+    company_a, hr_a = _company_with_hr("a-co", "شركة أ")
+    company_b, hr_b = _company_with_hr("b-co", "شركة ب")
+
+    assert organization_timezone(hr_a) == "UTC"  # absent -> seeded default
+    TimezoneConfig.objects.update_or_create(company=company_a, defaults={"name": "Africa/Cairo"})
+    assert organization_timezone(hr_a) == "Africa/Cairo"
+    # B is untouched by A's config — and creating B's own default UTC row no
+    # longer collides with the seeded __default__ "UTC" row (name uniqueness
+    # flipped with the singleton).
+    assert organization_timezone(hr_b) == "UTC"
+    assert TimezoneConfig.objects.filter(company=company_b, name="UTC").exists()

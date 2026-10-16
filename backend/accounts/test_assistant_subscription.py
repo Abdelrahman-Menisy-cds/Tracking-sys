@@ -40,12 +40,13 @@ from accounts import assistant_subscriptions
 from accounts import assistant_views
 from accounts.assistant_crypto import decrypt_key, encrypt_key, key_hint
 from accounts.models import AssistantConfig, AuditEvent, User
+from tenants.context import default_company
 
 User = User
 
 
 def _mk_user(email, role=User.Role.EMPLOYEE):
-    return User.objects.create_user(email=email, password="pass-12345678", role=role)
+    return User.objects.create_user(company=default_company(), email=email, password="pass-12345678", role=role)
 
 
 @pytest.fixture
@@ -484,7 +485,7 @@ def test_import_local_key_credential_and_reset_of_the_api_key(client_csrf):
     user = _mk_user("h19.import@example.com")
     # Start in api mode with a key, then link the subscription: the key must
     # be gone afterwards (exactly ONE credential per row).
-    AssistantConfig.objects.create(
+    AssistantConfig.objects.create(company=default_company(), 
         user=user,
         base_url="https://api.example.com/v1",
         model="old-model",
@@ -666,7 +667,7 @@ def _get_or_post(client, token, path, body, method):
 def test_expired_oauth_is_refreshed_once_before_the_call(stub_server, client_csrf):
     client, token = client_csrf
     user = _mk_user("h19.refresh@example.com")
-    AssistantConfig.objects.create(
+    AssistantConfig.objects.create(company=default_company(), 
         user=user,
         model="glm-5.3-flash",
         subscription_provider="opencode",
@@ -714,7 +715,7 @@ def test_expired_oauth_is_refreshed_once_before_the_call(stub_server, client_csr
 def test_failed_refresh_unlinks_and_audits_never_a_silent_dead_button(stub_server, client_csrf):
     client, token = client_csrf
     user = _mk_user("h19.unlink@example.com")
-    AssistantConfig.objects.create(
+    AssistantConfig.objects.create(company=default_company(), 
         user=user,
         model="glm-5.3-flash",
         subscription_provider="opencode",
@@ -758,7 +759,7 @@ def test_failed_refresh_unlinks_and_audits_never_a_silent_dead_button(stub_serve
 def test_models_listing_lists_what_the_subscription_offers(stub_server, client_csrf):
     client, token = client_csrf
     user = _mk_user("h19.models@example.com")
-    AssistantConfig.objects.create(
+    AssistantConfig.objects.create(company=default_company(), 
         user=user,
         model="glm-5.3-flash",
         subscription_provider="opencode",
@@ -780,7 +781,7 @@ def test_models_listing_lists_what_the_subscription_offers(stub_server, client_c
 def test_models_for_codex_say_no_listing_endpoint_honestly(client_csrf):
     client, token = client_csrf
     user = _mk_user("h19.codex.models@example.com")
-    AssistantConfig.objects.create(
+    AssistantConfig.objects.create(company=default_company(), 
         user=user,
         model="gpt-5.1",
         subscription_provider="codex",
@@ -809,7 +810,7 @@ def test_models_for_codex_say_no_listing_endpoint_honestly(client_csrf):
 def test_switching_back_to_api_mode_clears_the_subscription(client_csrf):
     client, token = client_csrf
     user = _mk_user("h19.back@example.com")
-    AssistantConfig.objects.create(
+    AssistantConfig.objects.create(company=default_company(), 
         user=user,
         model="glm-5.3-flash",
         subscription_provider="opencode",
@@ -905,7 +906,7 @@ def test_the_slow_refresh_concrete_case_errors_inside_the_ceiling(stub_server, c
     gets a clear error inside the ceiling instead of blocking its thread."""
     client, token = client_csrf
     user = _mk_user("h25.codex.slow-refresh@example.com")
-    AssistantConfig.objects.create(
+    AssistantConfig.objects.create(company=default_company(), 
         user=user,
         model="gpt-5.6-luna",
         subscription_provider="codex",
@@ -1251,7 +1252,7 @@ def test_device_flow_credential_expires_and_refreshes_at_the_console_url(stub_se
     never the zen /oauth/token URL the fix-up-4 world invented."""
     client, token = client_csrf
     user = _mk_user("h21.refresh@example.com")
-    AssistantConfig.objects.create(
+    AssistantConfig.objects.create(company=default_company(), 
         user=user,
         model="glm-5.3-flash",
         subscription_provider="opencode",

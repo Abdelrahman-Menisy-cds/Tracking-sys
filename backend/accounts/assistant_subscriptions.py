@@ -416,6 +416,7 @@ def unlink_expired(config, request=None):
     clear_subscription(config)
     request_id = getattr(request, "request_id", None) or ""
     AuditEvent.objects.create(
+        company=config.user.company,
         actor=config.user,
         subject=config.user,
         action="assistant.subscription_expired",
@@ -805,7 +806,9 @@ def parse_responses_sse(lines, model: str) -> dict:
 def _get_or_create_config(user):
     from accounts.models import AssistantConfig
 
-    config, _created = AssistantConfig.objects.get_or_create(user=user)
+    config, _created = AssistantConfig.objects.get_or_create(
+        user=user, defaults={"company": user.company}
+    )
     return config
 
 
@@ -1029,6 +1032,7 @@ def start_device_flow(user, provider_slug: str) -> dict:
     with transaction.atomic():
         PendingDeviceFlow.objects.select_for_update().filter(user_id=user.pk).delete()
         PendingDeviceFlow.objects.create(
+            company=user.company,
             user=user,
             provider=spec.slug,
             device_code_or_id=secret,

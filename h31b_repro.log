@@ -1,0 +1,36 @@
+............................F                                            [100%]
+=================================== FAILURES ===================================
+______________________ test_unmark_read_reverts_to_unread ______________________
+
+client_as_owner = <rest_framework.test.APIClient object at 0x7ea3f3c0a250>
+owner = <User: owner42@example.com>
+
+    @pytest.mark.django_db
+    def test_unmark_read_reverts_to_unread(client_as_owner, owner):
+        notification = create_notification(
+            recipient=owner, kind="request_updated", title="t", dedupe_key=""
+        )
+        client_as_owner.patch(
+            f"/api/v1/notifications/{notification.pk}/read-state",
+            {"is_read": True},
+            format="json",
+            HTTP_X_CSRFTOKEN=_csrf(client_as_owner),
+        )
+    
+        response = client_as_owner.patch(
+            f"/api/v1/notifications/{notification.pk}/read-state",
+            {"is_read": False},
+            format="json",
+            HTTP_X_CSRFTOKEN=_csrf(client_as_owner),
+        )
+    
+>       assert response.status_code == 200
+E       assert 429 == 200
+E        +  where 429 = <Response status_code=429, "application/json">.status_code
+
+notifications/test_story_4_2.py:428: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  django.request:log.py:253 Too Many Requests: /api/v1/notifications/1/read-state
+WARNING  django.request:log.py:253 Too Many Requests: /api/v1/notifications/1/read-state
+=========================== short test summary info ============================
+FAILED notifications/test_story_4_2.py::test_unmark_read_reverts_to_unread - ...

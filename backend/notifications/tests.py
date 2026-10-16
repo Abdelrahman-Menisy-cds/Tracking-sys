@@ -5,18 +5,19 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from notifications.models import Notification
+from tenants.context import default_company
 
 User = get_user_model()
 
 
 @pytest.fixture
 def notification_owner(db):
-    return User.objects.create_user(email="owner@example.com", password="secure-password")
+    return User.objects.create_user(company=default_company(), email="owner@example.com", password="secure-password")
 
 
 @pytest.fixture
 def other_user(db):
-    return User.objects.create_user(email="other@example.com", password="secure-password")
+    return User.objects.create_user(company=default_company(), email="other@example.com", password="secure-password")
 
 
 @pytest.fixture

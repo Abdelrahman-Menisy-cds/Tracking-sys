@@ -31,6 +31,7 @@ from timesheets.models import (
     TimesheetSubmitIdempotencyRecord,
     TimezoneConfig,
 )
+from tenants.context import default_company
 
 MONDAY = date(2026, 9, 7)
 REVIEWER_REASON = "Please correct Tuesday's hours."
@@ -42,9 +43,9 @@ def _key_hash(key: str) -> str:
 
 class Story32Base(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email="emp@example.com", password="pass-12345678")
-        self.other = User.objects.create_user(email="other@example.com", password="pass-12345678")
-        TimezoneConfig.objects.get_or_create(name="UTC")
+        self.user = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
+        self.other = User.objects.create_user(company=default_company(), email="other@example.com", password="pass-12345678")
+        TimezoneConfig.objects.get_or_create(company=default_company(), defaults={"name": "UTC"})
         cache.clear()
         self.client.force_login(self.user)
 
@@ -231,8 +232,8 @@ class TimeEntryDBIntegrityTests(TestCase):
     """
 
     def setUp(self):
-        self.user = User.objects.create_user(email="emp@example.com", password="pass-12345678")
-        TimezoneConfig.objects.get_or_create(name="UTC")
+        self.user = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
+        TimezoneConfig.objects.get_or_create(company=default_company(), defaults={"name": "UTC"})
         self.sheet = Timesheet.objects.create(employee=self.user, week_start=MONDAY)
 
     def _entry(self, **kwargs):

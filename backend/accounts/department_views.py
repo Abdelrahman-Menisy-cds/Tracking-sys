@@ -23,7 +23,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from accounts.department_serializers import DepartmentReadSerializer, DepartmentWriteSerializer
-from accounts.models import AuditEvent, Department, EmployeeProfile
+from accounts.models import AuditEvent, Department, EmployeeProfile, User
 from accounts.permissions import IsAuthenticated401, IsHR
 from accounts.throttles import MutationRateThrottle
 from config.api import error_payload
@@ -59,6 +59,7 @@ def _assign_manager(*, department, manager_id, actor, request_id):
     if manager_id is None:
         if department.manager_id is not None:
             AuditEvent.objects.create(
+                company=actor.company,
                 actor=actor,
                 subject_id=department.manager_id,
                 action="department.manager_unassigned",
@@ -72,7 +73,14 @@ def _assign_manager(*, department, manager_id, actor, request_id):
 
     profile = EmployeeProfile.objects.filter(user_id=manager_id).first()
     if profile is None:
-        profile = EmployeeProfile.objects.create(user_id=manager_id)
+        profile = EmployeeProfile.objects.create(
+            user_id=manager_id,
+            # The profile belongs to the MANAGER's company (same company by the
+            # no-cross-company-creation invariant; read from the user row).
+            company_id=User.objects.filter(pk=manager_id)
+            .values_list("company_id", flat=True)
+            .first(),
+        )
     if profile.department_id != department.pk:
         if profile.department_id is not None:
             return {
@@ -83,6 +91,7 @@ def _assign_manager(*, department, manager_id, actor, request_id):
         profile.department = department
         profile.save(update_fields=["department"])
         AuditEvent.objects.create(
+            company=actor.company,
             actor=actor,
             subject_id=manager_id,
             action="department.manager_placed",
@@ -93,6 +102,7 @@ def _assign_manager(*, department, manager_id, actor, request_id):
 
     if department.manager_id != manager_id:
         AuditEvent.objects.create(
+            company=actor.company,
             actor=actor,
             subject_id=manager_id,
             action="department.manager_assigned",
@@ -136,6 +146,7 @@ class DepartmentListView(APIView):
 
         with transaction.atomic():
             department = Department.objects.create(
+                company=request.user.company,
                 code=data["code"],
                 name_ar=data["name_ar"],
                 name_en=data.get("name_en", ""),

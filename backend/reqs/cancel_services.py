@@ -134,6 +134,7 @@ def cancel_request(
             to_status=to_status,
         )
         AuditEvent.objects.create(
+            company=requester.company,
             actor=requester,
             subject=requester,
             action="request_cancelled",

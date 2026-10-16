@@ -26,14 +26,20 @@ from django.db import models
 
 
 class TimezoneConfig(models.Model):
-    """Organization timezone, server-authoritative for week boundaries."""
+    """Per-company organization timezone (H30 plan §2.4), server-authoritative
+    for week boundaries. The pre-tenancy row lives in the ``__default__``
+    company (accounts migration 0012); readers resolve it via the caller's
+    company. ``name`` uniqueness flipped with the singleton: two companies may
+    both run "UTC" (the plan's §2.6 per-company uniqueness class)."""
 
-    name = models.CharField(max_length=63, unique=True, default="UTC")
+    company = models.OneToOneField(
+        "accounts.Company",
+        on_delete=models.PROTECT,
+        related_name="timezone_config",
+    )
+    name = models.CharField(max_length=63, default="UTC")
 
     class Meta:
-        constraints = [
-            models.CheckConstraint(condition=models.Q(id=1), name="chk_timezone_config_singleton"),
-        ]
         verbose_name = "organization timezone config"
         verbose_name_plural = "organization timezone configs"
 

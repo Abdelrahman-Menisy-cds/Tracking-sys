@@ -158,6 +158,7 @@ def create_attachment_record(*, user, request_obj, storage_key, original_filenam
         scan_status=RequestAttachment.ScanStatus.PENDING,
     )
     AuditEvent.objects.create(
+        company=user.company,
         actor=user,
         subject=user,
         action="attachment_uploaded",
@@ -204,6 +205,7 @@ def delete_attachment(*, user, request_obj, attachment, request_id: str = "",
         path.unlink()
     attachment.delete()
     AuditEvent.objects.create(
+        company=user.company,
         actor=user,
         subject=user,
         action="attachment_replaced" if replacement_of else "attachment_deleted",

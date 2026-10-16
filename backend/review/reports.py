@@ -43,9 +43,12 @@ class RowLimitExceeded(Exception):
     """Matched rows exceed MAX_REPORT_ROWS; CSV export refuses (no partial)."""
 
 
-def organization_timezone() -> str:
-    """Server-authoritative organization timezone (policy item 4)."""
-    cfg, _created = TimezoneConfig.objects.get_or_create(pk=1, defaults={"name": "UTC"})
+def organization_timezone(user) -> str:
+    """Server-authoritative organization timezone for the caller's company
+    (policy item 4; per-company since H30 §2.4)."""
+    cfg, _created = TimezoneConfig.objects.get_or_create(
+        company=user.company, defaults={"name": "UTC"}
+    )
     return cfg.name
 
 
@@ -84,7 +87,7 @@ def resolve_report(category: str, user, params):
     # Server-authoritative org timezone (policy item 4): the SAME value is
     # used for the date-bound conversion below and for the org_timezone
     # metadata, so advertised and applied semantics can never diverge.
-    tzone = organization_timezone()
+    tzone = organization_timezone(user)
     if category == "requests":
         scoped = review_scope.scope_requests(user)
         filtered, cleaned, errors = apply_request_queue_filters(scoped, params, timezone_name=tzone)

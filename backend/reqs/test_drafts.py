@@ -7,12 +7,13 @@ from rest_framework.test import APITestCase
 
 from accounts.models import User
 from reqs.models import EmployeeRequest, RequestEvent, RequestType
+from tenants.context import default_company
 
 
 class Story21Base(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email="emp@example.com", password="pass-12345678")
-        self.other = User.objects.create_user(email="other@example.com", password="pass-12345678")
+        self.user = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
+        self.other = User.objects.create_user(company=default_company(), email="other@example.com", password="pass-12345678")
         self.type_active = RequestType.objects.create(name="Leave", requires_hr_approval=True)
         self.type_inactive = RequestType.objects.create(name="Old", is_active=False)
         self.list_url = reverse("reqs:request-list")

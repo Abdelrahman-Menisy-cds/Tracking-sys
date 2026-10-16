@@ -143,6 +143,7 @@ class ReportCsvView(APIView):
         csv_text = build_csv(meta, header, rows)
 
         transactional_audit = AuditEvent.objects.create(
+            company=request.user.company,
             actor=request.user,
             subject=request.user,
             action=f"REPORT_EXPORT_{category.upper()}",

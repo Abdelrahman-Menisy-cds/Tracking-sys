@@ -24,10 +24,11 @@ from rest_framework.test import APIClient, APITestCase
 from accounts.models import EmployeeProfile, User
 from reqs.models import EmployeeRequest, RequestEvent, RequestType
 from timesheets.models import TimeEntry, Timesheet, TimesheetEvent
+from tenants.context import default_company
 
 
 def _mk_user(email, role=User.Role.EMPLOYEE, **kw):
-    return User.objects.create_user(email=email, password="pass-12345678", role=role, **kw)
+    return User.objects.create_user(company=default_company(), email=email, password="pass-12345678", role=role, **kw)
 
 
 class ReviewBase(APITestCase):
@@ -41,8 +42,8 @@ class ReviewBase(APITestCase):
         self.manager_other = _mk_user("mgr2@example.com", role=User.Role.MANAGER)
         self.hr = _mk_user("hr@example.com", role=User.Role.HR)
         self.plain = _mk_user("plain@example.com")
-        EmployeeProfile.objects.create(user=self.employee, manager=self.manager, employee_number="E-001")
-        EmployeeProfile.objects.create(user=self.employee2, manager=self.manager_other, employee_number="E-002")
+        EmployeeProfile.objects.create(company=default_company(), user=self.employee, manager=self.manager, employee_number="E-001")
+        EmployeeProfile.objects.create(company=default_company(), user=self.employee2, manager=self.manager_other, employee_number="E-002")
 
         self.type_manager = RequestType.objects.create(
             name="Equipment", requires_manager_approval=True, requires_hr_approval=False

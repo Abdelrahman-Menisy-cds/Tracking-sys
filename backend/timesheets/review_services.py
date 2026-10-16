@@ -196,6 +196,7 @@ def decide_timesheet(
         )
         timesheet_id = str(locked.pk)
         AuditEvent.objects.create(
+            company=reviewer.company,
             actor=reviewer,
             subject=locked.employee,
             action=_AUDIT_ACTION[action],
@@ -349,6 +350,7 @@ def reopen_timesheet(
         )
         timesheet_id = str(locked.pk)
         AuditEvent.objects.create(
+            company=hr_user.company,
             actor=hr_user,
             subject=locked.employee,
             action="timesheet_reopened",

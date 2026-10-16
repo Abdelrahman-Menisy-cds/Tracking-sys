@@ -30,6 +30,7 @@ from reqs.models import (
     RequestEvent,
     RequestType,
 )
+from tenants.context import default_company
 
 
 def _make_request(requester, request_type, title, status_, version=1, manager=None):
@@ -47,8 +48,8 @@ def _make_request(requester, request_type, title, status_, version=1, manager=No
 class CancelTestBase(APITestCase):
     def setUp(self):
         cache.clear()
-        self.employee = User.objects.create_user(email="emp@example.com", password="pass-12345678")
-        self.other = User.objects.create_user(email="other@example.com", password="pass-12345678")
+        self.employee = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
+        self.other = User.objects.create_user(company=default_company(), email="other@example.com", password="pass-12345678")
         self.type_manager = RequestType.objects.create(
             name="Equipment", requires_manager_approval=True, requires_hr_approval=False
         )
@@ -324,7 +325,7 @@ class CancelConcurrencyTests(APITestCase):
 
     def setUp(self):
         cache.clear()
-        self.employee = User.objects.create_user(email="emp@example.com", password="pass-12345678")
+        self.employee = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
         self.type_manager = RequestType.objects.create(
             name="Equipment", requires_manager_approval=True, requires_hr_approval=False
         )

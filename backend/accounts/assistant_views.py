@@ -106,7 +106,9 @@ def _error(request, code, message, fields, status_code):
 
 
 def _get_own_config(user) -> AssistantConfig:
-    config, _created = AssistantConfig.objects.get_or_create(user=user)
+    config, _created = AssistantConfig.objects.get_or_create(
+        user=user, defaults={"company": user.company}
+    )
     return config  # noqa: RET504 - return the same row the caller will use
 
 
@@ -319,7 +321,7 @@ class AssistantHRConfigView(APIView):
                 AssistantConfig.objects.select_for_update().filter(user=target).first()
             )
             if config is None:
-                config = AssistantConfig(user=target)
+                config = AssistantConfig(user=target, company=target.company)
             before_snapshot = {
                 "base_url": config.base_url,
                 "model": config.model,
@@ -342,6 +344,7 @@ class AssistantHRConfigView(APIView):
                 config.enabled_by_hr = True
             config.save()
             AuditEvent.objects.create(
+                company=request.user.company,
                 actor=request.user,
                 subject=target,
                 action="assistant.hr_config_updated",

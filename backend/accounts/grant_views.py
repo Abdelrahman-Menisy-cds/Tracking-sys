@@ -55,13 +55,19 @@ class ManagerGrantListView(APIView):
                 manager_id=data["manager"],
                 employee_id=data["employee"],
                 scope=data["scope"],
-                defaults={"granted_by": request.user, "is_active": True},
+                defaults={
+                    "granted_by": request.user,
+                    "is_active": True,
+                    # H30 §4.1: a grant lives inside ONE company — the actor's.
+                    "company": request.user.company,
+                },
             )
             if not created and not grant.is_active:
                 grant.is_active = True
                 grant.granted_by = request.user
                 grant.save(update_fields=["is_active", "granted_by"])
             AuditEvent.objects.create(
+                company=request.user.company,
                 actor=request.user,
                 subject_id=data["employee"],
                 action="manager_grant.granted" if created else "manager_grant.reactivated",
@@ -95,6 +101,7 @@ class ManagerGrantDetailView(APIView):
                 grant.is_active = False
                 grant.save(update_fields=["is_active"])
                 AuditEvent.objects.create(
+                    company=request.user.company,
                     actor=request.user,
                     subject_id=grant.employee_id,
                     action="manager_grant.revoked",

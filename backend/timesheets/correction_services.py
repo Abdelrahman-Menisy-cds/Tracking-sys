@@ -196,6 +196,7 @@ def submit_timesheet(
             to_status=Timesheet.Status.SUBMITTED,
         )
         AuditEvent.objects.create(
+            company=employee.company,
             actor=employee,
             subject=employee,
             action="timesheet_submitted",
@@ -308,6 +309,7 @@ def edit_entry(
             to_status=locked_sheet.status,
         )
         AuditEvent.objects.create(
+            company=employee.company,
             actor=employee,
             subject=employee,
             action="timesheet_entry_edited",
@@ -353,6 +355,7 @@ def delete_entry(
             to_status=locked_sheet.status,
         )
         AuditEvent.objects.create(
+            company=employee.company,
             actor=employee,
             subject=employee,
             action="timesheet_entry_deleted",

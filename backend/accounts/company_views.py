@@ -43,11 +43,14 @@ def _hr_denied(request):
     )
 
 
-def _load_profile():
-    """The singleton row, or None. Guarded pk read: the constraint admits
-    exactly pk=1, so lookup outside that pk is never even attempted."""
+def _load_profile(user):
+    """The caller's company row, or None (H30 plan §2.4: per-company reads).
+
+    The pre-tenancy guard read (pk=1) is gone with the singleton; an
+    unauthenticated caller never reaches this (view-level HR gate first).
+    """
     try:
-        return CompanyProfile.objects.get(pk=1)
+        return CompanyProfile.objects.get(company=user.company)
     except CompanyProfile.DoesNotExist:
         return None
 
@@ -75,9 +78,10 @@ class CompanyProfileView(APIView):
         return None
 
     def get(self, request):
-        if self._hr_user(request) is None:
+        actor = self._hr_user(request)
+        if actor is None:
             return _hr_denied(request)
-        return Response({"data": _payload(_load_profile())})
+        return Response({"data": _payload(_load_profile(actor))})
 
     def patch(self, request):
         actor = self._hr_user(request)
@@ -92,7 +96,7 @@ class CompanyProfileView(APIView):
                 serializer.errors,
                 status.HTTP_400_BAD_REQUEST,
             )
-        profile = _load_profile()
+        profile = _load_profile(actor)
         missing = merged_missing_required(profile, serializer.validated_data)
         if missing:
             return _error(

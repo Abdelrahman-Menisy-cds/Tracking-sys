@@ -15,15 +15,16 @@ from rest_framework.test import APIClient, APITestCase
 
 from accounts.models import AuditEvent, EmployeeProfile, User
 from reqs.models import EmployeeRequest, RequestEvent, RequestAttachment, RequestType
+from tenants.context import default_company
 
 
 class SubmissionTestBase(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email="emp@example.com", password="pass-12345678")
-        self.manager = User.objects.create_user(email="mgr@example.com", password="pass-12345678")
-        self.other = User.objects.create_user(email="other@example.com", password="pass-12345678")
-        EmployeeProfile.objects.create(user=self.user, manager=self.manager, employee_number="E-001")
-        EmployeeProfile.objects.create(user=self.other, employee_number="E-002")
+        self.user = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
+        self.manager = User.objects.create_user(company=default_company(), email="mgr@example.com", password="pass-12345678")
+        self.other = User.objects.create_user(company=default_company(), email="other@example.com", password="pass-12345678")
+        EmployeeProfile.objects.create(company=default_company(), user=self.user, manager=self.manager, employee_number="E-001")
+        EmployeeProfile.objects.create(company=default_company(), user=self.other, employee_number="E-002")
         self.type_manager = RequestType.objects.create(
             name="Equipment", requires_manager_approval=True, requires_hr_approval=False
         )
@@ -142,7 +143,7 @@ class ManagerSnapshotTests(SubmissionTestBase):
 
     def test_later_manager_change_does_not_affect_existing_snapshot(self):
         self.submit(version=1, key="k-later")
-        new_manager = User.objects.create_user(email="mgr2@example.com", password="pass-12345678")
+        new_manager = User.objects.create_user(company=default_company(), email="mgr2@example.com", password="pass-12345678")
         EmployeeProfile.objects.filter(user=self.user).update(manager=new_manager)
         self.assertEqual(self.refresh().manager_at_submission, self.manager)
 
@@ -150,7 +151,7 @@ class ManagerSnapshotTests(SubmissionTestBase):
         self.submit(version=1, key="k-resub")
         self.draft.status = EmployeeRequest.Status.RETURNED
         self.draft.save(update_fields=["status"])
-        new_manager = User.objects.create_user(email="mgr3@example.com", password="pass-12345678")
+        new_manager = User.objects.create_user(company=default_company(), email="mgr3@example.com", password="pass-12345678")
         EmployeeProfile.objects.filter(user=self.user).update(manager=new_manager)
         response = self.submit(version=self.refresh().version, key="k-resub2")
         self.assertEqual(response.status_code, status.HTTP_200_OK)

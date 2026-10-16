@@ -22,15 +22,16 @@ from timesheets.models import (
     TimesheetEvent,
     TimezoneConfig,
 )
+from tenants.context import default_company
 
 MONDAY = date(2026, 9, 7)  # a Monday
 
 
 class TimesheetBase(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email="emp@example.com", password="pass-12345678")
-        self.other = User.objects.create_user(email="other@example.com", password="pass-12345678")
-        TimezoneConfig.objects.get_or_create(name="UTC")
+        self.user = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
+        self.other = User.objects.create_user(company=default_company(), email="other@example.com", password="pass-12345678")
+        TimezoneConfig.objects.get_or_create(company=default_company(), defaults={"name": "UTC"})
         self.list_url = reverse("timesheets:timesheet-list")
         self.client.force_login(self.user)
         from django.core.cache import cache as django_cache

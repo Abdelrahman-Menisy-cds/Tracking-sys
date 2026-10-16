@@ -139,6 +139,8 @@ def _would_create_cycle(user, manager):
 def _append_event(*, actor, subject, action, request_id, before, after):
     """Append-only audit write (policy item 11) — never updated or deleted."""
     return AuditEvent.objects.create(
+        # H30 §2.6: the trail itself is tenant-scoped (the actor's company).
+        company=actor.company,
         actor=actor,
         subject=subject,
         action=action,
@@ -161,6 +163,9 @@ def create_employee(*, actor, validated_data):
     user_fields.setdefault("role", User.Role.EMPLOYEE)
     user_fields.setdefault("is_active", True)
     user_fields.setdefault("full_name", "")
+    # H30 plan §2.2: cross-company creation is not a feature — the new user
+    # belongs to the actor's (the HR's) company, and its profile inherits it.
+    user_fields["company"] = actor.company
     user_fields["email"] = _normalize_email_for_compare(user_fields["email"])
     # Field-level duplicate checks run BEFORE anything is staged so a rejected
     # create never leaves a half-built user/profile (and never becomes a 500
@@ -190,7 +195,9 @@ def create_employee(*, actor, validated_data):
 
     password = get_random_string(20)
     user = User.objects.create_user(password=password, **user_fields)
-    profile = EmployeeProfile.objects.create(user=user, manager=manager, **profile_fields)
+    profile = EmployeeProfile.objects.create(
+        user=user, manager=manager, company=user.company, **profile_fields
+    )
 
     _append_event(
         actor=actor,
@@ -287,7 +294,9 @@ def update_employee(*, actor, user, validated_data):
             user.save(update_fields=list(user_fields))
         audit_changes.update(user_fields)
     if profile_fields or "manager" in validated_data:
-        profile, _created = EmployeeProfile.objects.get_or_create(user=user)
+        profile, _created = EmployeeProfile.objects.get_or_create(
+            user=user, defaults={"company": user.company}
+        )
         if "manager" in validated_data:
             if profile.manager_id != (manager.pk if manager else None):
                 audit_changes["manager"] = manager.pk if manager else None

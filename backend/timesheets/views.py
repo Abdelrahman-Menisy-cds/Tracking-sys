@@ -150,7 +150,7 @@ class TimesheetListCreateView(APIView):
                 status=422,
             )
 
-        serializer = ts.TimesheetCreateSerializer(data=request.data)
+        serializer = ts.TimesheetCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         week_start = serializer.validated_data["week_start"]
         entries = serializer.validated_data["entries"]

@@ -14,3 +14,21 @@ def current_company(user):
     if user is None or not getattr(user, "is_authenticated", False):
         return None
     return getattr(user, "company", None)
+
+
+def default_company():
+    """The ``__default__`` company (H30 plan §2.6) — get_or_create.
+
+    The data migration (accounts/migrations/0012) owns the first creation and
+    the backfill; this lazy path lets R1-era creation code (sign_up,
+    create_superuser) bind the operator/bootstrap flows to the default
+    company until R3's two-branch signup replaces them. Idempotent by
+    construction, so a missing row heals instead of raising.
+    """
+    from accounts.models import Company
+
+    company, _created = Company.objects.get_or_create(
+        slug=DEFAULT_COMPANY_SLUG,
+        defaults={"name": DEFAULT_COMPANY_SLUG},
+    )
+    return company

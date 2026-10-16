@@ -30,6 +30,7 @@ from reqs.models import (
     RequestType,
 )
 from reqs.decision_services import decide_request
+from tenants.context import default_company
 
 
 def _make_request(requester, request_type, title, status, version=2, manager=None):
@@ -48,19 +49,19 @@ def _make_request(requester, request_type, title, status, version=2, manager=Non
 class DecisionTestBase(APITestCase):
     def setUp(self):
         cache.clear()
-        self.employee = User.objects.create_user(email="emp@example.com", password="pass-12345678")
-        self.manager = User.objects.create_user(
+        self.employee = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
+        self.manager = User.objects.create_user(company=default_company(), 
             email="mgr@example.com", password="pass-12345678", role=User.Role.MANAGER
         )
-        self.manager2 = User.objects.create_user(
+        self.manager2 = User.objects.create_user(company=default_company(), 
             email="mgr2@example.com", password="pass-12345678", role=User.Role.MANAGER
         )
-        self.hr = User.objects.create_user(
+        self.hr = User.objects.create_user(company=default_company(), 
             email="hr@example.com", password="pass-12345678", role=User.Role.HR
         )
-        self.other = User.objects.create_user(email="other@example.com", password="pass-12345678")
-        EmployeeProfile.objects.create(user=self.employee, manager=self.manager, employee_number="E-001")
-        EmployeeProfile.objects.create(user=self.other, employee_number="E-002")
+        self.other = User.objects.create_user(company=default_company(), email="other@example.com", password="pass-12345678")
+        EmployeeProfile.objects.create(company=default_company(), user=self.employee, manager=self.manager, employee_number="E-001")
+        EmployeeProfile.objects.create(company=default_company(), user=self.other, employee_number="E-002")
         self.type_manager = RequestType.objects.create(
             name="Equipment", requires_manager_approval=True, requires_hr_approval=False
         )
@@ -440,11 +441,11 @@ class DecisionIdempotencyConcurrencyTests(APITestCase):
 
     def setUp(self):
         cache.clear()
-        self.employee = User.objects.create_user(email="emp@example.com", password="pass-12345678")
-        self.manager = User.objects.create_user(
+        self.employee = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
+        self.manager = User.objects.create_user(company=default_company(), 
             email="mgr@example.com", password="pass-12345678", role=User.Role.MANAGER
         )
-        EmployeeProfile.objects.create(user=self.employee, manager=self.manager, employee_number="E-001")
+        EmployeeProfile.objects.create(company=default_company(), user=self.employee, manager=self.manager, employee_number="E-001")
         self.type_manager = RequestType.objects.create(
             name="Equipment", requires_manager_approval=True, requires_hr_approval=False
         )
@@ -637,8 +638,8 @@ class InactiveReviewerDefenseInDepthTests(APITestCase):
 
     def setUp(self):
         cache.clear()
-        self.employee = User.objects.create_user(email="emp@example.com", password="pass-12345678")
-        self.hr = User.objects.create_user(
+        self.employee = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
+        self.hr = User.objects.create_user(company=default_company(), 
             email="hr@example.com", password="pass-12345678", role=User.Role.HR
         )
         self.type_hr_only = RequestType.objects.create(
@@ -662,7 +663,7 @@ class InactiveReviewerDefenseInDepthTests(APITestCase):
         # Deactivate the reviewer row AFTER building the in-memory reviewer
         # object, so authentication cannot filter it out: only the service's
         # own active check can deny this request.
-        requester = User.objects.create_user(email="emp2@example.com", password="pass-12345678")
+        requester = User.objects.create_user(company=default_company(), email="emp2@example.com", password="pass-12345678")
         self.hr_pending = EmployeeRequest.objects.create(
             requester=requester,
             request_type=self.type_hr_only,
@@ -708,10 +709,10 @@ class InactiveReviewerDefenseInDepthTests(APITestCase):
 
     def test_inactive_manager_service_denial_no_transition_no_event(self):
         # Same defense-in-depth guarantee on the manager branch.
-        manager = User.objects.create_user(
+        manager = User.objects.create_user(company=default_company(), 
             email="mgr@example.com", password="pass-12345678", role=User.Role.MANAGER
         )
-        EmployeeProfile.objects.create(user=self.employee, manager=manager, employee_number="E-002")
+        EmployeeProfile.objects.create(company=default_company(), user=self.employee, manager=manager, employee_number="E-002")
         pending = EmployeeRequest.objects.create(
             requester=self.employee,
             request_type=self.type_hr_only,  # unused for manager branch

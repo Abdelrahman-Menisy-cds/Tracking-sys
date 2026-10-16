@@ -133,6 +133,7 @@ def submit_request(*, requester, request_obj: EmployeeRequest, version: int):
             to_status=to_status,
         )
         AuditEvent.objects.create(
+            company=requester.company,
             actor=requester,
             subject=requester,
             action="request_submitted",
@@ -169,6 +170,7 @@ def _resolve_manager(requester, request_id: str):
     manager = profile.manager if profile is not None else None
     if manager is None:
         AuditEvent.objects.create(
+            company=requester.company,
             actor=requester,
             subject=requester,
             action="request_submit_blocked",
@@ -186,6 +188,7 @@ def _resolve_manager(requester, request_id: str):
         )
     if not manager.is_active:
         AuditEvent.objects.create(
+            company=requester.company,
             actor=requester,
             subject=requester,
             action="request_submit_blocked",

@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from accounts.models import SubscriptionCode
 from django.core.exceptions import ValidationError as _django_validation_error
+from tenants.context import default_company
 
 
 def sign_up(*, request, email: str, code: str, password: str):
@@ -64,6 +65,9 @@ def sign_up(*, request, email: str, code: str, password: str):
             password=password,
             role=User.Role.HR,
             is_active=True,
+            # H30 plan §2.2 (R1 interim): the operator-code flow admits HR into
+            # the one default company; R3's two-branch signup replaces this.
+            company=default_company(),
         )
         subscription.record_use()
     # Same session/CSRF rotation path as login (services.sign_in).

@@ -35,6 +35,7 @@ from notifications.services import (
     mark_notification_read,
     related_object_is_available,
 )
+from tenants.context import default_company
 
 User = get_user_model()
 
@@ -50,7 +51,7 @@ class CreateNotificationServiceTests:
 
 @pytest.mark.django_db
 def test_create_notification_stores_recipient_kind_and_text():
-    user = User.objects.create_user(email="c1@example.com", password="secure-password")
+    user = User.objects.create_user(company=default_company(), email="c1@example.com", password="secure-password")
 
     notification = create_notification(
         recipient=user,
@@ -71,7 +72,7 @@ def test_create_notification_stores_recipient_kind_and_text():
 @pytest.mark.django_db
 def test_create_notification_does_not_change_source_state():
     request_type = RequestType.objects.create(name="Leave", requires_hr_approval=False)
-    user = User.objects.create_user(email="c2@example.com", password="secure-password")
+    user = User.objects.create_user(company=default_company(), email="c2@example.com", password="secure-password")
     request_obj = EmployeeRequest.objects.create(
         requester=user, request_type=request_type, title="T", status=EmployeeRequest.Status.APPROVED, version=2
     )
@@ -94,7 +95,7 @@ def test_create_notification_does_not_change_source_state():
 
 @pytest.mark.django_db
 def test_repeated_create_with_same_dedupe_key_creates_one_notification():
-    user = User.objects.create_user(email="c3@example.com", password="secure-password")
+    user = User.objects.create_user(company=default_company(), email="c3@example.com", password="secure-password")
     first = create_notification(
         recipient=user, kind="request_updated", title="t", body="", dedupe_key="request:A:approved:v2"
     )
@@ -110,7 +111,7 @@ def test_repeated_create_with_same_dedupe_key_creates_one_notification():
 @pytest.mark.django_db
 def test_dedupe_key_mismatch_on_retry_is_safe():
     """A conflicting same-key row from another writer is returned, not duplicated."""
-    user = User.objects.create_user(email="c4@example.com", password="secure-password")
+    user = User.objects.create_user(company=default_company(), email="c4@example.com", password="secure-password")
     existing = create_notification(
         recipient=user, kind="request_updated", title="t", body="", dedupe_key="request:B:rejected:v3"
     )
@@ -123,7 +124,7 @@ def test_dedupe_key_mismatch_on_retry_is_safe():
 
 @pytest.mark.django_db
 def test_later_decision_with_new_dedupe_key_notifies_again():
-    user = User.objects.create_user(email="c5@example.com", password="secure-password")
+    user = User.objects.create_user(company=default_company(), email="c5@example.com", password="secure-password")
     create_notification(recipient=user, kind="request_updated", title="first", dedupe_key="request:C:returned:v2")
     later = create_notification(recipient=user, kind="request_updated", title="second", dedupe_key="request:C:approved:v4")
 
@@ -133,7 +134,7 @@ def test_later_decision_with_new_dedupe_key_notifies_again():
 
 @pytest.mark.django_db
 def test_notifications_without_dedupe_key_never_collide():
-    user = User.objects.create_user(email="c6@example.com", password="secure-password")
+    user = User.objects.create_user(company=default_company(), email="c6@example.com", password="secure-password")
     one = create_notification(recipient=user, kind="request_updated", title="one")
     two = create_notification(recipient=user, kind="request_updated", title="two")
     assert one.pk != two.pk
@@ -149,7 +150,7 @@ def test_notifications_without_dedupe_key_never_collide():
 def test_request_decision_notification_created_after_commit():
     from reqs.decision_notifications import _notify_requester
 
-    user = User.objects.create_user(email="emp42@example.com", password="secure-password")
+    user = User.objects.create_user(company=default_company(), email="emp42@example.com", password="secure-password")
     request_type = RequestType.objects.create(name="Sick", requires_hr_approval=False)
     request_obj = EmployeeRequest.objects.create(
         requester=user, request_type=request_type, title="R", status=EmployeeRequest.Status.APPROVED, version=3
@@ -169,7 +170,7 @@ def test_request_decision_notification_created_after_commit():
 def test_decision_hook_failure_does_not_break_the_committed_outcome():
     from reqs.decision_notifications import notify_requester_of_decision
 
-    user = User.objects.create_user(email="emp43@example.com", password="secure-password")
+    user = User.objects.create_user(company=default_company(), email="emp43@example.com", password="secure-password")
     request_type = RequestType.objects.create(name="Sick2", requires_hr_approval=False)
     request_obj = EmployeeRequest.objects.create(
         requester=user, request_type=request_type, title="R2", status=EmployeeRequest.Status.APPROVED, version=3
@@ -193,7 +194,7 @@ def test_decision_hook_failure_does_not_break_the_committed_outcome():
 def test_timesheet_decision_notification_created_after_commit():
     from timesheets.review_services import _create_decision_notification
 
-    user = User.objects.create_user(email="emp44@example.com", password="secure-password")
+    user = User.objects.create_user(company=default_company(), email="emp44@example.com", password="secure-password")
     sheet = Timesheet.objects.create(employee=user, week_start=MONDAY, version=3)
 
     _create_decision_notification(str(sheet.pk), "reject", "Hours mismatch")
@@ -216,11 +217,11 @@ def test_timesheet_decision_notification_created_after_commit():
 def test_decision_notification_targets_the_requester_only():
     from reqs.decision_notifications import _notify_requester
 
-    requester = User.objects.create_user(email="emp45@example.com", password="secure-password")
-    manager = User.objects.create_user(
+    requester = User.objects.create_user(company=default_company(), email="emp45@example.com", password="secure-password")
+    manager = User.objects.create_user(company=default_company(), 
         email="mgr45@example.com", password="secure-password", role=User.Role.MANAGER
     )
-    EmployeeProfile.objects.create(user=requester, manager=manager)
+    EmployeeProfile.objects.create(company=default_company(), user=requester, manager=manager)
     request_type = RequestType.objects.create(name="Leave45", requires_hr_approval=False)
     request_obj = EmployeeRequest.objects.create(
         requester=requester,
@@ -254,12 +255,12 @@ def _csrf(client):
 
 @pytest.fixture
 def owner(db):
-    return User.objects.create_user(email="owner42@example.com", password="secure-password")
+    return User.objects.create_user(company=default_company(), email="owner42@example.com", password="secure-password")
 
 
 @pytest.fixture
 def intruder(db):
-    return User.objects.create_user(email="intruder42@example.com", password="secure-password")
+    return User.objects.create_user(company=default_company(), email="intruder42@example.com", password="secure-password")
 
 
 @pytest.fixture
@@ -462,15 +463,15 @@ def test_endpoints_require_authentication():
 @pytest.mark.django_db
 def test_related_object_unavailable_for_hidden_record():
     request_type = RequestType.objects.create(name="Hidden", requires_hr_approval=False)
-    requester = User.objects.create_user(email="hidden-emp@example.com", password="secure-password")
-    manager = User.objects.create_user(
+    requester = User.objects.create_user(company=default_company(), email="hidden-emp@example.com", password="secure-password")
+    manager = User.objects.create_user(company=default_company(), 
         email="hidden-mgr@example.com", password="secure-password", role=User.Role.MANAGER
     )
-    EmployeeProfile.objects.create(user=requester, manager=manager)
+    EmployeeProfile.objects.create(company=default_company(), user=requester, manager=manager)
     pending = EmployeeRequest.objects.create(
         requester=requester, request_type=request_type, title="H", status=EmployeeRequest.Status.PENDING_MANAGER
     )
-    outsider = User.objects.create_user(email="hidden-out@example.com", password="secure-password")
+    outsider = User.objects.create_user(company=default_company(), email="hidden-out@example.com", password="secure-password")
 
     assert related_object_is_available(requester, "request", pending.pk) is True
     assert related_object_is_available(manager, "request", pending.pk) is True

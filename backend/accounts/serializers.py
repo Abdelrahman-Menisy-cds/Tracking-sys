@@ -58,7 +58,7 @@ class CurrentUserSerializer(serializers.Serializer):
         from accounts.models import CompanyProfile
 
         try:
-            profile = CompanyProfile.objects.get(pk=1)
+            profile = CompanyProfile.objects.get(company=user.company)
         except CompanyProfile.DoesNotExist:
             return True
         return bool(merged_missing_required(profile, {}))

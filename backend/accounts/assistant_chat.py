@@ -310,6 +310,7 @@ def confirm_action(user, token: str) -> dict:
         raise ActionTokenError("execution_failed", f"The action could not be run ({type(error).__name__}).") from error
 
     AuditEvent.objects.create(
+        company=user.company,
         actor=user,
         subject=user,
         action=f"assistant.{tool}",

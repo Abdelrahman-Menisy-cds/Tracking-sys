@@ -9,6 +9,7 @@ from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from accounts.models import SubscriptionCode
+from tenants.context import default_company
 
 User = get_user_model()
 
@@ -123,7 +124,7 @@ def test_inactive_code_is_rejected_and_creates_nothing(anon_client, _csrf, inact
 
 @pytest.mark.django_db
 def test_existing_email_is_not_rerolled_or_leaked(anon_client, _csrf, active_code):
-    existing = User.objects.create_user(
+    existing = User.objects.create_user(company=default_company(), 
         email="victim@example.com",
         password="existing-user-pass-99",
         full_name="Victim",

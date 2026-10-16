@@ -236,6 +236,7 @@ class AttachmentDownloadView(APIView):
         # state must still authorize view capability.
         if request_obj.requester_id != request.user.pk:
             AuditEvent.objects.create(
+                company=request.user.company,
                 actor=request.user,
                 subject=request.user,
                 action="attachment_download_blocked",
@@ -246,6 +247,7 @@ class AttachmentDownloadView(APIView):
             raise Http404
         if attachment.scan_status != RequestAttachment.ScanStatus.CLEAN:
             AuditEvent.objects.create(
+                company=request.user.company,
                 actor=request.user,
                 subject=request.user,
                 action="attachment_download_blocked",
@@ -274,6 +276,7 @@ class AttachmentDownloadView(APIView):
         )
         response["X-Content-Type-Options"] = "nosniff"
         AuditEvent.objects.create(
+            company=request.user.company,
             actor=request.user,
             subject=request.user,
             action="attachment_downloaded",

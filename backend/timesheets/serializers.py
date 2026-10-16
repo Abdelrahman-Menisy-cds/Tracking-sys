@@ -37,8 +37,14 @@ class TimesheetCreateSerializer(serializers.Serializer):
     def validate_week_start(self, value):
         from .services import TimesheetError
 
+        # H30 plan §2.4: the timezone config is the CALLER's company's; the
+        # view passes the request through the serializer context.
+        request = self.context.get("request")
+        company = getattr(getattr(request, "user", None), "company", None)
         try:
-            return normalize_week_start(value.isoformat() if isinstance(value, date) else value)
+            return normalize_week_start(
+                value.isoformat() if isinstance(value, date) else value, company
+            )
         except TimesheetError as exc:
             raise serializers.ValidationError(str(exc.message))
 

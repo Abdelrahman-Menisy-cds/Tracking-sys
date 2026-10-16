@@ -13,12 +13,13 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from accounts.models import AuditEvent, EmployeeProfile, User
+from tenants.context import default_company
 
 pytestmark = pytest.mark.django_db
 
 
 def make_user(email, *, role=User.Role.EMPLOYEE, active=True, password="pw-1234567890"):
-    return User.objects.create_user(
+    return User.objects.create_user(company=default_company(), 
         email=email,
         password=password,
         role=role,
@@ -95,7 +96,7 @@ def test_update_rejects_inactive_manager_and_keeps_prior_relationship(db):
     employee = make_user("e@x.test")
     good = make_user("g@x.test", role=User.Role.MANAGER)
     inactive = make_user("i@x.test", role=User.Role.MANAGER, active=False)
-    EmployeeProfile.objects.create(user=employee, manager=good)
+    EmployeeProfile.objects.create(company=default_company(), user=employee, manager=good)
     response = client.patch(
         f"/api/v1/employees/{employee.pk}",
         {"manager": inactive.pk, "job_title": "Should not apply"},
@@ -114,8 +115,8 @@ def test_update_rejects_reporting_cycle(db):
     client.defaults["HTTP_X_CSRFTOKEN"] = "test-csrf-token"
     a = make_user("a@x.test", role=User.Role.MANAGER)
     b = make_user("b@x.test", role=User.Role.MANAGER)
-    EmployeeProfile.objects.create(user=a, manager=b)
-    EmployeeProfile.objects.create(user=b, manager=None)
+    EmployeeProfile.objects.create(company=default_company(), user=a, manager=b)
+    EmployeeProfile.objects.create(company=default_company(), user=b, manager=None)
     response = client.patch(f"/api/v1/employees/{b.pk}", {"manager": a.pk}, format="json")
     assert response.status_code == 422
     assert "manager" in response.data["error"]["fields"]
@@ -312,7 +313,7 @@ def test_create_rejects_duplicate_employee_number_with_field_error(db):
     client, _ = hr_client()
     client.defaults["HTTP_X_CSRFTOKEN"] = "test-csrf-token"
     existing = make_user("num-owner@x.test")
-    EmployeeProfile.objects.create(user=existing, employee_number="EMP-TAKEN")
+    EmployeeProfile.objects.create(company=default_company(), user=existing, employee_number="EMP-TAKEN")
     response = client.post(
         "/api/v1/employees",
         {"email": "dup-num@x.test", "employee_number": "EMP-TAKEN"},
@@ -329,7 +330,7 @@ def test_update_rejects_employee_number_taken_by_other(db):
     client, _ = hr_client()
     client.defaults["HTTP_X_CSRFTOKEN"] = "test-csrf-token"
     other = make_user("num-owner2@x.test")
-    EmployeeProfile.objects.create(user=other, employee_number="EMP-777")
+    EmployeeProfile.objects.create(company=default_company(), user=other, employee_number="EMP-777")
     employee = make_user("e7@x.test")
     response = client.patch(
         f"/api/v1/employees/{employee.pk}",
@@ -349,9 +350,9 @@ def test_update_employee_number_normalized_duplicate_rejected_and_same_value_all
     client, _ = hr_client()
     client.defaults["HTTP_X_CSRFTOKEN"] = "test-csrf-token"
     other = make_user("num-owner3@x.test")
-    EmployeeProfile.objects.create(user=other, employee_number="emp-shared")
+    EmployeeProfile.objects.create(company=default_company(), user=other, employee_number="emp-shared")
     employee = make_user("e8@x.test")
-    EmployeeProfile.objects.create(user=employee, employee_number="OWN-123")
+    EmployeeProfile.objects.create(company=default_company(), user=employee, employee_number="OWN-123")
 
     # Another employee's number, only differing by case/spacing -> rejected.
     take = client.patch(f"/api/v1/employees/{employee.pk}", {"employee_number": "  EMP-Shared "}, format="json")

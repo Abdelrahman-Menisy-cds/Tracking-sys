@@ -62,9 +62,10 @@ class IdempotencyConflict(Exception):
     """Same key + user but a different payload; contract maps to 409."""
 
 
-def organization_timezone_name() -> str:
-    """Single-row TimezoneConfig; seeded by migration so week math never guesses."""
-    config = TimezoneConfig.objects.first()
+def organization_timezone_name(company) -> str:
+    """Per-company TimezoneConfig (H30 plan §2.4); the __default__ row is
+    seeded by migration so week math never guesses."""
+    config = TimezoneConfig.objects.filter(company=company).first()
     if config is None or not config.name:
         raise TimesheetError(
             "week_invalid",
@@ -82,8 +83,8 @@ def organization_timezone_name() -> str:
     return config.name
 
 
-def normalize_week_start(raw_week_start: str) -> date:
-    """Validate YYYY-MM-DD is a Monday in the organization timezone calendar.
+def normalize_week_start(raw_week_start: str, company) -> date:
+    """Validate YYYY-MM-DD is a Monday in the company's timezone calendar.
 
     The organization timezone is authoritative for week boundaries: the code
     resolves and validates the configured IANA zone first (a misconfigured or
@@ -91,7 +92,7 @@ def normalize_week_start(raw_week_start: str) -> date:
     calendar weekday. Because MVP entries are duration-only (no clock
     instants), DST offsets cannot shift the Monday-Sunday boundaries.
     """
-    timezone_name = organization_timezone_name()
+    timezone_name = organization_timezone_name(company)
     ZoneInfo(timezone_name)  # validated by organization_timezone_name already
     local_week_start = date.fromisoformat(raw_week_start)
     if local_week_start.weekday() != 0:  # Monday == 0

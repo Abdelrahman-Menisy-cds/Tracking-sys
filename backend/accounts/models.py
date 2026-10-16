@@ -33,6 +33,12 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault("is_staff", True)
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("role", User.Role.HR)
+        # H30 plan §2.2: a superuser binds to a company too — the default
+        # company unless the caller passes one explicitly (break-glass only).
+        if extra_fields.get("company") is None:
+            from tenants.context import default_company
+
+            extra_fields["company"] = default_company()
         return self._create_user(email, password, **extra_fields)
 
 
@@ -64,6 +70,13 @@ class User(AbstractBaseUser, PermissionsMixin):
         default=Role.EMPLOYEE,
         db_index=True,
     )
+    # H30 plan §2.2: one user belongs to exactly one company. Nullable through
+    # the 0011 step, backfilled in 0012, hard (null=False) from 0013 on.
+    company = models.ForeignKey(
+        "Company",
+        on_delete=models.PROTECT,
+        related_name="users",
+    )
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)  # Django admin break-glass only
     date_joined = models.DateTimeField(default=timezone.now)
@@ -87,6 +100,30 @@ class User(AbstractBaseUser, PermissionsMixin):
         return self.full_name or self.email
 
 
+class Company(models.Model):
+    """The tenant anchor (H30 plan §2.1).
+
+    One row per company; every tenant table carries a ``company`` FK back to
+    it and every scoped read goes through ``tenants.managers.TenantManager``.
+    ``slug`` is the stable generated identifier; ``__default__`` is the home
+    of every row that predates per-company signup (the §2.6 data migration).
+    The FIRST user of a company is its HR — today's ``sign_up`` grants
+    ``role=HR`` and that stays the company-founder shape.
+    """
+
+    slug = models.SlugField(max_length=64, unique=True)
+    name = models.CharField(max_length=200)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+
+    class Meta:
+        verbose_name = "company"
+        verbose_name_plural = "companies"
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.slug})"
+
+
 class Department(models.Model):
     """A workforce department and the manager responsible for it (Story H16).
 
@@ -100,6 +137,7 @@ class Department(models.Model):
     SET_NULL, and the service deactivates (``is_active``) instead of deleting.
     """
 
+    company = models.ForeignKey("Company", on_delete=models.PROTECT)
     code = models.CharField(max_length=32, unique=True)
     name_ar = models.CharField(max_length=120)
     name_en = models.CharField(max_length=120, blank=True, default="")
@@ -132,6 +170,9 @@ class EmployeeProfile(models.Model):
     profile.py owns the model contract per architecture-security.md §3.
     """
 
+    # H30 plan §2.6: the tenant anchor, denormalized from ``user.company``;
+    # creation paths (employee_service) keep the two in agreement.
+    company = models.ForeignKey("Company", on_delete=models.PROTECT)
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -188,6 +229,7 @@ class ManagerGrant(models.Model):
     #: The closed list HR may hand out; anything else is rejected at validation.
     ALL_SCOPES = tuple(scope.value for scope in Scope)
 
+    company = models.ForeignKey("Company", on_delete=models.PROTECT)
     manager = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -229,13 +271,13 @@ class ManagerGrant(models.Model):
 
 
 class CompanyProfile(models.Model):
-    """Organization-wide company identity, ONE row for the whole org (Story H17).
+    """Company identity, ONE row per company (Story H17; per-company since H30).
 
-    Singleton precedent: ``timesheets.TimezoneConfig`` — a single forced row
-    (``CheckConstraint(id == 1)``) rather than “one row per something”, because
-    the record describes THE organisation, not a member of a population. The
-    first successful save creates that row; every later save updates it, so
-    there is never a second row to reconcile.
+    H30 §2.4 replaced the pk=1 forced singleton with a ``company`` OneToOne
+    (``related_name="profile"``): the row is created on the company's first
+    save, and every reader resolves it through the caller's company (readers
+    answer None / ``needs_profile`` until then). The old
+    ``chk_company_profile_singleton`` check is gone with the singleton.
 
     Required fields (name/activity/address/phone) stay blank-forbidden at the
     model level AND are re-checked as a merged set by the view, so a PATCH
@@ -248,6 +290,11 @@ class CompanyProfile(models.Model):
 
     REQUIRED_FIELDS = ("name", "activity", "address", "phone")
 
+    company = models.OneToOneField(
+        "Company",
+        on_delete=models.PROTECT,
+        related_name="profile",
+    )
     name = models.CharField(max_length=200)
     activity = models.CharField(max_length=200)
     address = models.CharField(max_length=300)
@@ -272,9 +319,6 @@ class CompanyProfile(models.Model):
     )
 
     class Meta:
-        constraints = [
-            models.CheckConstraint(condition=models.Q(id=1), name="chk_company_profile_singleton"),
-        ]
         verbose_name = "company profile"
         verbose_name_plural = "company profile"
 
@@ -296,6 +340,16 @@ class SubscriptionCode(models.Model):
 
     code = models.CharField(max_length=128, unique=True)
     label = models.CharField(max_length=200, blank=True, default="")
+    # H30 plan §2.3/§2.5: NULL only for operator-issued bootstrap "create
+    # company" codes — this FK deliberately STAYS nullable (0013 does not
+    # harden it); every existing code backfills into the default company.
+    company = models.ForeignKey(
+        "Company",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="signup_codes",
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     last_used_at = models.DateTimeField(null=True, blank=True)
@@ -345,8 +399,11 @@ class PendingDeviceFlow(models.Model):
     ``device_code_or_id`` is the SECRET the provider's poll needs (opencode:
     device_code; codex: device_auth_id) — server-side only, never in any
     response; ``user_code`` is the display code the SPA already shows.
+
+    H30 §2.6: tenant-scoped — ``company`` mirrors the user's.
     """
 
+    company = models.ForeignKey("Company", on_delete=models.PROTECT)
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -376,9 +433,11 @@ class AuditEvent(models.Model):
     """Append-only, HR-created audit record for employee administration.
 
     No update/delete through the app (policy item 11): actor, subject,
-    UTC timestamp, actor request id, and before/after snapshots.
+    UTC timestamp, actor request id, and before/after snapshots. The trail
+    itself is tenant-scoped: ``company`` is the actor's company (H30 §2.6).
     """
 
+    company = models.ForeignKey("Company", on_delete=models.PROTECT)
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -427,8 +486,11 @@ class AssistantConfig(models.Model):
 
     No provider presets anywhere: plain OpenAI-compatible free-form endpoint
     fields, per the owner's explicit decision.
+
+    H30 §2.6: the row is tenant-scoped — ``company`` mirrors the user's.
     """
 
+    company = models.ForeignKey("Company", on_delete=models.PROTECT)
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

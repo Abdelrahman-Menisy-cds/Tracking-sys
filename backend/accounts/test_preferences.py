@@ -22,13 +22,14 @@ from config.schema import build_schema
 
 from accounts.tests import _csrf, anon_client, active_user  # noqa: F401 — shared fixtures/helpers
 from config.schema import build_schema
+from tenants.context import default_company
 
 
 @pytest.fixture
 def other_user(db):
     from django.contrib.auth import get_user_model
 
-    return get_user_model().objects.create_user(
+    return get_user_model().objects.create_user(company=default_company(), 
         email="othouser@example.com",
         password="another-good-pass",
         full_name="Other User",

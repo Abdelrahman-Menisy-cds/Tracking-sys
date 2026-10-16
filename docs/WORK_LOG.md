@@ -226,6 +226,17 @@ Story 5.3 evidence (accepted 2026-09-14):
 - Commits: implementation `65e6b1d`, merge `528284f` = main HEAD.
 - Next step: Story 5.4 — release verification and operational gates.
 
+## H30 R1 evidence (backend multi-tenant groundwork, 2026-10-16):
+
+- Multi-tenant groundwork landed: `Company` model (`backend/accounts/models.py`), `User.company` FK (non-nullable, `PROTECT`), per-company `EmployeeProfile` / `ManagerGrant` / `SubscriptionCode` (nullable for bootstrap codes) / `AuditEvent` / `AssistantConfig` / `PendingDeviceFlow` / `Department` tenants, `CompanyProfile` and `TimezoneConfig` switched from a pk=1 singleton to a per-company OneToOne (`backend/accounts/migrations/0010..0013`, `backend/timesheets/migrations/0008..0009`); `backend/tenants/context.py::default_company()` is the canonical `__default__` resolver.
+- Staged FK hardening: 0011 adds nullable FKs → 0012 backfills all existing rows into the `__default__` company (name from the pre-existing CompanyProfile row, `__default__` fallback; the live `SubscriptionCode` becomes that company's join code) → 0013 drops the null. `SubscriptionCode.company` deliberately stays nullable: `seed_signup_code` bootstrap codes are tenantless by contract.
+- Every `AuditEvent` creation site (accounts employee/department/grant/assistant/company flows, reqs submission/cancel/attachment, timesheets correction/review, review reports) stamps `company=actor.company`; tenant readers (`CompanyProfile`, timezone) resolve per company; `timesheets` `normalize_week_start` takes the company; the timesheet-create serializer resolves it from the request.
+- Deviation logged: `TimezoneConfig.name` column uniqueness flipped per-company in R1 (plan §2.4 omitted it; R1's per-company reader `get_or_create(company, defaults={"name": "UTC"})` would collide with the seeded `__default__` "UTC" row for any second company — same uniqueness class the plan defers to R2).
+- Verification: Django system check clean; `makemigrations --check` clean; migrations applied on the local SQLite dev DB with no row loss (before/after each table: users 0→0, departments 0→0, employee-profiles 0→0, manager-grants 0→0, subscription-codes 1→1 now bound to `__default__`, audit 0→0, assistant-config 0→0, device-flows 0→0, company-profiles 0→0, timezone 0→0 (absent pre-migration; readers seed lazily); migration records 42→48; company table 0→1).
+- Static guard: `tenants/test_scoping_static.py` 2 passed (AST tenant leak ratchet).
+- Suite: before (pristine HEAD via `git archive`) 487 tests completed, 1 failed; after 490 tests completed (3 new tests in `backend/accounts/test_company.py` covering per-company profile gates and per-company timezone config), 1 failed. The single failure in both runs is `accounts/tests.py::test_login_active_user_sets_authenticated_rotated_secure_session`, pre-existing and environmental: `settings.py` loads the repo-root `.env` whose `DJANGO_ALLOW_INSECURE_COOKIES=1` disables `SESSION_COOKIE_SECURE` — unrelated to R1. Focused runs (`accounts/`, `notifications/`, `reqs/test_drafts+attachments`, `review/test_queues`, `timesheets` style areas exercised via the full suite) show no R1 regressions.
+- Helper evidence scripts (untracked): `h31b_patch_tests.py` (mechanical test binding of created users/rows to the default company), `h31b_row_counts.py` (dev-DB row counts).
+
 ## Scope boundary
 
 This log documents Tracking-sys only. It does not describe or govern any Odoo project.

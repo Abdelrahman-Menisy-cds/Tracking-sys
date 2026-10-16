@@ -16,6 +16,7 @@ from rest_framework.test import APITestCase
 
 from accounts.models import AuditEvent, User
 from reqs.models import EmployeeRequest, RequestAttachment, RequestType
+from tenants.context import default_company
 
 try:  # real DOCX content (valid OPC zip) when zipfile is available
     import zipfile
@@ -42,8 +43,8 @@ DOCX_BYTES = _make_docx_bytes()
 
 class AttachmentTestBase(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(email="emp@example.com", password="pass-12345678")
-        self.other = User.objects.create_user(email="other@example.com", password="pass-12345678")
+        self.user = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
+        self.other = User.objects.create_user(company=default_company(), email="other@example.com", password="pass-12345678")
         self.request_type = RequestType.objects.create(name="Leave")
         self.draft = EmployeeRequest.objects.create(
             requester=self.user, request_type=self.request_type, title="T"

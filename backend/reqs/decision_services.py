@@ -227,6 +227,7 @@ def decide_request(
         )
         request_id = str(locked.pk)
         AuditEvent.objects.create(
+            company=reviewer.company,
             actor=reviewer,
             subject=locked.requester,
             action=_AUDIT_ACTION[action],

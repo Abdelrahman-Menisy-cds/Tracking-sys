@@ -14,20 +14,21 @@ from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from accounts.services import deactivate_user
+from tenants.context import default_company
 
 User = get_user_model()
 
 
 @pytest.fixture
 def active_user(db):
-    return User.objects.create_user(
+    return User.objects.create_user(company=default_company(), 
         email="sabah@example.com", password="correct-horse-battery", full_name="Sabah Fouad", role=User.Role.EMPLOYEE
     )
 
 
 @pytest.fixture
 def inactive_user(db):
-    return User.objects.create_user(
+    return User.objects.create_user(company=default_company(), 
         email="inactive@example.com", password="another-good-pass", full_name="Inactive Person", role=User.Role.EMPLOYEE, is_active=False
     )
 
