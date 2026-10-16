@@ -114,3 +114,30 @@ def test_assistant_cannot_resolve_a_foreign_employee(two_companies):
 
     assert _get_employee(two_companies["a"]["company"], two_companies["a"]["emp"].pk) is not None
     assert _get_employee(two_companies["a"]["company"], two_companies["b"]["emp"].pk) is None
+
+
+def test_holidays_register_is_one_company_only(two_companies):
+    """GET /api/v1/holidays returns the caller's company register only.
+
+    Every company keeps its own holiday rows (they are per-company since H30),
+    so an unscoped read here showed the same day once per tenant.
+    """
+    from django.test import Client
+
+    from holidays.models import PublicHoliday
+
+    for key in ("a", "b"):
+        PublicHoliday.objects.create(
+            company=two_companies[key]["company"],
+            country_code="EG",
+            year=2026,
+            date="2026-01-07",
+            name=f"holiday-{key}",
+        )
+    client = Client()
+    client.force_login(two_companies["a"]["hr"])
+    response = client.get("/api/v1/holidays?year=2026&country=EG")
+    assert response.status_code == 200
+    names = {row["name"] for row in response.json()["data"]}
+    assert "holiday-a" in names
+    assert "holiday-b" not in names

@@ -68,7 +68,9 @@ class HolidayListView(APIView):
             return _invalid_param(
                 request, "country", "country must be a 2-letter ISO 3166-1 alpha-2 code."
             )
-        rows = PublicHoliday.objects.filter(country_code=country, year=year).order_by("date", "name")
+        rows = PublicHoliday.objects.filter(
+            company=request.user.company, country_code=country, year=year
+        ).order_by("date", "name")
         return Response({"data": hs.PublicHolidaySerializer(rows, many=True).data})
 
 
