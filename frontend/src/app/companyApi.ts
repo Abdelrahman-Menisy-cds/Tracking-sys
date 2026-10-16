@@ -1,5 +1,5 @@
 /**
- * The company profile API — Story H17.
+ * The company profile API - Story H17.
  *
  * The organisation's identity is one singleton row on the server ("who is this
  * company?" is a property of the organisation, not of the person). The read
@@ -32,7 +32,7 @@ export type CompanyProfile = {
   updated_at?: string;
 };
 
-/** GET/PATCH /api/v1/company — `profile` null until the row is first saved. */
+/** GET/PATCH /api/v1/company - `profile` null until the row is first saved. */
 export type CompanyState = { profile: CompanyProfile | null; needs_profile: boolean };
 
 /** A partial write: the caller sends only the fields it wants to change. */

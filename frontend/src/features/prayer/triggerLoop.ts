@@ -55,12 +55,12 @@ export function nextPrayerTrigger(
 
   const pre = options?.preReminder ?? false;
   // Fire-window semantics. A trigger must still be offered briefly AFTER its
-  // boundary crosses — otherwise the two conditions (provider offers while
+  // boundary crosses - otherwise the two conditions (provider offers while
   // azan >= now, loop fires while azan <= now) share a single instant and
   // any poll gap straddling the boundary swallows the notice for the whole
   // day (this exact defect shipped once and made the stack stone-silent).
-  // But the catch-up window must be SHORT — poll-gap scale, not "until the
-  // next prayer" — or a page loaded hours later would flash a stale azan.
+  // But the catch-up window must be SHORT - poll-gap scale, not "until the
+  // next prayer" - or a page loaded hours later would flash a stale azan.
   // GRACE_MS also bounds the reminder line's catch-up.
   const GRACE_MS = 90_000;
   for (let i = 0; i < entries.length; i++) {
@@ -94,7 +94,7 @@ export function nextPrayerTrigger(
 /**
  * Draw a dhikr index at random. `excludeIndex` (the dhikr shown immediately
  * before, tracked per person per session) is removed from the pool so a
- * repeat never follows itself — the owner reads a repeat as "not random".
+ * repeat never follows itself - the owner reads a repeat as "not random".
  * `random` is injectable so the gate can drive the draw with a fixed
  * sequence; defaults to Math.random.
  */
@@ -115,7 +115,7 @@ export function drawDhikrIndex(
 /**
  * Next hourly dhikr boundary at/after `nowMs`. Fires at wall-clock top of
  * hour per the local clock. WHICH dhikr is drawn at random (per employee,
- * never the immediately previous one) — the clock only sets the boundary,
+ * never the immediately previous one) - the clock only sets the boundary,
  * it no longer selects the content (the old `floor(hour) % count` rotation
  * made every employee see the same dhikr in the same hour).
  */
@@ -132,7 +132,7 @@ export function nextHourlyDhikrTrigger(
 
 /**
  * Which dhikr shows "immediately upon enabling": a fresh random draw, per
- * person, excluding the last one shown — NOT a rotation (the old version
+ * person, excluding the last one shown - NOT a rotation (the old version
  * derived the pick from the epoch hour, so every toggle inside one hour
  * showed the same card and two employees matched each other).
  */
@@ -164,7 +164,7 @@ export interface TriggerLoopHandle {
 
 /**
  * Run ONE loop of trigger polling for whichever of the two settings is on.
- * The loop never hangs on an empty trigger list — it wakes every pollMs and
+ * The loop never hangs on an empty trigger list - it wakes every pollMs and
  * re-asks, so a new day or a new set of times just works.
  */
 export function startTriggerLoop(
@@ -182,7 +182,7 @@ export function startTriggerLoop(
     if (stopped) return;
     const trigger = provider();
     // Fire the trigger when its boundary has been crossed. `lastFiredAt` is
-    // recorded ONLY on an actual fire — a first tick that sees a FUTURE
+    // recorded ONLY on an actual fire - a first tick that sees a FUTURE
     // trigger must not record it, or that same trigger would be suppressed
     // forever once time actually crosses its boundary (the notice then
     // never fires for the whole day; this exact bug shipped once).

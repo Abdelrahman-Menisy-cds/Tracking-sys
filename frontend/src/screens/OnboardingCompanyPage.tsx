@@ -12,11 +12,11 @@ import type { Dict, Locale } from "../i18n/dict";
 type DictKey = keyof Dict;
 
 /**
- * /onboarding/company — the mandatory first stop after signup (Story H17).
+ * /onboarding/company - the mandatory first stop after signup (Story H17).
  *
  * The gate lives in the app shell: while `needs_company_profile` is true,
  * every other route redirects here. So the only exit besides saving is the
- * sign-out control at the top — deliberately no nav, no links into the app:
+ * sign-out control at the top - deliberately no nav, no links into the app:
  * the owner's rule is that the company's data is the first thing the HR user
  * does, and staying here until it is saved IS the contract, not a glitch.
  *
@@ -73,7 +73,7 @@ export default function OnboardingCompanyPage({ onCompleted }: { onCompleted?: (
     // The gate reads the identity, not this screen's copy of the state. The
     // boot-time /auth/me snapshot still says "onboarding owed", so re-read the
     // identity (the server's own authoritative flag, now false) and adopt it
-    // BEFORE navigating — otherwise the gate would divert the very navigation
+    // BEFORE navigating - otherwise the gate would divert the very navigation
     // this save just earned and bounce the user straight back here. The fresh
     // me-answer, not the PATCH envelope, is what the gate consumes.
     try {

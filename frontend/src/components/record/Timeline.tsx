@@ -23,7 +23,7 @@ const statusLabels: Record<string, { ar: string; en: string }> = {
 
 /**
  * The review-history rows come off the server (`ServerRecordEvent`), and the
- * server does NOT expose who performed an action — only what changed and when.
+ * server does NOT expose who performed an action - only what changed and when.
  * The actor line is therefore dropped rather than invented.
  */
 export default function Timeline({ events }: { events: ServerRecordEvent[] }) {

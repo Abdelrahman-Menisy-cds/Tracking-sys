@@ -29,9 +29,13 @@ from config.api import error_payload
 from review import reports as report_source
 from review.serializers import report_rows_for
 from review.csv_export import (
+    ATTENDANCE_ROWS_HEADER,
+    PEOPLE_ROWS_HEADER,
     REQUEST_ROWS_HEADER,
     TIMESHEET_ROWS_HEADER,
+    attendance_row_out,
     build_csv,
+    people_row_out,
     request_row_out,
     timesheet_row_out,
 )
@@ -137,9 +141,15 @@ class ReportCsvView(APIView):
         if category == "requests":
             header = REQUEST_ROWS_HEADER
             rows = [request_row_out(meta, obj) for obj in filtered]
-        else:
+        elif category == "timesheets":
             header = TIMESHEET_ROWS_HEADER
             rows = [timesheet_row_out(meta, obj) for obj in filtered]
+        elif category == "attendance":
+            header = ATTENDANCE_ROWS_HEADER
+            rows = [attendance_row_out(meta, obj) for obj in filtered]
+        else:  # people: build from the SAME dicts /rows returns (parity)
+            header = PEOPLE_ROWS_HEADER
+            rows = [people_row_out(meta, row) for row in report_rows_for("people", filtered)]
         csv_text = build_csv(meta, header, rows)
 
         transactional_audit = AuditEvent.objects.create(

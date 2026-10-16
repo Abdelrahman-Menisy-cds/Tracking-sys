@@ -4,7 +4,7 @@ import { useApp } from "../../app/AppContext";
 import type { Dict } from "../../i18n/dict";
 
 /**
- * First-run tour — a coach-mark walkthrough over the real shell.
+ * First-run tour - a coach-mark walkthrough over the real shell.
  *
  * Shown once per identity: the flag is stored under the same localStorage
  * convention the language and appearance preferences already use, keyed by the
@@ -109,7 +109,7 @@ export default function TourGuide() {
   const targetRef = useRef<HTMLElement | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
 
-  /** Steps whose target is actually on screen — the list is role-agnostic. */
+  /** Steps whose target is actually on screen - the list is role-agnostic. */
   const steps = useMemo(() => {
     if (index === null) return [];
     return tour.steps.map((step, position) => ({ ...step, position })).filter((step) => {

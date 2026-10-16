@@ -1,5 +1,5 @@
 /**
- * The timesheets API — Brief H33. Personal sheet lifecycle (Story 3.1/3.2) plus
+ * The timesheets API - Brief H33. Personal sheet lifecycle (Story 3.1/3.2) plus
  * the reviewer's queue/detail/decisions (Story 3.3, review scope), all through
  * the shared client in ./api. Mutations require an Idempotency-Key header.
  *
@@ -17,18 +17,18 @@ import type {
   ServerReviewTimesheetRow,
 } from "./serverTypes";
 
-/** GET /timesheets — the caller's own sheets. */
+/** GET /timesheets - the caller's own sheets. */
 export function listMyTimesheets(locale: string, page = 1): Promise<PagedPayload<ServerMyTimesheet>> {
   return apiRequest<PagedPayload<ServerMyTimesheet>>(`/timesheets?page=${page}`, { acceptLanguage: locale });
 }
 
-/** GET /timesheets/{id} — owner-only detail. */
+/** GET /timesheets/{id} - owner-only detail. */
 export function getMyTimesheet(id: string, locale: string): Promise<ServerMyTimesheet> {
   return apiRequest<{ data: ServerMyTimesheet }>(`/timesheets/${id}`, { acceptLanguage: locale }).then((payload) => payload.data);
 }
 
 /**
- * PATCH /timesheets/{id}/entries/{entryId} — one permitted-field correction.
+ * PATCH /timesheets/{id}/entries/{entryId} - one permitted-field correction.
  * Sends the sheet's known version; returns the sheet AT ITS NEW VERSION.
  */
 export function editTimesheetEntry(
@@ -46,7 +46,7 @@ export function editTimesheetEntry(
   }).then((payload) => payload.data);
 }
 
-/** DELETE /timesheets/{id}/entries/{entryId} — owner correction. */
+/** DELETE /timesheets/{id}/entries/{entryId} - owner correction. */
 export function deleteTimesheetEntry(
   sheetId: string,
   entryId: string,
@@ -61,7 +61,7 @@ export function deleteTimesheetEntry(
   }).then((payload) => payload.data);
 }
 
-/** POST /timesheets/{id}/submit — {confirm:true, version}; DRAFT/RETURNED only. */
+/** POST /timesheets/{id}/submit - {confirm:true, version}; DRAFT/RETURNED only. */
 export function submitMyTimesheet(id: string, version: number, locale: string): Promise<ServerMyTimesheet> {
   return apiRequest<{ data: ServerMyTimesheet }>(`/timesheets/${id}/submit`, {
     method: "POST",
@@ -71,7 +71,7 @@ export function submitMyTimesheet(id: string, version: number, locale: string): 
   }).then((payload) => payload.data);
 }
 
-/** POST /timesheets/{id}/decision — reviewer-only approve/reject/return. */
+/** POST /timesheets/{id}/decision - reviewer-only approve/reject/return. */
 export function decideTimesheet(
   id: string,
   action: DecisionAction,
@@ -87,7 +87,7 @@ export function decideTimesheet(
   }).then((payload) => payload.data);
 }
 
-/** GET /review/timesheets/queue — manager/HR scoped rows (params = ?status=, ?q=). */
+/** GET /review/timesheets/queue - manager/HR scoped rows (params = ?status=, ?q=). */
 export function listReviewTimesheets(
   locale: string,
   options: { status?: string; page?: number } = {},
@@ -98,7 +98,7 @@ export function listReviewTimesheets(
   return apiRequest<PagedPayload<ServerReviewTimesheetRow>>(`/review/timesheets/queue?${params.toString()}`, { acceptLanguage: locale });
 }
 
-/** GET /review/timesheets/{id} — scoped detail with entries + events. */
+/** GET /review/timesheets/{id} - scoped detail with entries + events. */
 export function getReviewTimesheet(id: string, locale: string): Promise<ServerReviewTimesheet> {
   return apiRequest<{ data: ServerReviewTimesheet }>(`/review/timesheets/${id}`, { acceptLanguage: locale }).then((payload) => payload.data);
 }

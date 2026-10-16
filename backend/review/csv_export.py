@@ -54,6 +54,40 @@ TIMESHEET_ROWS_HEADER = (
     "updated_at_utc",
 )
 
+# H35: attendance (derived from the timesheet entry history) and people
+# (employee/department counts). The people exporter consumes the SAME
+# report_rows_for dicts the /rows endpoint returns, so CSV and JSON rows
+# cannot diverge.
+ATTENDANCE_ROWS_HEADER = (
+    "report",
+    "scope",
+    "org_timezone",
+    "date_from",
+    "date_to",
+    "employee_id",
+    "employee_name",
+    "employee_email",
+    "work_date",
+    "status",
+    "duration_minutes",
+    "unpaid_break_minutes",
+    "timesheet_id",
+    "timesheet_status",
+)
+
+PEOPLE_ROWS_HEADER = (
+    "report",
+    "scope",
+    "org_timezone",
+    "date_from",
+    "date_to",
+    "department_id",
+    "department_code",
+    "department_name",
+    "manager_name",
+    "headcount",
+)
+
 
 def sanitize_cell(value) -> str:
     """Neutralize formula-injection payloads and strip control characters."""
@@ -116,6 +150,46 @@ def timesheet_row_out(meta: dict, sheet) -> list:
         str(breaks),
         sheet.created_at.isoformat(),
         sheet.updated_at.isoformat(),
+    ]
+
+
+def attendance_row_out(meta: dict, entry) -> list:
+    """One employee-day row; the derived status comes from the SAME rule the
+    JSON rows use (review.reports.attendance_day_status)."""
+    from review.reports import attendance_day_status
+
+    return [
+        meta["report"],
+        meta["scope"],
+        meta["org_timezone"],
+        meta.get("date_from") or "",
+        meta.get("date_to") or "",
+        str(entry.timesheet.employee_id),
+        entry.timesheet.employee.full_name,
+        entry.timesheet.employee.email,
+        entry.work_date.isoformat(),
+        attendance_day_status(entry.duration_minutes),
+        str(entry.duration_minutes),
+        str(entry.unpaid_break_minutes),
+        str(entry.timesheet_id),
+        entry.timesheet.status,
+    ]
+
+
+def people_row_out(meta: dict, row: dict) -> list:
+    """row is ONE report_rows_for('people', …) dict — the CSV therefore shows
+    exactly the rows the /rows endpoint returns (parity by construction)."""
+    return [
+        meta["report"],
+        meta["scope"],
+        meta["org_timezone"],
+        meta.get("date_from") or "",
+        meta.get("date_to") or "",
+        row["department_id"] or "",
+        row["department_code"],
+        row["department_name"],
+        row["manager_name"],
+        str(row["headcount"]),
     ]
 
 

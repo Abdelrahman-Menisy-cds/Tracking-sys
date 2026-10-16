@@ -79,6 +79,11 @@ def _scoped_employee_ids(manager):
     return ids
 
 
+# H35: the people report reuses the SAME scope source as the request and
+# timesheet queues — a public alias so reports never grow a parallel one.
+scoped_employee_ids = _scoped_employee_ids
+
+
 def scope_requests(manager):
     """Manager/HR scope queryset; applied before filters/count/pagination.
 

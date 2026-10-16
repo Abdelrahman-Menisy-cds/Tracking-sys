@@ -14,7 +14,7 @@ import AssistantSettingsPanel from "../features/assistant/AssistantSettingsPanel
  * "my own employee file" to every role, so those fields render the honest
  * unavailable state instead of fixture rows. For the same reason the
  * prayer/dhikr block, which was gated on the directory's religion field,
- * never mounts any more — no endpoint expose that field for the caller.
+ * never mounts any more - no endpoint expose that field for the caller.
  */
 export default function ProfilePage() {
   const { t, locale, serverAccount } = useApp();
@@ -23,7 +23,7 @@ export default function ProfilePage() {
   /** The server's own role string, mapped onto the dict's role labels. */
   const roleLabel = serverAccount
     ? serverAccount.role === "HR" ? t("roleHr") : serverAccount.role === "MANAGER" ? t("roleManager") : t("roleEmployee")
-    : "—";
+    : "-";
 
   const unavailable = locale === "ar"
     ? "حقول ملف الموظف (المسمى الوظيفي، الإدارة، الرقم الوظيفي، المدير، تاريخ التعيين) تُقرأ من نقطة نهاية الموظفين على الخادم لاحقًا؛ لا توجد بيانات مؤكدة الآن."
@@ -39,7 +39,7 @@ export default function ProfilePage() {
     <div className="page reading-page profile-page">
       <PageHeader
         title={<><UserIcon /> {t("profileTitle")}</>}
-        subtitle={<><bdi>{serverAccount?.full_name ?? "—"}</bdi> · {t("profileSubtitle")}</>}
+        subtitle={<><bdi>{serverAccount?.full_name ?? "-"}</bdi> · {t("profileSubtitle")}</>}
       />
       {serverAccount ? null : (
         <Banner tone="warning" role="alert">
@@ -48,7 +48,7 @@ export default function ProfilePage() {
       )}
       <section className="work-surface section" aria-labelledby="profile-details-heading">
         <div className="section-heading">
-          <h2 id="profile-details-heading"><bdi>{serverAccount?.full_name ?? "—"}</bdi></h2>
+          <h2 id="profile-details-heading"><bdi>{serverAccount?.full_name ?? "-"}</bdi></h2>
           <span className="muted">{roleLabel}</span>
         </div>
         {knownFields.length ? (
@@ -68,7 +68,7 @@ export default function ProfilePage() {
           <EmptyState message={unavailable} />
         )}
       </section>
-      {/* H18: the employee links their OWN provider here — no presets, per the owner. */}
+      {/* H18: the employee links their OWN provider here - no presets, per the owner. */}
       <AssistantSettingsPanel />
     </div>
   );

@@ -9,12 +9,12 @@ import ManagerGrantsPanel from "./ManagerGrantsPanel";
 import EmployeeAssistantPanel from "../../features/assistant/EmployeeAssistantPanel";
 
 /**
- * Employee employment settings — spec §2.2/§2.3/§2.4 at /admin/people/:employeeId.
+ * Employee employment settings - spec §2.2/§2.3/§2.4 at /admin/people/:employeeId.
  *
  * HONEST STATE (Brief H33): identity comes from the SERVER (`GET /employees/{id}`).
  * The employment-type/hybrid policy, schedule exceptions, leave allocation,
  * task-capability flags and the two-tier file (salary, national id, bank,
- * contracts, religion) have NO server endpoints — src/mock carried them, and
+ * contracts, religion) have NO server endpoints - src/mock carried them, and
  * the mock is deleted, so those panels render the honest unavailable state
  * instead of fixture rows. Manager grants and the assistant config panel stay
  * on their real endpoints.
@@ -50,7 +50,7 @@ export default function AdminPeopleDetailPage() {
         <>
           <PageHeader
             title={employee.data.full_name}
-            subtitle={<span>{t("adminPeopleEmploymentSubtitle")} · <bdi dir="ltr">{employee.data.employee_number ?? "—"}</bdi> · {locale === "ar" ? (employee.data.department_name_ar ?? "—") : (employee.data.department_name_en ?? "—")}</span>}
+            subtitle={<span>{t("adminPeopleEmploymentSubtitle")} · <bdi dir="ltr">{employee.data.employee_number ?? "-"}</bdi> · {locale === "ar" ? (employee.data.department_name_ar ?? "-") : (employee.data.department_name_en ?? "-")}</span>}
             breadcrumb={<a href="/admin/people">{t("adminPeopleBack")}</a>}
           />
           {!employee.data.is_active ? (

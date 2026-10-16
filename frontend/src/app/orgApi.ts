@@ -1,5 +1,5 @@
 /**
- * The organisation API — Story H16: departments, employees and HR grants.
+ * The organisation API - Story H16: departments, employees and HR grants.
  *
  * Thin wrappers over the shared `apiRequest`, so every call inherits the same
  * session, CSRF, timeout and error-envelope handling as the rest of the app. The
@@ -64,7 +64,7 @@ export async function listEmployees(locale: string): Promise<ServerEmployee[]> {
   return Array.isArray(data) ? data : (data?.results ?? []);
 }
 
-/** GET /employees/{id} — one authoritative row (HR only; 404 envelope otherwise). */
+/** GET /employees/{id} - one authoritative row (HR only; 404 envelope otherwise). */
 export async function getEmployee(id: number, locale: string): Promise<ServerEmployee> {
   const payload = await apiRequest<{ data: ServerEmployee }>(`/employees/${id}`, { acceptLanguage: locale });
   return payload.data;

@@ -10,7 +10,7 @@ import type { Dict } from "../../i18n/dict";
 /**
  * The employee's OWN prayer/dhikr settings block on /profile.
  *
- * Rendered ONLY when the signed-in employee's directory entry says MUSLIM —
+ * Rendered ONLY when the signed-in employee's directory entry says MUSLIM -
  * read from their own hr_file.religion through the employeeDirectory (the
  * same overlay-merged directory the admin screens write to). Christian and
  * OTHER employees see nothing here at all: the block does not exist for
@@ -19,7 +19,7 @@ import type { Dict } from "../../i18n/dict";
  *
  * The notices stack is rendered FROM this screen but portaled to the
  * document body, so it floats over any authenticated page while /profile
- * stays open. No service worker, no push, no background delivery — stated
+ * stays open. No service worker, no push, no background delivery - stated
  * plainly in the copy below and in the feature module.
  */
 

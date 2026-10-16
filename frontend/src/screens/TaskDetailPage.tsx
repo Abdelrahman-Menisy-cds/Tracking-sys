@@ -4,7 +4,7 @@ import { Banner, EmptyState } from "../components/ui";
 import PageHeader from "../components/layout/PageHeader";
 
 /**
- * /tasks/:taskId — Brief H33 honest state. The backend exposes NO tasks
+ * /tasks/:taskId - Brief H33 honest state. The backend exposes NO tasks
  * endpoints, so a task record cannot exist on the server and no detail view
  * can be rendered truthfully. The route shell stays so the link resolves.
  */

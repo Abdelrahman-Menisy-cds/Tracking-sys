@@ -1,8 +1,8 @@
 /**
- * H20 — a tiny, dependency-light renderer for the مدام عفاف replies.
+ * H20 - a tiny, dependency-light renderer for the مدام عفاف replies.
  *
- * The model answers in a markdown subset — `**bold**`, `` `code` ``, `-`
- * bullet lists, `1.` numbered lists, and plain line breaks — and until now
+ * The model answers in a markdown subset - `**bold**`, `` `code` ``, `-`
+ * bullet lists, `1.` numbered lists, and plain line breaks - and until now
  * those markers reached the owner raw («**ساعاتك», «**رقم نوع الطلب»).
  *
  * Safety rule from the brief: the text comes from a model, so nothing here
@@ -21,7 +21,7 @@
 
 import type { ReactNode } from "react";
 
-/** `**bold**` | `` `code` `` | other text runs — one pass, non-greedy. */
+/** `**bold**` | `` `code` `` | other text runs - one pass, non-greedy. */
 const INLINE_RE = /(\*\*[^*]+\*\*)|(`[^`\n]+`)/g;
 
 /** `- item` | `* item` | `1.` item | `12) item` */

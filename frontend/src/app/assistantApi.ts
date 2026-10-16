@@ -1,5 +1,5 @@
 /**
- * The مدام عفاف assistant API — brief H18.
+ * The مدام عفاف assistant API - brief H18.
  *
  * Thin wrappers over the shared `apiRequest`, exactly like `orgApi`: the
  * session, CSRF, timeouts and the error envelope all come from there, so this
@@ -7,7 +7,7 @@
  *
  * The contract is frozen in brief-H18-afaf-assistant-frontend.md. The one rule
  * everything downstream depends on: the API key NEVER comes back in any
- * response — the config only carries `key_hint` and `key_source`. Nothing in
+ * response - the config only carries `key_hint` and `key_source`. Nothing in
  * this file or the UIs built on it may ever need to read the raw key.
  */
 import { apiRequest } from "./api";
@@ -21,13 +21,13 @@ export interface AssistantConfig {
   /** "self" = the employee linked it, "hr" = HR set it in the employee file, null = nothing set. */
   key_source: "self" | "hr" | null;
   can_replace_key: boolean;
-  /** H19 — derived server-side: "subscription" when a provider credential exists, else "api". */
+  /** H19 - derived server-side: "subscription" when a provider credential exists, else "api". */
   mode: "api" | "subscription";
   /** "opencode" | "codex" when linked; "" in api mode. */
   subscription_provider: string;
   /** Display-only masked credential hint (e.g. "••••88"). NEVER a token. */
   subscription_hint: string;
-  /** "key" (the CLI's stored provider key — does not expire) | "oauth" (access+refresh). */
+  /** "key" (the CLI's stored provider key - does not expire) | "oauth" (access+refresh). */
   subscription_cred_type: string;
   /** "device" (the in-app login flow) | "local" (imported from this machine's CLI login). */
   subscription_source: string;
@@ -53,7 +53,7 @@ export interface AssistantMessage {
 
 /**
  * A write the assistant wants to perform. It lives only in the reply until the
- * operator presses تأكيد — confirming runs it against the system.
+ * operator presses تأكيد - confirming runs it against the system.
  */
 export interface PendingAssistantAction {
   token: string;
@@ -76,7 +76,7 @@ export interface AssistantSaveInput {
 }
 
 /**
- * H19 — the subscription write body: exactly one credential per row, so the
+ * H19 - the subscription write body: exactly one credential per row, so the
  * picker sends mode="subscription" + the provider, and the server clears the
  * api-key fields itself. Switching to api mode sends the api subset, which
  * unlinks the subscription on the server.
@@ -86,7 +86,7 @@ export type AssistantModeSaveInput =
   | ({ mode: "api" } & AssistantSaveInput);
 
 /**
- * H19 fix-up 4 — what a provider honestly supports. The import is the
+ * H19 fix-up 4 - what a provider honestly supports. The import is the
  * PRIMARY link path; a login flow exists only where the provider itself
  * offers one. The backend never POSTs any /oauth/* path to a provider's
  * API base (the invented /oauth/device/start call is deleted), so the UI
@@ -105,7 +105,7 @@ export type AssistantPollOutcome =
   | ({ status: "linked" } & AssistantConfig);
 
 /**
- * H21c — what POST /assistant/subscription/start returns: the device-login
+ * H21c - what POST /assistant/subscription/start returns: the device-login
  * job. The user types user_code at verification_uri; the server holds the
  * token and NEVER returns it. Poll on `interval` until `linked` or expiry.
  */
@@ -113,7 +113,7 @@ export interface AssistantSubscriptionStart {
   provider: SubscriptionProvider;
   verification_uri: string;
   user_code: string;
-  /** Seconds between polls — the server's own pacing, honoured verbatim. */
+  /** Seconds between polls - the server's own pacing, honoured verbatim. */
   interval?: number;
   /** Seconds until the device code expires. */
   expires_in?: number;
@@ -126,7 +126,7 @@ export interface AssistantModelsResult {
   detail: string;
 }
 
-/** H19 — the subscription presets (owner's rule: ONLY these two logins exist). */
+/** H19 - the subscription presets (owner's rule: ONLY these two logins exist). */
 export type SubscriptionProvider = "opencode" | "codex";
 
 export async function getAssistantConfig(locale?: string): Promise<AssistantConfig> {
@@ -204,11 +204,11 @@ export function notifyAssistantConfigChanged(): void {
   window.dispatchEvent(new Event(ASSISTANT_CONFIG_CHANGED_EVENT));
 }
 
-/* ═══ H19 — the subscription login paths (the server drives the login the ═══
+/* ═══ H19 - the subscription login paths (the server drives the login the ═══
    the provider's own CLI does; no token EVER comes back in these payloads). ═══ */
 
 /**
- * GET /assistant/subscription/capability — what this provider honestly
+ * GET /assistant/subscription/capability - what this provider honestly
  * supports, so the panel shows import (and a login button ONLY when the
  * provider actually has one; none do today).
  */
@@ -224,9 +224,9 @@ export async function getSubscriptionCapability(
 }
 
 /**
- * POST /assistant/subscription/import — link from THIS machine's CLI login
+ * POST /assistant/subscription/import - link from THIS machine's CLI login
  * (`opencode auth login` / `codex login`). The response carries the config
- * read shape with `subscription_source: "local"` — the widget shows that.
+ * read shape with `subscription_source: "local"` - the widget shows that.
  */
 export async function importSubscription(
   provider: SubscriptionProvider,
@@ -240,7 +240,7 @@ export async function importSubscription(
   return payload.data;
 }
 
-/** GET /assistant/subscription/models — the models the linked subscription offers. */
+/** GET /assistant/subscription/models - the models the linked subscription offers. */
 export async function getSubscriptionModels(locale?: string): Promise<AssistantModelsResult> {
   const payload = await apiRequest<{ data: AssistantModelsResult }>("/assistant/subscription/models", {
     acceptLanguage: locale,
@@ -249,7 +249,7 @@ export async function getSubscriptionModels(locale?: string): Promise<AssistantM
 }
 
 /**
- * H21c — POST /assistant/subscription/start: begin the REAL device login.
+ * H21c - POST /assistant/subscription/start: begin the REAL device login.
  * Returns the user code + verification link + pacing; nothing secret in it.
  */
 export async function startSubscriptionLogin(
@@ -265,7 +265,7 @@ export async function startSubscriptionLogin(
 }
 
 /**
- * H21c — POST /assistant/subscription/poll: ask ONCE whether the user has
+ * H21c - POST /assistant/subscription/poll: ask ONCE whether the user has
  * approved. Callers pace these calls on the interval `start` returned.
  * Pending until the user approves; linked carries the new read shape.
  */

@@ -13,14 +13,14 @@ import OperationalTable, { type OperationalColumn } from "../../components/data/
 import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../../components/ui";
 
 /**
- * HR-managed extra access for ONE employee — Story H16.
+ * HR-managed extra access for ONE employee - Story H16.
  *
  * The rule this panel exists for: a manager never sees someone outside their own
  * department unless HR says so, in writing, for that one person. The backend
  * enforces it; this is the only screen that can widen it.
  *
  * The employee file on this screen is still fed by the demo directory, whose
- * emails do not exist on the server — so when the email does not resolve we say
+ * emails do not exist on the server - so when the email does not resolve we say
  * so and let HR pick the real account instead of pretending to know.
  *
  * House primitives only: `.section`/`.section-heading`, `.work-surface`,
@@ -129,7 +129,7 @@ export default function ManagerGrantsPanel({ employeeEmail }: { employeeEmail?: 
             {t("adminGrantsRevoke")}
           </button>
         ) : (
-          <span className="page-meta">—</span>
+          <span className="page-meta">-</span>
         ),
     },
   ];
@@ -184,12 +184,13 @@ export default function ManagerGrantsPanel({ employeeEmail }: { employeeEmail?: 
           <Banner tone="info">{t("adminGrantsNoRealAccount")}</Banner>
           <label className="field" style={{ marginBlockEnd: "var(--sp-3)" }}>
             <span className="field-label">{t("adminGrantsPickEmployee")}</span>
+            {/* ds-allow-native-select: dynamic-option picker; listbox rewrite is deferred */}
             <select className="select" value={pickedId} onChange={(event) => setPickedId(event.target.value)}>
               <option value="">{t("adminGrantsChoose")}</option>
               {(employees ?? []).map((entry) => (
                 <option key={entry.id} value={entry.id}>
                   {entry.full_name || entry.email}
-                  {entry.department_name_ar ? ` — ${entry.department_name_ar}` : ""}
+                  {entry.department_name_ar ? ` - ${entry.department_name_ar}` : ""}
                 </option>
               ))}
             </select>
@@ -203,6 +204,7 @@ export default function ManagerGrantsPanel({ employeeEmail }: { employeeEmail?: 
             <div className="form-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
               <label className="field" style={{ marginBlockEnd: "var(--sp-3)" }}>
                 <span className="field-label">{t("adminGrantsManager")}</span>
+                {/* ds-allow-native-select: dynamic-option picker; listbox rewrite is deferred */}
                 <select
                   className="select"
                   value={draft.manager}
@@ -212,13 +214,14 @@ export default function ManagerGrantsPanel({ employeeEmail }: { employeeEmail?: 
                   {managers.map((manager) => (
                     <option key={manager.id} value={manager.id}>
                       {manager.full_name || manager.email}
-                      {manager.department_name_ar ? ` — ${manager.department_name_ar}` : ""}
+                      {manager.department_name_ar ? ` - ${manager.department_name_ar}` : ""}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="field" style={{ marginBlockEnd: "var(--sp-3)" }}>
                 <span className="field-label">{t("adminGrantsScope")}</span>
+                {/* ds-allow-native-select: dynamic-option picker; listbox rewrite is deferred */}
                 <select
                   className="select"
                   value={draft.scope}

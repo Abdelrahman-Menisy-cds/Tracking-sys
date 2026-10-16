@@ -10,7 +10,7 @@ import { MoonIcon, SunIcon } from "../components/icons";
 import type { Dict } from "../i18n/dict";
 
 /**
- * /signup — the H34b two-step signup wizard.
+ * /signup - the H34b two-step signup wizard.
  *
  * The owner's requirement: the company-data screen comes FIRST, with the
  * activation code as the LAST field on it (not on a separate screen), and the
@@ -23,7 +23,7 @@ import type { Dict } from "../i18n/dict";
  *
  * Step 1 reuses the CompanyForm component (same fields, same validation rules,
  * same copy as the company-profile form) and only adds the activation-code
- * field through its `trailing` slot. Nothing is sent on step 1 — the fused
+ * field through its `trailing` slot. Nothing is sent on step 1 - the fused
  * request happens once, on step 2.
  *
  * Field mapping (server is authoritative): a server refusal carries
@@ -39,7 +39,7 @@ import type { Dict } from "../i18n/dict";
  * The demo signup code (Story H14b), in the bundle for the same reason as
  * DEMO_MODE's other constants: DEMO_MODE is compile-time, so a real build
  * drops it. When the API is unreachable the demo path has no server to check
- * the code, so the client must judge — this constant IS the demo judge.
+ * the code, so the client must judge - this constant IS the demo judge.
  */
 const DEMO_SIGNUP_CODE = "Menisy2002";
 
@@ -84,14 +84,14 @@ type SignupFieldParts = {
   codeMessage: string | null;
   emailMessage: string | null;
   passwordMessage: string | null;
-  /** `non_field_errors` — no single field owns it. */
+  /** `non_field_errors` - no single field owns it. */
   formMessage: string | null;
 };
 
 /**
  * Split the server's error envelope across the wizard's screens. The declared
  * type is `Record<string, string[]>`, but the company refusals arrive NESTED
- * (or as a plain array) — runtime shapes are checked, not assumed.
+ * (or as a plain array) - runtime shapes are checked, not assumed.
  */
 function partitionSignupFields(fields: Record<string, string[]> | undefined): SignupFieldParts {
   const parts: SignupFieldParts = {
@@ -131,7 +131,8 @@ function partitionSignupFields(fields: Record<string, string[]> | undefined): Si
 function EyeIcon() {
   return (
     <svg aria-hidden="true" className="icon" fill="none" focusable="false" height="20" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.65} viewBox="0 0 20 20" width="20">
-      <path d="M2 10s2.8-4.8 8-4.8S18 10 18 10s-2.8 4.8-8 4.8S2 10 2 10Z" />
+      {/* ds-allow-hardcode: svg path data, "10s" is not a duration */}
+      <path /* ds-allow-hardcode: svg path data; "10s" is an arc command, not a duration */ d="M2 10s2.8-4.8 8-4.8S18 10 18 10s-2.8 4.8-8 4.8S2 10 2 10Z" />
       <circle cx="10" cy="10" r="2.4" />
     </svg>
   );
@@ -140,7 +141,8 @@ function EyeIcon() {
 function EyeOffIcon() {
   return (
     <svg aria-hidden="true" className="icon" fill="none" focusable="false" height="20" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.65} viewBox="0 0 20 20" width="20">
-      <path d="M2 10s2.8-4.8 8-4.8S18 10 18 10s-2.8 4.8-8 4.8S2 10 2 10Z" />
+      {/* ds-allow-hardcode: svg path data, "10s" is not a duration */}
+      <path /* ds-allow-hardcode: svg path data; "10s" is an arc command, not a duration */ d="M2 10s2.8-4.8 8-4.8S18 10 18 10s-2.8 4.8-8 4.8S2 10 2 10Z" />
       <path d="M4 4 16 16" />
     </svg>
   );
@@ -182,7 +184,7 @@ export default function SignupPage() {
   const targetLocale = locale === "ar" ? "en" : "ar";
   const languageLabel = targetLocale === "ar" ? t("switchToArabic") : t("switchToEnglish");
   const targetTheme: Exclude<Appearance, "system"> = resolvedTheme === "light" ? "dark" : "light";
-  // The icon names the theme you would get, not the one you are in — the same
+  // The icon names the theme you would get, not the one you are in - the same
   // convention as the login screen's header buttons.
   const ThemeIcon = resolvedTheme === "light" ? MoonIcon : SunIcon;
 
@@ -191,7 +193,7 @@ export default function SignupPage() {
   const hasCompanyPatch = companyPatch !== null && Object.keys(companyPatch).length > 0;
   const step1Seed = (): CompanyProfile => ({ ...COMPANY_EMPTY_PROFILE, ...(companyPatch ?? {}) });
 
-  /** Step 1's only job: VALIDATE locally, collect, advance. No network here —
+  /** Step 1's only job: VALIDATE locally, collect, advance. No network here -
    * the fused POST happens once, from step 2 (H34b). */
   const collectStep1 = async (patch: CompanyProfilePatch): Promise<void> => {
     setCompanyPatch(patch);
@@ -199,7 +201,7 @@ export default function SignupPage() {
     if (!code.trim()) {
       setCodeError(t("signupEnterCode"));
       codeRef.current?.focus();
-      return; // do NOT advance — CompanyForm just resolves; the wizard stays
+      return; // do NOT advance - CompanyForm just resolves; the wizard stays
     }
     setCodeError(null);
     setStep2FieldErrors({});
@@ -230,6 +232,15 @@ export default function SignupPage() {
       setStep2FieldErrors(clientErrors);
       return;
     }
+    if (!hasCompanyPatch) {
+      // H34b: without the company patch the server founds a company with NO
+      // profile and then bounces the owner to /onboarding/company - the silent
+      // half-state that cost two rounds of testing. Refuse LOUDLY and send them
+      // back to the screen that collects it.
+      setStep2FieldErrors({ email: t("signupCompanyMissing") });
+      setStep(1);
+      return;
+    }
     setBusy(true);
     setStep2FieldErrors({});
     setStep2Banner(null);
@@ -237,7 +248,7 @@ export default function SignupPage() {
       const me = await signup(signupEmail.trim(), code.trim(), signupPassword, locale, hasCompanyPatch ? companyPatch ?? {} : undefined);
       // Success is a signed-in session whose company profile arrived COMPLETE
       // (needs_company_profile: false): adopt it exactly like sign-in and go
-      // straight to / — no onboarding screen, none owed.
+      // straight to / - no onboarding screen, none owed.
       adoptSession(me);
       navigate("/");
       return;
@@ -268,12 +279,12 @@ export default function SignupPage() {
       if (parts.codeMessage || parts.companyArrayMessage || companyFaults) {
         // Step-1's screen owns these fields: return there, remounted with the
         // collected values AND the refusals under their own fields. A bound
-        // code (`company` as an array) reprimands the CODE — the contradiction
+        // code (`company` as an array) reprimands the CODE - the contradiction
         // is the code, and the company screen cannot fix it by editing fields.
         if (companyFaults) setStep1ServerErrors(parts.companyFieldErrors);
         if (parts.companyArrayMessage) setCodeError(t("signupCodeBound"));
         else if (parts.codeMessage) setCodeError(parts.codeMessage);
-        // A same-answer password/email fault stays queued for step 2 — it is
+        // A same-answer password/email fault stays queued for step 2 - it is
         // still true of the values the user will re-submit.
         const queued: Partial<Record<"email" | "password" | "confirm", string>> = {};
         if (parts.emailMessage) queued.email = parts.emailMessage;

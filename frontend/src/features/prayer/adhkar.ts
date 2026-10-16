@@ -1,7 +1,7 @@
 /**
  * ~15 authentic short adhkar (remembrances), Arabic text with English
  * translation. Sources: the standard maṣādír (Ḥiṣn al-Muslim / fortified
- * Muslim's remembrances, Ṣaḥīḥ al-Bukhārī and Ṣaḥīḥ Muslim) — kept short
+ * Muslim's remembrances, Ṣaḥīḥ al-Bukhārī and Ṣaḥīḥ Muslim) - kept short
  * so each fits one floating notice for 14 seconds.
  */
 export interface Dhikr {
@@ -55,7 +55,7 @@ export const ADHKAR: Dhikr[] = [
   {
     ar: "حَسْبِيَ اللَّهُ وَنِعْمَ الْوَكِيلُ",
     en: "Allah is sufficient for me and the best disposer of affairs.",
-    source: { ar: "سورة الأنفال ٨:٤٠ — مأثور", en: "Qur'an 8:40-derived formula" },
+    source: { ar: "سورة الأنفال ٨:٤٠ - مأثور", en: "Qur'an 8:40-derived formula" },
   },
   {
     ar: "اللَّهُمَّ عَافِنِي فِي بَدَنِي، اللَّهُمَّ عَافِنِي فِي سَمْعِي، اللَّهُمَّ عَافِنِي فِي بَصَرِي",

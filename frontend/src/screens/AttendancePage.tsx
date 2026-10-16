@@ -7,7 +7,7 @@ import { ClockIcon, CloseIcon } from "../components/icons";
 import PageHeader from "../components/layout/PageHeader";
 
 /**
- * Brief H33 — the attendance record has NO server endpoint yet (punches,
+ * Brief H33 - the attendance record has NO server endpoint yet (punches,
  * derived days, exceptions, schedule resolution all lived only in the deleted
  * mock layer). The frontend may not invent rows, so the three attendance
  * routes keep their shells, headings and copy and render the honest
@@ -137,6 +137,7 @@ export function AttendanceHistoryPage() {
             </label>
             <label className="field">
               <span className="field-label">{translate(locale, "attendanceStatusOrException")}</span>
+              {/* ds-allow-native-select: dynamic-option picker; listbox rewrite is deferred */}
               <select className="select" value={filter} onChange={(e) => setFilter(e.target.value)}>
                 <option value="ALL">{translate(locale, "attendanceAll")}</option>
                 <option value="PRESENT">{translate(locale, "attendanceStatusPresent")}</option>

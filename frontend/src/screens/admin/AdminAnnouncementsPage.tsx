@@ -5,7 +5,7 @@ import PageHeader from "../../components/layout/PageHeader";
 import AdminNav from "./AdminNav";
 
 /**
- * Announcements — Brief H33 honest state.
+ * Announcements - Brief H33 honest state.
  *
  * Spec §4 built a composer + send lifecycle + history on the mock boundary,
  * but the backend exposes NO announcements endpoints (no feeds, no send

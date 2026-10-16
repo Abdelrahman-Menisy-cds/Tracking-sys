@@ -11,7 +11,7 @@ import { FilterIcon, PlusIcon } from "../components/icons";
 
 function nextStage(request: ServerMyRequest, locale: "ar" | "en") {
   const ar = locale === "ar";
-  if (request.status === "DRAFT" || request.status === "RETURNED") return ar ? "أنت — حفظ أو إرسال" : "You — save or submit";
+  if (request.status === "DRAFT" || request.status === "RETURNED") return ar ? "أنت - حفظ أو إرسال" : "You - save or submit";
   if (request.status === "PENDING_MANAGER") return ar ? "مراجعة المدير" : "Manager review";
   if (request.status === "PENDING_HR") return ar ? "مراجعة الموارد البشرية" : "HR review";
   return ar ? "لا يوجد إجراء مطلوب" : "No action required";
@@ -33,15 +33,16 @@ export default function MyRequestsPage() {
     /* The server does not expose submitted_at on the requester's own list, so
        the cell is honest: a draft says so, and everything else renders an
        empty marker rather than a fabricated date. */
-    { key: "submitted", label: labels.submitted, render: (request) => request.status === "DRAFT" ? t("draft") : <span className="muted">—</span> },
+    { key: "submitted", label: labels.submitted, render: (request) => request.status === "DRAFT" ? t("draft") : <span className="muted">-</span> },
     { key: "updated", label: t("lastUpdate"), render: (request) => formatDateTime(request.updated_at, locale) },
-    { key: "action", label: labels.action, render: (request) => request.status === "DRAFT" || request.status === "RETURNED" ? <Link to={`/requests/${request.id}`}>{locale === "ar" ? "متابعة" : "Continue"}</Link> : <span className="muted">—</span> },
+    { key: "action", label: labels.action, render: (request) => request.status === "DRAFT" || request.status === "RETURNED" ? <Link to={`/requests/${request.id}`}>{locale === "ar" ? "متابعة" : "Continue"}</Link> : <span className="muted">-</span> },
   ];
   return <div className="page"><PageHeader title={t("myRequestsTitle")} subtitle={locale === "ar" ? "نطاق العمل الشخصي" : "Personal scope"} primaryAction={<button className="btn btn-primary" onClick={() => navigate("/requests/new")}><PlusIcon />{t("newRequest")}</button>} />
     {list.phase === "loading" && <SkeletonRows rows={4} />}{list.phase === "error" && <ErrorState onRetry={list.retry} />}
     {list.phase === "ready" && <>
       <div className="filter-panel page-filter-panel">
-        <div className="filter-toolbar"><label className="field"><span className="field-label"><FilterIcon />{t("status")}</span><select className="select" value={statusFilter} onChange={(event) => setFilter(event.target.value)}><option value="all">{t("taskFilterAllStatuses")}</option>{(["DRAFT", "PENDING_MANAGER", "PENDING_HR", "APPROVED", "RETURNED", "REJECTED", "CANCELLED"] as RequestStatusType[]).map((status) => <option key={status} value={status}>{status === "DRAFT" ? t("stDraft") : status === "PENDING_MANAGER" ? t("stPendingManager") : status === "PENDING_HR" ? t("stPendingHr") : status === "APPROVED" ? t("stApproved") : status === "RETURNED" ? t("stReturned") : status === "REJECTED" ? t("stRejected") : t("stCancelled")}</option>)}</select></label></div>
+        <div className="filter-toolbar"><label className="field"><span className="field-label"><FilterIcon />{t("status")}</span>{/* ds-allow-native-select: dynamic-option picker; listbox rewrite is deferred */}
+<select className="select" value={statusFilter} onChange={(event) => setFilter(event.target.value)}><option value="all">{t("taskFilterAllStatuses")}</option>{(["DRAFT", "PENDING_MANAGER", "PENDING_HR", "APPROVED", "RETURNED", "REJECTED", "CANCELLED"] as RequestStatusType[]).map((status) => <option key={status} value={status}>{status === "DRAFT" ? t("stDraft") : status === "PENDING_MANAGER" ? t("stPendingManager") : status === "PENDING_HR" ? t("stPendingHr") : status === "APPROVED" ? t("stApproved") : status === "RETURNED" ? t("stReturned") : status === "REJECTED" ? t("stRejected") : t("stCancelled")}</option>)}</select></label></div>
         {statusFilter !== "all" && <div className="applied-filters tasks-filter-chips" aria-label={t("taskFiltersApplied")}><span className="filter-chip">{t("status")}<button type="button" className="tasks-chip-remove" aria-label={t("taskFilterRemove").replace("%s", t("status"))} onClick={() => setFilter("all")}>×</button></span><button type="button" className="btn btn-secondary" onClick={() => setFilter("all")}>{t("taskFiltersClearAll")}</button></div>}
         <p className="page-meta tasks-result-count" role="status">{t("taskFiltersShowing").replace("%s", String(filtered.length)).replace("%s", String(rows.length))}</p>
       </div>

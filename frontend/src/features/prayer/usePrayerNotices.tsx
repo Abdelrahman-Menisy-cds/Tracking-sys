@@ -20,7 +20,7 @@ import {
 /*
  * Employee-visible prayer & dhikr settings, for the employee's OWN profile
  * page only (<code>/profile</code>). Shown ONLY when the signed-in
- * employee's directory entry says MUSLIM — the product owner's rule:
+ * employee's directory entry says MUSLIM - the product owner's rule:
  * «لو الموظف مسلم خلي عند الموظف نفسه انه يقدر يشغل 2 اوبشن».
  *
  * Preferences persist in localStorage (device-local, per employee id),
@@ -90,7 +90,7 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
   // Refs mirror the latest prefs/locale for the trigger callback without
   // re-arming the loop on every re-render; both are written ONLY in the sync
   // effect below and read ONLY inside callbacks (onTrigger, the loop's
-  // provider) — never during render, so the pure-render rule holds.
+  // provider) - never during render, so the pure-render rule holds.
   const prefsRef = useRef(prefs);
   const localeRef = useRef(locale);
   const nextIdRef = useRef(0);
@@ -98,8 +98,8 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
    * Keeps prefsRef/localeRef pointing at the latest props on every change.
    * Without this effect both refs keep their MOUNT-time values for the whole
    * component lifetime: the loop's provider (line ~169) then sees
-   * hourlyDhikr: false forever and returns null for every poll — which is
-   * exactly the defect that made the whole notification system dead — and
+   * hourlyDhikr: false forever and returns null for every poll - which is
+   * exactly the defect that made the whole notification system dead - and
    * even a candidate reaching onTrigger would be rejected by the guards at
    * line ~123 reading the same frozen value. [BRIEF-D fix]
    */
@@ -110,14 +110,14 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
   /**
    * Previous value of prefs.hourlyDhikr as seen by the arming effect. Seeded
    * with the MOUNT-time value (what was stored), so a reload with the
-   * preference already on is NOT an enable — only a real OFF→ON transition
+   * preference already on is NOT an enable - only a real OFF→ON transition
    * inside this session fires the "show one dhikr after enabling" feedback.
    */
   const prevHourlyDhikrRef = useRef(prefs.hourlyDhikr);
   /**
-   * Last dhikr index shown FOR THIS EMPLOYEE in this session (NOT stored —
+   * Last dhikr index shown FOR THIS EMPLOYEE in this session (NOT stored -
    * a durable "last dhikr" would be a preference, and the brief forbids
-   * promoting it). Every draw — enable feedback and top-of-hour alike —
+   * promoting it). Every draw - enable feedback and top-of-hour alike -
    * excludes it, so the same card never follows itself for the same person.
    */
   const lastDhikrIndexRef = useRef<number | null>(null);
@@ -162,7 +162,7 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
                 id,
                 title: localeRef.current === "ar" ? "حان وقت الصلاة" : "It is time for prayer",
                 body: <>
-                  {localeRef.current === "ar" ? `حان وقت صلاة ${prayerName} — على الموظف الخروج لأداء الصلاة.` : `It is time for the ${prayerName} prayer — time to step away and pray.`}
+                  {localeRef.current === "ar" ? `حان وقت صلاة ${prayerName} - على الموظف الخروج لأداء الصلاة.` : `It is time for the ${prayerName} prayer - time to step away and pray.`}
                 </>,
                 dismissLabel: localeRef.current === "ar" ? `إغلاق إشعار صلاة ${prayerName}` : `Dismiss ${prayerName} prayer notice`,
                 visibleMs: 30_000,
@@ -171,7 +171,7 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
             : {
                 id,
                 title: localeRef.current === "ar" ? "الصلاة على الأبواب" : "Prayer is near",
-                body: localeRef.current === "ar" ? `باقي ٥ دقائق على أذان ${prayerName} — اتوضأ واستعد للصلاة.` : `5 minutes until the ${prayerName} call to prayer — make wudu and get ready.`,
+                body: localeRef.current === "ar" ? `باقي ٥ دقائق على أذان ${prayerName} - اتوضأ واستعد للصلاة.` : `5 minutes until the ${prayerName} call to prayer - make wudu and get ready.`,
                 dismissLabel: localeRef.current === "ar" ? `إغلاق تنبيه اقتراب صلاة ${prayerName}` : `Dismiss ${prayerName} pre-prayer reminder`,
                 visibleMs: 30_000,
                 tone: "prayer",
@@ -180,16 +180,16 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
       } else if (trigger.kind === "dhikr") {
         const dhikr = ADHKAR[trigger.dhikrIndex ?? 0] ?? ADHKAR[0];
         // Record what this person just saw, so the next draw (enable
-        // feedback or hourly) excludes it — a repeat reads as "not random".
+        // feedback or hourly) excludes it - a repeat reads as "not random".
         if (typeof trigger.dhikrIndex === "number") lastDhikrIndexRef.current = trigger.dhikrIndex;
         setNotices((current) => [
           ...current,
           {
             id,
             title: localeRef.current === "ar" ? "ذكر الساعة" : "Hourly dhikr",
-            body: <bdi style={{ fontSize: "var(--font-size-md)" }}>{localeRef.current === "ar" ? dhikr.ar : `${dhikr.ar}  —  ${dhikr.en}`}</bdi>,
+            body: <bdi style={{ fontSize: "var(--font-size-md)" }}>{localeRef.current === "ar" ? dhikr.ar : `${dhikr.ar}  -  ${dhikr.en}`}</bdi>,
             dismissLabel: localeRef.current === "ar" ? "إغلاق تنبيه الذكر" : "Dismiss dhikr notice",
-            visibleMs: DHIKR_VISIBLE_MS, // 14 seconds, then gone — measured by the test below.
+            visibleMs: DHIKR_VISIBLE_MS, // 14 seconds, then gone - measured by the test below.
             tone: "dhikr",
           },
         ]);
@@ -213,7 +213,7 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
           });
           if (p) candidates.push(p);
           // After today's last prayer, the next REAL event is tomorrow's
-          // Fajr — computed, never invented. Roll the calendar day forward
+          // Fajr - computed, never invented. Roll the calendar day forward
           // and ask the same pure function.
           if (!p) {
             const tomorrow = new Date(now + 86_400_000);
@@ -241,7 +241,7 @@ export function usePrayerNotices(employeeId: string): PrayerNoticesState {
     // Runs with the transition flag computed above:
     if (transitionedOn) {
       // Fresh random draw for this person, excluding the dhikr shown
-      // immediately before (per-session ref — see the ref's comment):
+      // immediately before (per-session ref - see the ref's comment):
       const immediate = immediateDhikrTrigger(Date.now(), ADHKAR.length, {
         excludeIndex: lastDhikrIndexRef.current,
       });

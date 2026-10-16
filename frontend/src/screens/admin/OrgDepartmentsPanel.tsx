@@ -14,14 +14,14 @@ import OperationalTable, { type OperationalColumn } from "../../components/data/
 import { Banner, Dialog, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../../components/ui";
 
 /**
- * Departments and the people inside them — Story H16, the HR surface.
+ * Departments and the people inside them - Story H16, the HR surface.
  *
  * Built from the house primitives only, so it reads like the roster screens it
  * sits next to: `.section` + `.section-heading` for the block, `.work-surface`
  * for each card, `.form-grid` + `.field` + `.select` for the forms, and
  * `OperationalTable` for every list of people.
  *
- * Both create flows are dialogs opened from the section heading — the page
+ * Both create flows are dialogs opened from the section heading - the page
  * itself stays a readable list of departments instead of a form that is always
  * open whether or not anyone is adding something.
  *
@@ -283,6 +283,7 @@ export default function OrgDepartmentsPanel() {
 
                 <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
                   <span className="field-label">{t("adminOrgManager")}</span>
+                  {/* ds-allow-native-select: dynamic-option picker; listbox rewrite is deferred */}
                   <select
                     className="select"
                     value={department.manager_id ?? ""}
@@ -292,7 +293,7 @@ export default function OrgDepartmentsPanel() {
                     {managers.map((person) => (
                       <option key={person.id} value={person.id}>
                         {person.full_name || person.email}
-                        {person.department_name_ar ? ` — ${person.department_name_ar}` : ""}
+                        {person.department_name_ar ? ` - ${person.department_name_ar}` : ""}
                       </option>
                     ))}
                   </select>
@@ -395,6 +396,7 @@ export default function OrgDepartmentsPanel() {
 
           <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
             <span className="field-label">{t("adminOrgRole")}</span>
+            {/* ds-allow-native-select: dynamic-option picker; listbox rewrite is deferred */}
             <select
               className="select"
               value={employeeDraft.role}
@@ -409,6 +411,7 @@ export default function OrgDepartmentsPanel() {
 
           <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
             <span className="field-label">{t("adminOrgDepartment")}</span>
+            {/* ds-allow-native-select: dynamic-option picker; listbox rewrite is deferred */}
             <select
               className="select"
               value={employeeDraft.department}
@@ -431,6 +434,7 @@ export default function OrgDepartmentsPanel() {
 
           <label className="field" style={{ marginBlockEnd: "var(--sp-4)" }}>
             <span className="field-label">{t("adminOrgManagerOfEmployee")}</span>
+            {/* ds-allow-native-select: dynamic-option picker; listbox rewrite is deferred */}
             <select
               className="select"
               value={employeeDraft.manager}

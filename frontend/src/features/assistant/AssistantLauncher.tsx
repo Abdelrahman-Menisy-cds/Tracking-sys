@@ -9,11 +9,11 @@ import {
 import AssistantPanel from "./AssistantPanel";
 
 /**
- * The floating مدام عفاف launcher — brief H18, piece 1.
+ * The floating مدام عفاف launcher - brief H18, piece 1.
  *
  * The owner's rule, enforced here and nowhere else: while the employee has no
  * active model linked (nothing configured, or is_active false), the button is
- * FADED and NOT enabled — it does not open the chat — but hovering it OR
+ * FADED and NOT enabled - it does not open the chat - but hovering it OR
  * focusing it (Tab keeps it reachable: aria-disabled, not disabled) says they
  * need to link an active model from the settings, and the hint carries a link
  * straight to the profile widget, so the recovery is one click away.
@@ -31,7 +31,7 @@ export default function AssistantLauncher() {
       .then((next) => setConfig(next))
       .catch(() => {
         // Unreachable backend / no endpoints yet: keep the launcher faded rather
-        // than guessing a state — the next save event or reload re-probes.
+        // than guessing a state - the next save event or reload re-probes.
         setConfig((current) => current ?? null);
       });
   }, [locale]);

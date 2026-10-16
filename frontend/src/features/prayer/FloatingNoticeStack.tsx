@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 /**
- * FloatingNoticeStack — the ONE notification surface for everything that
+ * FloatingNoticeStack - the ONE notification surface for everything that
  * fires from the prayer/dhikr features (and anything else that wants a
  * corner notice later).
  *
  * Contract:
  * - Portaled to document.body; pinned to the START corner (inline-start), so
- *   in RTL it visually sits top-right and in LTR top-left — it never covers
+ *   in RTL it visually sits top-right and in LTR top-left - it never covers
  *   the reading column's end edge, which is where scrollbars and reading
  *   reading motion live.
  * - aria-live="polite" on the container; individual notices carry their own
@@ -40,7 +40,7 @@ interface FloatingNoticeStackProps {
 
 export function FloatingNoticeStack({ notices, onDismiss }: FloatingNoticeStackProps) {
   // This is a client-only app (no SSR), and document.body always exists by
-  // the time React runs createRoot — so no mount gate is needed at all.
+  // the time React runs createRoot - so no mount gate is needed at all.
   return createPortal(
     <div
       className="notice-stack"

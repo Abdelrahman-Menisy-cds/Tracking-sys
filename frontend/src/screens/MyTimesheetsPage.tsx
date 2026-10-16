@@ -66,8 +66,8 @@ type EditorEntry = {
  * The week editor. The contract corrects EXISTING entries one PATCH at a
  * time, each carrying the sheet's known version; an accepted edit returns
  * the sheet at its new version and the next edit chains off it. Days the
- * week was created without an entry have NO server row to edit — the
- * backend exposes no add-entry endpoint — so those cells are inert and
+ * week was created without an entry have NO server row to edit - the
+ * backend exposes no add-entry endpoint - so those cells are inert and
  * labelled, never silently writable.
  */
 function TimesheetEditor({ initialSheet }: { initialSheet: ServerMyTimesheet }) {
@@ -104,8 +104,8 @@ function TimesheetEditor({ initialSheet }: { initialSheet: ServerMyTimesheet }) 
     } catch {
       setSavedTone("warning");
       setSavedMessage(locale === "ar"
-        ? "تعذّر حفظ التعديل. أعد تحميل السجل قبل المحاولة مرة أخرى — قد يكون تغيّر إصداره."
-        : "The edit was not saved. Reload the record before retrying — its version may have changed.");
+        ? "تعذّر حفظ التعديل. أعد تحميل السجل قبل المحاولة مرة أخرى - قد يكون تغيّر إصداره."
+        : "The edit was not saved. Reload the record before retrying - its version may have changed.");
     } finally {
       setEntryBusy(null);
     }
@@ -149,7 +149,7 @@ function TimesheetEditor({ initialSheet }: { initialSheet: ServerMyTimesheet }) 
       <PageHeader title={<>{t("week")}: {weekInterval(currentSheet.week_start, locale)}</>} subtitle={locale === "ar" ? "الاثنين إلى الأحد · المنطقة الزمنية للمؤسسة: القاهرة" : "Monday to Sunday · organization timezone: Cairo"} breadcrumb={<Link to="/timesheets">{t("myTimesheetsTitle")}</Link>} />
       <div className="work-surface status-action-block"><div className="status-action-row"><TimesheetStatusPill status={currentSheet.status} /><span>{readOnly ? t("readonlyTimesheet") : (locale === "ar" ? "يمكنك تعديل هذا السجل قبل الإرسال." : "This record can be edited before submission.")}{entryBusy ? ` · ${locale === "ar" ? "جارٍ الحفظ" : "saving"}` : "" }</span></div></div>
       <div className="table-wrap section"><table><caption className="table-caption">{locale === "ar" ? "المدة والراحة بالدقائق؛ كل تعديل يُرسل إلى الخادم فورًا مع إصدار السجل." : "Duration and breaks in minutes; every edit is sent to the server immediately with the record's version."}</caption><thead><tr><th scope="col">{t("workDate")}</th><th scope="col">{t("duration")}</th><th scope="col">{t("breakTime")}</th><th scope="col">{t("description")}</th></tr></thead><tbody>{entries.map((entry) => <tr key={entry.work_date}><th scope="row">{formatDate(`${entry.work_date}T12:00:00Z`, locale)}</th><td>{cell(entry, "duration_minutes", `duration-${entry.work_date}`, `${t("duration")} ${formatDate(`${entry.work_date}T12:00:00Z`, locale)}`, "ltr", true)}</td><td>{cell(entry, "unpaid_break_minutes", `break-${entry.work_date}`, `${t("breakTime")} ${formatDate(`${entry.work_date}T12:00:00Z`, locale)}`, "ltr", true)}</td><td>{cell(entry, "description", `description-${entry.work_date}`, `${t("description")} ${formatDate(`${entry.work_date}T12:00:00Z`, locale)}`)}</td></tr>)}</tbody></table>
-        <p className="page-meta">{locale === "ar" ? "ملاحظة: الأيام التي أنشئ الأسبوع بدون إدخال لها تظهر معطّلة — لا تتيح نقطة النهاية إضافة إدخال جديد لأسبوع قائم." : "Note: days the week was created without an entry show disabled — the API offers no add-entry endpoint for an existing week."}</p>
+        <p className="page-meta">{locale === "ar" ? "ملاحظة: الأيام التي أنشئ الأسبوع بدون إدخال لها تظهر معطّلة - لا تتيح نقطة النهاية إضافة إدخال جديد لأسبوع قائم." : "Note: days the week was created without an entry show disabled - the API offers no add-entry endpoint for an existing week."}</p>
       </div>
       <div className="mobile-record-list section">{entries.map((entry) => <section className="record-block" aria-labelledby={`day-${entry.work_date}`} key={entry.work_date}><h2 id={`day-${entry.work_date}`}>{formatDate(`${entry.work_date}T12:00:00Z`, locale)}</h2><label className="field"><span className="field-label">{t("duration")}</span>{cell(entry, "duration_minutes", `mobile-duration-${entry.work_date}`, `${t("duration")} ${formatDate(`${entry.work_date}T12:00:00Z`, locale)}`, "ltr", true)}</label><label className="field"><span className="field-label">{t("breakTime")}</span>{cell(entry, "unpaid_break_minutes", `mobile-break-${entry.work_date}`, `${t("breakTime")} ${formatDate(`${entry.work_date}T12:00:00Z`, locale)}`, "ltr", true)}</label><label className="field"><span className="field-label">{t("description")}</span>{cell(entry, "description", `mobile-description-${entry.work_date}`, `${t("description")} ${formatDate(`${entry.work_date}T12:00:00Z`, locale)}`)}</label></section>)}</div>
       <div className="summary-strip section"><div className="summary-item"><span className="summary-label">{t("totalHours")}</span><strong className="summary-value">{formatMinutes(worked, locale)}</strong></div><div className="summary-item"><span className="summary-label">{t("breakTime")}</span><strong className="summary-value">{formatMinutes(breaks, locale)}</strong></div></div>

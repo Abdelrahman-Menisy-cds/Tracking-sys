@@ -12,7 +12,7 @@ const ROLE_OPTIONS: Role[] = ["employee", "manager", "hr"];
 /**
  * The demo accounts, one per role (created by `manage.py seed_demo_accounts`).
  *
- * The picker does not grant a role — the server still derives it from the
+ * The picker does not grant a role - the server still derives it from the
  * account, so picking a role and typing that role's email by hand land in
  * exactly the same place. All it chooses is WHICH account you sign in as.
  *
@@ -74,7 +74,8 @@ function devQueryEnabled(): boolean {
 function EyeIcon() {
   return (
     <svg aria-hidden="true" className="icon" fill="none" focusable="false" height="20" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.65} viewBox="0 0 20 20" width="20">
-      <path d="M2 10s2.8-4.8 8-4.8S18 10 18 10s-2.8 4.8-8 4.8S2 10 2 10Z" />
+      {/* ds-allow-hardcode: svg path data, "10s" is not a duration */}
+      <path /* ds-allow-hardcode: svg path data; "10s" is an arc command, not a duration */ d="M2 10s2.8-4.8 8-4.8S18 10 18 10s-2.8 4.8-8 4.8S2 10 2 10Z" />
       <circle cx="10" cy="10" r="2.4" />
     </svg>
   );
@@ -83,7 +84,8 @@ function EyeIcon() {
 function EyeOffIcon() {
   return (
     <svg aria-hidden="true" className="icon" fill="none" focusable="false" height="20" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.65} viewBox="0 0 20 20" width="20">
-      <path d="M2 10s2.8-4.8 8-4.8S18 10 18 10s-2.8 4.8-8 4.8S2 10 2 10Z" />
+      {/* ds-allow-hardcode: svg path data, "10s" is not a duration */}
+      <path /* ds-allow-hardcode: svg path data; "10s" is an arc command, not a duration */ d="M2 10s2.8-4.8 8-4.8S18 10 18 10s-2.8 4.8-8 4.8S2 10 2 10Z" />
       <path d="M4 4 16 16" />
     </svg>
   );
@@ -124,7 +126,7 @@ export default function LoginPage() {
   const showRoleBlock = devQueryEnabled();
 
   const targetTheme: Exclude<Appearance, "system"> = resolvedTheme === "light" ? "dark" : "light";
-  // The icon names the theme you would get, not the one you are in — the same
+  // The icon names the theme you would get, not the one you are in - the same
   // convention as the language button beside it (which shows "AR"/"EN" for the
   // target) and the same thing the aria-label says.
   const ThemeIcon = resolvedTheme === "light" ? MoonIcon : SunIcon;
@@ -132,7 +134,7 @@ export default function LoginPage() {
   const setPasswordForDevRole = (option: Role) => {
     setDevRole(option);
     // In the demo build the picker fills the account too, so one tap really
-    // does sign you in as that role. The server still decides the role — this
+    // does sign you in as that role. The server still decides the role - this
     // only names the account.
     if (DEMO_MODE) {
       setIdentifier(DEMO_ACCOUNTS[option].email);
@@ -223,7 +225,7 @@ export default function LoginPage() {
                   onChange={(event) => {
                     setIdentifier(event.target.value);
                     // Typing means you are naming the account yourself, so stop letting a
-                    // previous pick speak for the role — the readout follows the email again.
+                    // previous pick speak for the role - the readout follows the email again.
                     setDevRole(null);
                   }}
                 />

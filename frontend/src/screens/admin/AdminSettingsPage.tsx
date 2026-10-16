@@ -15,11 +15,11 @@ import type { Dict, Locale } from "../../i18n/dict";
 type DictKey = keyof Dict;
 
 /**
- * Organization settings — spec §1, now server-backed where the server exists:
+ * Organization settings - spec §1, now server-backed where the server exists:
  *
  *   • §1.3 Public-holidays register: READ from `GET /holidays` and refreshed
  *     by the §1.4 control (`POST /holidays/refresh`). The manual add/edit/
- *     delete dialogs had no endpoint behind them — they were demo writes, and
+ *     delete dialogs had no endpoint behind them - they were demo writes, and
  *     they are gone; the register is read-only + refresh, invoices proposals
  *     as proposals, and an empty register is an honest empty state.
  *   • §1.1 Work schedule + §1.2 leave entitlement: NO endpoints exist. They
@@ -32,7 +32,7 @@ const dateIsValid = (value: string): boolean => ISO_DATE.test(value) && Number.i
 
 const numText = (value: number, locale: Locale): string => new Intl.NumberFormat(locale).format(value);
 
-// Brief H3 — the ONE shared formatting path; no screen-local Intl date formatters.
+// Brief H3 - the ONE shared formatting path; no screen-local Intl date formatters.
 const fullDate = (value: string, locale: Locale): string =>
   dateIsValid(value) ? formatDateLong(`${value}T12:00:00Z`, locale) : value;
 
@@ -60,7 +60,7 @@ export default function AdminSettingsPage() {
             <LeaveSection t={t as (key: DictKey) => string} locale={locale} />
           </div>
         ) : null}
-        {/* H17 — the company identity: its own widget card, full width, server-backed
+        {/* H17 - the company identity: its own widget card, full width, server-backed
             (GET/PATCH /company). */}
         <div style={{ gridColumn: "1 / -1" }}>
           <CompanyProfilePanel t={t as (key: DictKey) => string} locale={locale} />
@@ -164,7 +164,7 @@ function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; local
       <div className="section-heading">
         <h2 id="settings-holidays-heading">{t("hrHolidaysTitle")}</h2>
         <div className="row-actions">
-          {/* §1.4 — the control is real. It reports what the server actually did. */}
+          {/* §1.4 - the control is real. It reports what the server actually did. */}
           <button
             type="button"
             className="btn btn-secondary has-tooltip"
@@ -185,7 +185,7 @@ function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; local
         {t("adminSettingsAiNote")}
       </span>
 
-      {/* A failed read is stated by its real reason — nothing was rendered instead. */}
+      {/* A failed read is stated by its real reason - nothing was rendered instead. */}
       {loadFailure ? (
         <p className="page-meta" style={{ marginBlockStart: "var(--sp-2)" }}>
           {describeLoadFailure(loadFailure, t)}
@@ -248,7 +248,7 @@ function describeLoadFailure(failure: { reason: ApiFailureKind }, t: (key: DictK
   return t("adminSettingsAiServerUnreachable");
 }
 
-/** The refresh outcome, from the server's own summary — counts, not adjectives. */
+/** The refresh outcome, from the server's own summary - counts, not adjectives. */
 function summariseRefresh(summary: RefreshSummary, locale: Locale, t: (key: DictKey) => string): string {
   const n = (value: number) => numText(value, locale);
   const parts = [
@@ -265,7 +265,7 @@ function summariseRefresh(summary: RefreshSummary, locale: Locale, t: (key: Dict
   // A dead LLM is a PARTIAL result: the official import landed, the Arabic/proposals did not.
   return summary.llm_available
     ? line
-    : `${line} — ${t("adminSettingsAiLlmUnavailable")}`;
+    : `${line} - ${t("adminSettingsAiLlmUnavailable")}`;
 }
 
 /** A failed refresh names the reason. It never reads as a success. */
@@ -276,10 +276,10 @@ function describeRefreshFailure(state: { reason: ApiFailureKind }, t: (key: Dict
   return t("adminSettingsAiFailedServer");
 }
 
-/** Server register row — read-only now: no endpoint backs manual edits. */
+/** Server register row - read-only now: no endpoint backs manual edits. */
 function HolidayRow({ holiday, t, locale }: { holiday: PublicHoliday; t: (key: DictKey) => string; locale: Locale }) {
   // Provenance. A proposal is NOT an official holiday, so it gets its own tone
-  // and its own label — never the default one.
+  // and its own label - never the default one.
   const badge = holiday.needsConfirmation
     ? { tone: "warning" as StatusTone, label: t("adminSettingsAiProposed") }
     : holiday.isManualOverride

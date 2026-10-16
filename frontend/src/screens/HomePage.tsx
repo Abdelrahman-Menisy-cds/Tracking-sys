@@ -11,15 +11,15 @@ import { AlertTriangleIcon, BellIcon, CalendarIcon, ClockIcon, DocumentIcon, Plu
 import PageHeader from "../components/layout/PageHeader";
 
 function splitContextTitle(title: string) {
-  const parts = title.split(" — ");
+  const parts = title.split(" - ");
   if (parts.length < 2) return { title, meta: null };
-  return { title: parts[0], meta: parts.slice(1).join(" — ") };
+  return { title: parts[0], meta: parts.slice(1).join(" - ") };
 }
 
 export default function HomePage() {
   const { t, locale, serverAccount, capabilities } = useApp();
   usePageTitle(t("homeTitle"));
-  /* Every dashboard summary reads the SERVER's own scope — no client tenant,
+  /* Every dashboard summary reads the SERVER's own scope - no client tenant,
      no fixture rows; an empty queue is an honest empty card. */
   const requestState = useServerData(() => listMyRequests(locale).then((payload) => payload.data), [locale]);
   const timesheetState = useServerData(() => listMyTimesheets(locale).then((payload) => payload.data), [locale]);
@@ -42,7 +42,7 @@ export default function HomePage() {
 
   return (
     <div className="page home-page">
-      <PageHeader title={t("homeTitle")} subtitle={<>{t("homeWelcome")}, <bdi>{serverAccount?.full_name ?? "—"}</bdi> · {locale === "ar" ? "فترة العمل الحالية" : "Current work period"}: <bdi>{currentWeek ? weekInterval(currentWeek.week_start, locale) : "—"}</bdi></>} primaryAction={<><Link className="btn btn-primary" to="/requests/new"><PlusIcon />{t("newRequest")}</Link><Link className="btn btn-secondary" to="/timesheets"><ClockIcon />{t("openTimesheet")}</Link></>} />
+      <PageHeader title={t("homeTitle")} subtitle={<>{t("homeWelcome")}, <bdi>{serverAccount?.full_name ?? "-"}</bdi> · {locale === "ar" ? "فترة العمل الحالية" : "Current work period"}: <bdi>{currentWeek ? weekInterval(currentWeek.week_start, locale) : "-"}</bdi></>} primaryAction={<><Link className="btn btn-primary" to="/requests/new"><PlusIcon />{t("newRequest")}</Link><Link className="btn btn-secondary" to="/timesheets"><ClockIcon />{t("openTimesheet")}</Link></>} />
       {attentionRequests.length > 0 && <section className="attention-strip" aria-label={locale === "ar" ? "يحتاج إلى انتباه" : "Needs attention"}><AlertTriangleIcon /><div><strong>{locale === "ar" ? "يحتاج إلى انتباه" : "Needs your attention"}</strong><span>{locale === "ar" ? "لديك عمل مُعاد أو مسودة يمكنك متابعتها." : "You have returned work or a draft to continue."}</span></div><Link className="btn btn-secondary btn-compact" to="/requests">{locale === "ar" ? "متابعة الطلبات" : "Review requests"}</Link></section>}
       <div className="dashboard-grid">
         <section className="section" aria-labelledby="my-work-heading">

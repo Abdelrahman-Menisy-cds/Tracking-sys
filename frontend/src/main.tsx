@@ -22,6 +22,7 @@ import AdminAnnouncementsPage from "./screens/admin/AdminAnnouncementsPage";
 import OnboardingCompanyPage from "./screens/OnboardingCompanyPage";
 import TasksPage from "./screens/TasksPage";
 import TaskDetailPage from "./screens/TaskDetailPage";
+import ReportsPage from "./screens/ReportsPage";
 
 /**
  * The app screens need a session.
@@ -36,7 +37,7 @@ function RequireSession() {
   // Wait for the boot probe in BOTH modes. Rendering the demo immediately looked
   // harmless, but it raced the probe: the admin route evaluated its permission
   // against the "employee" default, redirected to /, and only then did the real
-  // role arrive — so a signed-in HR user could never open an admin page by URL.
+  // role arrive - so a signed-in HR user could never open an admin page by URL.
   if (!sessionChecked) return null;
   if (isDemoMode) return <AppShell />;
   if (!serverAccount) return <Navigate to="/login" replace />;
@@ -49,7 +50,7 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
-          {/* H34b: the two-step signup wizard — company data + activation code
+          {/* H34b: the two-step signup wizard - company data + activation code
               first, then the founding HR account; one fused POST, straight to
               /. Lives OUTSIDE RequireSession exactly like /login. */}
           <Route path="/signup" element={<SignupPage />} />
@@ -67,6 +68,9 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/reviews" element={<TeamReviewsPage />} />
             <Route path="/reviews/requests/:id" element={<ReviewRequestDetailPage />} />
             <Route path="/reviews/timesheets/:id" element={<ReviewTimesheetDetailPage />} />
+            {/* H35: one reports route for manager AND HR - the server scopes
+                the data per caller; an employee gets the honest denied state. */}
+            <Route path="/reports" element={<ReportsPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/attendance" element={<AttendancePage />} />

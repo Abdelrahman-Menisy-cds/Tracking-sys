@@ -24,7 +24,7 @@ import Timeline from "../components/record/Timeline";
  * The review lane is now server-backed end to end: the queue and details ask
  * /review/* (the backend scopes every row by who is asking), and decisions go
  * through the Idempotency-Key'd decision endpoints. The queue keeps its
- * short-staffed columns; the decision suggestion column is gone — nothing on
+ * short-staffed columns; the decision suggestion column is gone - nothing on
  * the server carries the attendance/workload fixtures it was computed from.
  */
 
@@ -111,7 +111,7 @@ export default function TeamReviewsPage() {
       render: (request) => (
         request.permissions.can_decide
           ? <button className="btn btn-primary" onClick={() => setDeciding(request)}>{t("decision")}</button>
-          : <span className="muted">—</span>
+          : <span className="muted">-</span>
       ),
     },
   ];
@@ -132,7 +132,7 @@ export default function TeamReviewsPage() {
       render: (sheet) => (
         sheet.permissions.can_decide
           ? <button className="btn btn-primary" onClick={() => setDeciding(sheet)}>{t("decision")}</button>
-          : <span className="muted">—</span>
+          : <span className="muted">-</span>
       ),
     },
   ];
@@ -197,7 +197,7 @@ export default function TeamReviewsPage() {
           ) : null}
           {activeState.phase === "ready" && records.length > 0 && tab === "timesheets" ? (
             <>
-              <p className="muted">{locale === "ar" ? "الأسابيع من الاثنين إلى الأحد · المنطقة الزمنية للمؤسسة: Africa/Cairo" : "Weeks run Monday–Sunday · organization timezone: Africa/Cairo"}</p>
+              <p className="muted">{locale === "ar" ? "الأسابيع من الاثنين إلى الأحد · المنطقة الزمنية للمؤسسة: Africa/Cairo" : "Weeks run Monday-Sunday · organization timezone: Africa/Cairo"}</p>
               <OperationalTable
                 caption={locale === "ar" ? `${pendingTimesheets.length} سجلات وقت بانتظار قرار ضمن نطاقك` : `${pendingTimesheets.length} timesheets awaiting your decision within your server scope`}
                 columns={timesheetColumns}
@@ -388,7 +388,7 @@ export function ReviewRequestDetailPage() {
     <div className="page reading-page">
       <PageHeader title={<bdi>{request.title}</bdi>} subtitle={`${t("employee")}: ${request.requester_name}`} breadcrumb={<Link to="/reviews">{t("teamReviewsTitle")}</Link>} />
       <div className="status-action-block"><RequestStatusPill status={request.status} /><p>{requestNextStage(request, locale)}</p></div>
-      {/* The review detail carries no picked period — the server serializes
+      {/* The review detail carries no picked period - the server serializes
           only type/title/details, so that block renders its honest empty state. */}
       <section className="work-surface section" aria-labelledby="review-period"><h2 id="review-period">{t("requestPeriod")}</h2><EmptyState message={locale === "ar" ? "الخادم لا يعرض الفترة المختارة على هذا المسار بعد." : "The server does not expose the picked period on this endpoint yet."} /></section>
       <section className="work-surface section" aria-labelledby="review-details"><h2 id="review-details">{t("requestReason")}</h2><p className="preserve-lines"><bdi>{request.details}</bdi></p></section>
@@ -453,7 +453,7 @@ export function ReviewTimesheetDetailPage() {
 
 /**
  * The review detail endpoints answer 403/404 for anything outside the caller's
- * server-built scope — the shared client turns that into a catch — and a
+ * server-built scope - the shared client turns that into a catch - and a
  * ticket can also simply no longer be in scope. Either way there is NO local
  * copy to fall back on (the review fixtures are gone), so this renders the
  * honest unavailable state instead of a stale demo record.

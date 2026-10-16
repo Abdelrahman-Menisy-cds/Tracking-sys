@@ -7,10 +7,10 @@ import type { ServerMyRequest } from "../app/serverTypes";
 import { Banner, EmptyState, ErrorState, RequestStatusPill, SkeletonRows } from "../components/ui";
 import PageHeader from "../components/layout/PageHeader";
 
-function nextStage(status: ServerMyRequest["status"], locale: "ar" | "en") { if (status === "RETURNED") return locale === "ar" ? "أنت — صحح ثم أرسل" : "You — correct and submit"; if (status === "PENDING_MANAGER") return locale === "ar" ? "مراجعة المدير" : "Manager review"; if (status === "PENDING_HR") return locale === "ar" ? "مراجعة الموارد البشرية" : "HR review"; return locale === "ar" ? "لا يوجد إجراء مطلوب" : "No action required"; }
+function nextStage(status: ServerMyRequest["status"], locale: "ar" | "en") { if (status === "RETURNED") return locale === "ar" ? "أنت - صحح ثم أرسل" : "You - correct and submit"; if (status === "PENDING_MANAGER") return locale === "ar" ? "مراجعة المدير" : "Manager review"; if (status === "PENDING_HR") return locale === "ar" ? "مراجعة الموارد البشرية" : "HR review"; return locale === "ar" ? "لا يوجد إجراء مطلوب" : "No action required"; }
 
 /**
- * The requester's own record detail — GET /requests/{id} plus its own
+ * The requester's own record detail - GET /requests/{id} plus its own
  * attachments endpoint. The server does NOT expose the event trail, a
  * requester_name, or the picked period on this endpoint, so those blocks
  * render their honest states instead of fixture content (Brief H33).

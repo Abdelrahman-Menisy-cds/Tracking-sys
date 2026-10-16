@@ -99,7 +99,7 @@ interface AppState {
   setAppearance: (appearance: Appearance) => void;
   resolvedTheme: "light" | "dark";
   /**
-   * H17 — the server's own word ("this session still owes the company
+   * H17 - the server's own word ("this session still owes the company
    * profile"). Strictly `true`/`false`/undefined: undefined (older backend,
    * or the boot probe not answered yet) fails OPEN, so the gate never bricks
    * the app on a missing flag.
@@ -199,7 +199,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * What this role may do. Capability follows the ROLE — it used to be ANDed with
+   * What this role may do. Capability follows the ROLE - it used to be ANDed with
    * DEMO_MODE, which made the admin screens unreachable for a signed-in HR user.
    * Enforcement stays server-side; screens use these flags to render the right
    * honest state, never to pretend an action happened.
@@ -265,7 +265,7 @@ export function usePageTitle(page: string): void {
   const { locale } = useApp();
   useEffect(() => {
     document.title = locale === "ar"
-      ? `${page} — هي فوضى؟`
-      : `${page} — Heya Fawda?`;
+      ? `${page} - هي فوضى؟`
+      : `${page} - Heya Fawda?`;
   }, [locale, page]);
 }

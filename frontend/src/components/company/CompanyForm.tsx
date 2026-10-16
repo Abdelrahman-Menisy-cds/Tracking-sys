@@ -11,12 +11,12 @@ import type { Dict, Locale } from "../../i18n/dict";
 type DictKey = keyof Dict;
 
 /**
- * The H17 company form — one shared implementation, two users.
+ * The H17 company form - one shared implementation, two users.
  *
  * It renders inline (no dialog) both inside the mandatory /onboarding/company
  * page and inside the CompanyProfilePanel edit mode on /admin/settings, so the
  * two screens cannot drift: same fields, same validation mapping, same logo
- * pipeline. The caller owns the data flow — it hands over the current profile
+ * pipeline. The caller owns the data flow - it hands over the current profile
  * (null = nothing yet) and a `save` promise, and receives per-field errors back
  * translated, plus a success line.
  *
@@ -50,7 +50,7 @@ const TEXT_FIELDS = Object.keys(FIELD_KEYS).filter(
 
 const PHONE_PATTERN = /^[0-9\s+\-()]+$/u;
 
-/** Client-side mirror of the server's validators — only fast, cheap misses. */
+/** Client-side mirror of the server's validators - only fast, cheap misses. */
 function validate(values: TextFields, logo: string | null, locale: Locale): Partial<Record<keyof TextFields | "logo_data_url", string>> {
   const ar = locale === "ar";
   const errors: ReturnType<typeof validate> = {};
@@ -166,7 +166,7 @@ export function CompanyForm({
   compact?: boolean;
   /**
    * H34b: extra fields the parent renders INSIDE this form, after the
-   * optional group — the signup wizard puts the activation-code field here so
+   * optional group - the signup wizard puts the activation-code field here so
    * the code stays the LAST field of the company screen and Enter still
    * submits the same form. The parent owns that field's state entirely.
    */

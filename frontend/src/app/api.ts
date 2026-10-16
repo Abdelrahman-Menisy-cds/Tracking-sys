@@ -20,8 +20,8 @@ export const API_BASE: string =
 export const API_CONFIGURED = true;
 
 export type ApiFailureKind =
-  | "unauthenticated" // 401 — no session on the server
-  | "forbidden" // 403/404 — signed in, but not an HR role
+  | "unauthenticated" // 401 - no session on the server
+  | "forbidden" // 403/404 - signed in, but not an HR role
   | "unreachable" // network error / no server behind the URL
   | "server" // 5xx
   | "invalid"; // 4xx we can name
@@ -99,7 +99,7 @@ export interface ServerIdentity {
   email: string;
   full_name: string;
   role: string;
-  /** H17: absent on an older backend — treat exactly like false (fail open). */
+  /** H17: absent on an older backend - treat exactly like false (fail open). */
   needs_company_profile?: boolean;
 }
 
@@ -132,7 +132,7 @@ export async function getIdentity(): Promise<ServerIdentity> {
  * code included at the wizard level) together with the founding HR
  * credentials in ONE request; the backend validates the code first, then
  * writes Company + a COMPLETE CompanyProfile + the founding HR user in one
- * transaction and answers signed-in with `needs_company_profile: false` —
+ * transaction and answers signed-in with `needs_company_profile: false` -
  * so no onboarding step is owed and the caller goes straight to /.
  *
  * Success is a signed-in session: the server creates the HR account and
@@ -140,7 +140,7 @@ export async function getIdentity(): Promise<ServerIdentity> {
  * the same envelope login() returns.
  *
  * The one non-signup outcome is `email_in_use`: an existing email answered with
- * a valid code returns `{"data": {"outcome": "email_in_use"}}` — non-enumerating,
+ * a valid code returns `{"data": {"outcome": "email_in_use"}}` - non-enumerating,
  * no re-role, no account data. It is NOT a ServerIdentity and must not be
  * adopted as one, so it is raised as an ApiError and the wizard renders
  * its own line for it.

@@ -9,7 +9,7 @@ import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../com
 import PageHeader from "../components/layout/PageHeader";
 
 /**
- * Brief H33 — the notifications page asks the server (GET /notifications;
+ * Brief H33 - the notifications page asks the server (GET /notifications;
  * the backend scopes every row to the caller). The only mutation the
  * contract exposes is the READ STATE (PATCH /notifications/{id}/read-state):
  * the old client-side «remove»/«clear» never existed server-side and would

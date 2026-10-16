@@ -141,6 +141,21 @@ class SignupView(APIView):
         CsrfEnforcedSessionAuthentication().enforce_csrf(request)
         serializer = SignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # TEMPORARY DIAGNOSTIC (H34b): which shape did this signup really carry?
+        # Remove once the company-first flow is confirmed end to end.
+        import sys
+
+        _co = request.data.get("company") if hasattr(request.data, "get") else None
+        _shape = (
+            "ABSENT"
+            if _co is None
+            else ("EMPTY" if _co == {} else (sorted(_co.keys()) if hasattr(_co, "keys") else type(_co).__name__))
+        )
+        print(
+            f"SIGNUP-DIAG keys={sorted(request.data.keys()) if hasattr(request.data, 'keys') else []} company={_shape}",
+            file=sys.stderr,
+            flush=True,
+        )
         try:
             user, error = sign_up(
                 request=request,

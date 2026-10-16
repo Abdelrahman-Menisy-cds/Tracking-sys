@@ -24,12 +24,12 @@ function viewOf(config: AssistantEmployeeConfig): SubscriptionView {
 }
 
 /**
- * HR's assistant widget inside the ONE employee's file — brief H18,
+ * HR's assistant widget inside the ONE employee's file - brief H18,
  * extended by H19 with the same three-way mode picker the employee's own
  * widget has, at the top of the card: «مفتاح API» / «اشتراك opencode» /
  * «اشتراك Codex». Subscription bodies travel through THIS employee's HR
- * endpoint (PUT /employees/<id>/assistant, which accepts the mode fields) —
- * never through HR's own config — and the state shown is always the read
+ * endpoint (PUT /employees/<id>/assistant, which accepts the mode fields) -
+ * never through HR's own config - and the state shown is always the read
  * shape the server returns. The note the owner dictated is still on the
  * widget: the employee cannot read a key HR set, but may replace it.
  *
@@ -155,7 +155,7 @@ export default function EmployeeAssistantPanel({ employeeEmail }: { employeeEmai
     }
   }, [apiKey, baseUrl, employeeId, isActive, keyTouched, locale, model, t]);
 
-  // H19 — one writer for subscription bodies on the EMPLOYEE's row: the HR
+  // H19 - one writer for subscription bodies on the EMPLOYEE's row: the HR
   // endpoint's partial PUT. The server's read shape that comes back is the
   // only state this widget adopts; if the server's build does not yet apply
   // subscription writes on the employee row, the panel shows exactly what
@@ -255,7 +255,7 @@ export default function EmployeeAssistantPanel({ employeeEmail }: { employeeEmai
           <p className="page-meta">{t("assistantKeyHintLine").replace("%s", config.key_hint)}</p>
         ) : null}
 
-        {/* ── H19 — the same three-way mode picker, on the employee's behalf. ── */}
+        {/* ── H19 - the same three-way mode picker, on the employee's behalf. ── */}
         <fieldset className="assistant-mode-picker" aria-label={t("assistantModeLabel")}>
           <legend className="field-label">{t("assistantModeLabel")}</legend>
           <div className="role-segmented" role="group">
@@ -287,7 +287,7 @@ export default function EmployeeAssistantPanel({ employeeEmail }: { employeeEmai
 
         {!subActive ? (
           <form className="quiet-inset" onSubmit={(event) => event.preventDefault()}>
-            <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+            <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" /* ds-allow-hardcode: attribute-table column */ }}>
               <label className="field" style={{ marginBlockEnd: "var(--sp-3)" }}>
                 <span className="field-label">{t("assistantFieldBaseUrl")}</span>
                 <input

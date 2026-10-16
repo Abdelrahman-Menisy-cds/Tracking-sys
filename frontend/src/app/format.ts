@@ -4,7 +4,7 @@
  * All rules, unchanged from the original brief:
  *  - LATIN digits always, via `localeTag` (`ar-EG-u-nu-latn` for `ar`).
  *  - A stable shape in BOTH locales, the DATE zero-padded and the clock's HOUR
- *    not («04/10/2026 · 9:24 ص» — one shape everywhere)
+ *    not («04/10/2026 · 9:24 ص» - one shape everywhere)
  *  - NO per-row time zone name; the zone is stated once on the page
  *  - every returned value wraps in Unicode isolates (LRI … PDI); call sites
  *    must not add <bdi> or dir overrides.
@@ -18,7 +18,7 @@ const CAIRO_TIME_ZONE = "Africa/Cairo";
 const LRI = "\u2066";
 const PDI = "\u2069";
 
-/** Wrap a formatted value in bidi isolates — brief H3 rule 4. */
+/** Wrap a formatted value in bidi isolates - brief H3 rule 4. */
 function isolated(value: string): string {
   return `${LRI}${value}${PDI}`;
 }
@@ -64,14 +64,14 @@ function timeRun(parts: { hour: string; minute: string; period: string }): strin
   return `${parts.hour}:${parts.minute}\u00a0${parts.period}`;
 }
 
-/** DD/MM/YYYY · h:mm period — bidi-isolated, no zone token. */
+/** DD/MM/YYYY · h:mm period - bidi-isolated, no zone token. */
 export function formatDateTime(isoDate: string, locale: "ar" | "en"): string {
   const date = new Date(isoDate);
   const time = timeParts(date, locale);
   return isolated(`${unwrapped(formatDate(isoDate, locale))}\u00a0·\u00a0${timeRun(time)}`);
 }
 
-/** h:mm period only — bidi-isolated, no zone token. */
+/** h:mm period only - bidi-isolated, no zone token. */
 export function formatTime(isoDate: string, locale: "ar" | "en"): string {
   const time = timeParts(new Date(isoDate), locale);
   return isolated(timeRun(time));
@@ -112,7 +112,7 @@ export function formatWallClock(value: string, locale: "ar" | "en"): string {
 
 /** A single isolated time range; null represents a missing endpoint. */
 export function formatTimeRange(fromIso: string | null, toIso: string | null, locale: "ar" | "en"): string {
-  return isolated(`${fromIso ? formatTime(fromIso, locale) : "—"} → ${toIso ? formatTime(toIso, locale) : "—"}`);
+  return isolated(`${fromIso ? formatTime(fromIso, locale) : "-"} → ${toIso ? formatTime(toIso, locale) : "-"}`);
 }
 
 export function formatDateTimeRange(fromIso: string, toIso: string, locale: "ar" | "en"): string {
@@ -120,12 +120,12 @@ export function formatDateTimeRange(fromIso: string, toIso: string, locale: "ar"
 }
 
 export function formatWallClockRange(from: string, to: string | null, locale: "ar" | "en"): string {
-  return isolated(`${formatWallClock(from, locale)} → ${to ? formatWallClock(to, locale) : "—"}`);
+  return isolated(`${formatWallClock(from, locale)} → ${to ? formatWallClock(to, locale) : "-"}`);
 }
 
 /** Numeric dates in dense rows and schedule validity ranges. */
 export function formatDateRange(fromIso: string, toIso: string | null, locale: "ar" | "en"): string {
-  return isolated(`${formatDate(fromIso, locale)} → ${toIso ? formatDate(toIso, locale) : "—"}`);
+  return isolated(`${formatDate(fromIso, locale)} → ${toIso ? formatDate(toIso, locale) : "-"}`);
 }
 
 export function weekInterval(weekStart: string, locale: "ar" | "en"): string {
@@ -142,7 +142,7 @@ export function weekInterval(weekStart: string, locale: "ar" | "en"): string {
     const values = formatter.formatToParts(date).reduce<Record<string, string>>((result, item) => { result[item.type] = item.value; return result; }, {});
     return `${isolated(values.day)} ${isolated(values.month)} ${isolated(values.year)}`;
   };
-  return isolated(`${part(start)} – ${part(end)}`);
+  return isolated(`${part(start)} - ${part(end)}`);
 }
 
 export function formatMinutes(minutes: number, locale: "ar" | "en"): string {

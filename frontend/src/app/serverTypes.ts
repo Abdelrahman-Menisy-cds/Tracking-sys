@@ -1,5 +1,5 @@
 /**
- * Brief H33 — the shared SERVER-FACING record types.
+ * Brief H33 - the shared SERVER-FACING record types.
  *
  * The mock module's type declarations used to be the de-facto contract
  * (`src/mock/data.ts`). The server is the contract now: these are the shapes
@@ -7,7 +7,7 @@
  * timesheets/serializers.py). Every API-backed screen types its rows from here.
  */
 
-/** EmployeeRequest.Status — reqs/models.py. */
+/** EmployeeRequest.Status - reqs/models.py. */
 export type RequestStatusType =
   | "DRAFT"
   | "PENDING_MANAGER"
@@ -17,13 +17,13 @@ export type RequestStatusType =
   | "RETURNED"
   | "CANCELLED";
 
-/** Timesheet.Status — timesheets/models.py. */
+/** Timesheet.Status - timesheets/models.py. */
 export type TimesheetStatusType = "DRAFT" | "SUBMITTED" | "RETURNED" | "APPROVED" | "REJECTED";
 
 /** Decision actions accepted by the decision endpoints (lowercase on the wire). */
 export type DecisionAction = "approve" | "reject" | "return";
 
-/** RequestTypeSerializer — `name` is a plain string in the caller's language. */
+/** RequestTypeSerializer - `name` is a plain string in the caller's language. */
 export interface ServerRequestType {
   id: number;
   name: string;
@@ -50,7 +50,7 @@ export interface ServerAttachmentSummary {
   created_at: string;
 }
 
-/** EmployeeRequestSerializer — the requester's own rows. No requester_name, no events. */
+/** EmployeeRequestSerializer - the requester's own rows. No requester_name, no events. */
 export interface ServerMyRequest {
   id: string;
   request_type: ServerRequestType;
@@ -62,7 +62,7 @@ export interface ServerMyRequest {
   updated_at: string;
 }
 
-/** ReviewRequestSummarySerializer — a queue row of the review scope. */
+/** ReviewRequestSummarySerializer - a queue row of the review scope. */
 export interface ServerReviewRequestRow {
   id: string;
   requester_id: string;
@@ -76,7 +76,7 @@ export interface ServerReviewRequestRow {
   created_at: string;
 }
 
-/** ReviewRequestSerializer — the review detail: attachments + events + permissions. */
+/** ReviewRequestSerializer - the review detail: attachments + events + permissions. */
 export interface ServerReviewRequest extends Omit<ServerReviewRequestRow, "requester_name"> {
   requester_name: string;
   details: string;
@@ -96,7 +96,7 @@ export interface ServerTimeEntry {
   updated_at: string;
 }
 
-/** TimesheetSerializer — the owner's own sheet (has totals, no employee_name). */
+/** TimesheetSerializer - the owner's own sheet (has totals, no employee_name). */
 export interface ServerMyTimesheet {
   id: string;
   employee_id: string;
@@ -114,7 +114,7 @@ export interface ServerMyTimesheet {
   updated_at: string;
 }
 
-/** ReviewTimesheetSummarySerializer — a review-queue row (no entries). */
+/** ReviewTimesheetSummarySerializer - a review-queue row (no entries). */
 export interface ServerReviewTimesheetRow {
   id: string;
   employee_id: string;
@@ -126,7 +126,7 @@ export interface ServerReviewTimesheetRow {
   created_at: string;
 }
 
-/** ReviewTimesheetSerializer — the review detail with entries + events. */
+/** ReviewTimesheetSerializer - the review detail with entries + events. */
 export interface ServerReviewTimesheet extends Omit<ServerReviewTimesheetRow, "employee_name"> {
   employee_name: string;
   entries: Omit<ServerTimeEntry, "created_at" | "updated_at">[];
@@ -136,7 +136,7 @@ export interface ServerReviewTimesheet extends Omit<ServerReviewTimesheetRow, "e
   updated_at: string;
 }
 
-/** NotificationSerializer — title/body are server-language STRINGS, not {ar,en}. */
+/** NotificationSerializer - title/body are server-language STRINGS, not {ar,en}. */
 export interface ServerNotification {
   id: number;
   kind: string;
@@ -159,7 +159,7 @@ export type PublicHoliday = {
   /**
    * Provenance, present only on rows that came from the server.
    * `needsConfirmation` marks an LLM *proposal* (Ramadan, Eid Al-Fitr) that HR
-   * has not confirmed — it must never render as an official holiday.
+   * has not confirmed - it must never render as an official holiday.
    */
   source?: "NAGER" | "LLM" | "MANUAL";
   isManualOverride?: boolean;

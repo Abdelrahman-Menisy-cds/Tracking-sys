@@ -14,7 +14,7 @@ import type { Dict, Locale } from "../../i18n/dict";
 type DictKey = keyof Dict;
 
 /**
- * The Company profile widget (Story H17) — one card on /admin/settings,
+ * The Company profile widget (Story H17) - one card on /admin/settings,
  * beside the schedule, leave, and holidays cards, never a paragraph inside
  * another widget.
  *
@@ -23,7 +23,7 @@ type DictKey = keyof Dict;
  * API does not answer (retried through the retry control), the saved identity
  * as a read-out (logo, name, activity, address, phone, contact, legal
  * numbers), and an edit mode reusing the exact same CompanyForm the
- * onboarding page uses — one implementation, two screens.
+ * onboarding page uses - one implementation, two screens.
  */
 export function CompanyProfilePanel({ t, locale }: { t: (key: DictKey) => string; locale: Locale }) {
   const [state, setState] = useState<CompanyState | null>(null);

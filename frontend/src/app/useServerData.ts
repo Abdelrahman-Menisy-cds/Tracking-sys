@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 
 /**
- * Brief H33 — the ONE server list read hook, replacing the demo-fixture hook.
+ * Brief H33 - the ONE server list read hook, replacing the demo-fixture hook.
  *
  * Same render contract the screens already branch on (loading / error+retry /
  * ready), minus the demo fixture control: whatever the server answers IS the
- * state. An empty list is a ready, empty array — the screen renders its honest
+ * state. An empty list is a ready, empty array - the screen renders its honest
  * empty state; nothing is ever substituted for it.
  */
 export type ListState<T> =

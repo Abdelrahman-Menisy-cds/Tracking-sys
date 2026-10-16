@@ -1,6 +1,6 @@
 /**
- * The requests API — Brief H33. Personal rows, review rows, and the four
- * mutations (draft, submit, decision, cancel — Story 2.1–2.5), all through
+ * The requests API - Brief H33. Personal rows, review rows, and the four
+ * mutations (draft, submit, decision, cancel - Story 2.1-2.5), all through
  * the shared client in ./api. The server scopes everything; the client adds
  * no filters of its own. Idempotency-Key is REQUIRED by the mutating
  * endpoints, so the callers generate one per attempt.
@@ -44,7 +44,7 @@ export function listMyRequestAttachments(id: string, locale: string): Promise<Se
 }
 
 /**
- * Create a DRAFT. POST /requests: {request_type_id, title, details} — the
+ * Create a DRAFT. POST /requests: {request_type_id, title, details} - the
  * period travels inside the composed title (server field allowlist).
  */
 export function createRequestDraft(
@@ -59,7 +59,7 @@ export function createRequestDraft(
   }).then((payload) => payload.data);
 }
 
-/** POST /requests/{id}/submit — {version}; server derives the routing. */
+/** POST /requests/{id}/submit - {version}; server derives the routing. */
 export function submitMyRequest(id: string, version: number, locale: string): Promise<ServerMyRequest> {
   return apiRequest<{ data: ServerMyRequest }>(`/requests/${id}/submit`, {
     method: "POST",
@@ -69,7 +69,7 @@ export function submitMyRequest(id: string, version: number, locale: string): Pr
   }).then((payload) => payload.data);
 }
 
-/** POST /requests/{id}/cancel — requester-only, before any decision. */
+/** POST /requests/{id}/cancel - requester-only, before any decision. */
 export function cancelMyRequest(id: string, version: number, locale: string): Promise<ServerMyRequest> {
   return apiRequest<{ data: ServerMyRequest }>(`/requests/${id}/cancel`, {
     method: "POST",
@@ -79,7 +79,7 @@ export function cancelMyRequest(id: string, version: number, locale: string): Pr
   }).then((payload) => payload.data);
 }
 
-/** POST /requests/{id}/decision — reviewer's approve/reject/return. */
+/** POST /requests/{id}/decision - reviewer's approve/reject/return. */
 export function decideRequest(
   id: string,
   action: DecisionAction,
@@ -95,7 +95,7 @@ export function decideRequest(
   }).then((payload) => payload.data);
 }
 
-/** GET /review/requests/queue — manager/HR scoped rows (params = ?status=, ?q=). */
+/** GET /review/requests/queue - manager/HR scoped rows (params = ?status=, ?q=). */
 export function listReviewRequests(
   locale: string,
   options: { status?: string; page?: number } = {},
@@ -106,7 +106,7 @@ export function listReviewRequests(
   return apiRequest<PagedPayload<ServerReviewRequestRow>>(`/review/requests/queue?${params.toString()}`, { acceptLanguage: locale });
 }
 
-/** GET /review/requests/{id} — scoped read-only detail with events + attachments. */
+/** GET /review/requests/{id} - scoped read-only detail with events + attachments. */
 export function getReviewRequest(id: string, locale: string): Promise<ServerReviewRequest> {
   return apiRequest<{ data: ServerReviewRequest }>(`/review/requests/${id}`, { acceptLanguage: locale }).then((payload) => payload.data);
 }

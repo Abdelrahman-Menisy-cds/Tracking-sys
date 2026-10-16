@@ -12,12 +12,13 @@ import {
   type PendingAssistantAction,
 } from "../../app/assistantApi";
 import { renderAssistantMarkdown } from "./assistantMarkdown";
+import { CloseIcon } from "../../components/icons";
 
 /**
- * The مدام عفاف chat panel — brief H18, piece 2.
+ * The مدام عفاف chat panel - brief H18, piece 2.
  *
  * A side panel over the app: the persona header, the provider/model shown
- * subtly, the transcript in component state ONLY (no localStorage — the
+ * subtly, the transcript in component state ONLY (no localStorage - the
  * conversation dies with the page), a composer with a typing state, and the
  * confirmation card for a pending write. Nothing reaches the system until
  * تأكيد is pressed: the pending action card only ever renders what the
@@ -171,14 +172,14 @@ export default function AssistantPanel({ config, open, onClose }: AssistantPanel
             {t("assistantSettingsLink")}
           </Link>
           <button type="button" className="btn btn-ghost btn-compact" aria-label={t("close")} onClick={onClose}>
-            ✕
+            <CloseIcon size={16} />
           </button>
         </header>
         <div className="assistant-transcript" ref={listRef} aria-live="polite">
           {entries.length === 0 && !thinking ? <p className="assistant-empty page-meta">{t("assistantEmptyChat")}</p> : null}
           {entries.map((entry, index) => (
             <div key={index} className={`assistant-message assistant-message-${entry.role}`}>
-              {/* H20 — the reply renders as elements (bold/lists/code), never raw `**`. */}
+              {/* H20 - the reply renders as elements (bold/lists/code), never raw `**`. */}
               <div className="assistant-message-text" dir="auto" style={{ display: "block" }}>
                 {renderAssistantMarkdown(entry.content)}
               </div>

@@ -15,11 +15,11 @@ import {
 } from "../../app/assistantApi";
 
 /**
- * The H19 subscription half of the assistant widget — ONE implementation,
+ * The H19 subscription half of the assistant widget - ONE implementation,
  * two users (the employee's own /profile widget and HR's employee-file
  * panel hand in their own context, see below).
  *
- * H21c — the owner looked at the opencode tab and said the red import
+ * H21c - the owner looked at the opencode tab and said the red import
  * button is NOT the right one: the PRIMARY action is now the real device
  * login («تسجيل الدخول للاشتراك»), driven by the server's
  * /assistant/subscription/start (device code + verification link) and
@@ -29,7 +29,7 @@ import {
  *
  * The hard rule the whole panel honours: no token or key is ever shown.
  * There is no reveal affordance; the linked state names the provider, the
- * credential KIND (key/oauth), the source, and the model — nothing else.
+ * credential KIND (key/oauth), the source, and the model - nothing else.
  */
 
 /** The subset of the config read shape this panel actually renders. */
@@ -51,7 +51,7 @@ export interface SubscriptionPanelProps {
   /**
    * How a subscription write reaches the server: the employee's own
    * /assistant/config (mode switch), or the HR employee-file
-   * /employees/<id>/assistant PUT. The server owns every transition —
+   * /employees/<id>/assistant PUT. The server owns every transition -
    * this panel never derives a state the server did not send.
    */
   applyWrite: (body: Record<string, unknown>) => Promise<SubscriptionView>;
@@ -103,7 +103,7 @@ export default function SubscriptionPanel({ config, provider, applyWrite, onChan
   const state: "unlinked" | "linked" = linkedHere ? "linked" : "unlinked";
 
   // The unlinked face asks the server ONCE what this provider honestly
-  // supports — the capability word decides whether the flow may even start
+  // supports - the capability word decides whether the flow may even start
   // (a provider without a login flow must not show a button that can only
   // fail). Import stays available regardless: it is the legacy path.
   useEffect(() => {
@@ -127,11 +127,11 @@ export default function SubscriptionPanel({ config, provider, applyWrite, onChan
   }, [state, provider, locale]);
 
   // The linked state fetches the subscription's OWN model list once, so the
-  // dropdown offers what the provider actually serves — never a hardcoded list.
+  // dropdown offers what the provider actually serves - never a hardcoded list.
   useEffect(() => {
     if (!linkedHere) {
       // Leaving the linked face: clear the stale list synchronously is the
-      // point of the cleanup — a warning here is a style note, not a bug.
+      // point of the cleanup - a warning here is a style note, not a bug.
       setModels(null);
       setModelsLoading(false);
       return;
@@ -160,7 +160,7 @@ export default function SubscriptionPanel({ config, provider, applyWrite, onChan
     try {
       const outcome = await importSubscription(provider, locale);
       if (outcome.status === "linked") {
-        // The server's own read shape becomes the state — not a guess.
+        // The server's own read shape becomes the state - not a guess.
         onChanged(outcomeToView(outcome));
       }
     } catch (failure) {
@@ -193,7 +193,7 @@ export default function SubscriptionPanel({ config, provider, applyWrite, onChan
     try {
       // The provider's own model id travels to the server, which is the only
       // writer of the row. The subscription write shape re-links the SAME
-      // provider — and the server never echoes a token back, so the read
+      // provider - and the server never echoes a token back, so the read
       // shape that returns is safe to render.
       const next = await applyWrite({ mode: "subscription", subscription_provider: provider, model: pickedModel });
       onChanged(next);
@@ -205,7 +205,7 @@ export default function SubscriptionPanel({ config, provider, applyWrite, onChan
   }, [applyWrite, pickedModel, provider, t, onChanged]);
 
   const stateLabel = state === "linked" ? t("assistantSubStateLinked") : t("assistantSubStateUnlinked");
-  // The device login exists ONLY where the provider genuinely offers one —
+  // The device login exists ONLY where the provider genuinely offers one -
   // locked to the server's capability word, exactly like before H21c.
   const loginFlowAvailable = capability?.login_flow_available === true;
 
@@ -224,18 +224,19 @@ export default function SubscriptionPanel({ config, provider, applyWrite, onChan
             {config.subscription_source === "device" ? t("assistantSubSourceDevice") : t("assistantSubSourceLocal")}
           </p>
           {/* The credential KIND only: a key does not expire, an oauth set shows
-              the expiry — the VALUE is on the server and never in this DOM. */}
+              the expiry - the VALUE is on the server and never in this DOM. */}
           <p className="field-hint">
             {config.subscription_cred_type === "oauth" && config.subscription_expires
               ? `${t("assistantSubProvenanceLine")} (${config.subscription_expires})`
               : t("assistantSubProvenanceLine")}
           </p>
-          <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+          <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" /* ds-allow-hardcode: attribute-table column */ }}>
             <label className="field" style={{ marginBlockEnd: "var(--sp-3)" }}>
               <span className="field-label">{t("assistantSubModelLabel")}</span>
               {modelsLoading ? (
                 <span className="field-hint">{t("assistantSubModelsLoading")}</span>
               ) : models && models.supported && models.models.length > 0 ? (
+                /* ds-allow-native-select: dynamic-option picker; listbox rewrite is deferred */
                 <select
                   className="input"
                   dir="ltr"
@@ -291,7 +292,7 @@ export default function SubscriptionPanel({ config, provider, applyWrite, onChan
         </>
       ) : (
         <>
-          {/* H21c — the PRIMARY action first, inside the standard actions row
+          {/* H21c - the PRIMARY action first, inside the standard actions row
               so the whole app reads it as THE action: the real device login,
               or the honest "this provider has no in-app login" sentence when
               the server's capability word says none exists. */}
@@ -308,7 +309,7 @@ export default function SubscriptionPanel({ config, provider, applyWrite, onChan
             <p className="field-hint">{t("assistantSubImportPrimaryHint")}</p>
           )}
           {/* Demoted per the owner's word: import gets a small, secondary
-              control under the primary — but it stays exactly as working. */}
+              control under the primary - but it stays exactly as working. */}
           <div className="form-actions assistant-sub-secondary-actions">
             <button
               type="button"
@@ -332,7 +333,7 @@ export default function SubscriptionPanel({ config, provider, applyWrite, onChan
 }
 
 /**
- * H21c — the device-login flow, the primary «تسجيل الدخول للاشتراك» button.
+ * H21c - the device-login flow, the primary «تسجيل الدخول للاشتراك» button.
  * 1. POST /assistant/subscription/start → the server's own code, link,
  *    interval and expiry.
  * 2. The code + link render as copyable LTR islands inside the RTL layout.
@@ -340,7 +341,7 @@ export default function SubscriptionPanel({ config, provider, applyWrite, onChan
  *    on the server's interval (fallback ~3s), stopping at the server's
  *    expires_in; expiry/failure shows the retry button again.
  * Kept as its own component so switching provider or linking resets every
- * timer and state bit back to zero — no stale countdown can leak across tabs.
+ * timer and state bit back to zero - no stale countdown can leak across tabs.
  */
 function DeviceFlow({
   provider,
@@ -357,7 +358,7 @@ function DeviceFlow({
   /** aliveRef flips when this instance stops being the current one. */
   const aliveRef = useRef(true);
   /**
-   * H24 — the explicit cancel («إلغاء») is the ONLY in-UI way out of the
+   * H24 - the explicit cancel («إلغاء») is the ONLY in-UI way out of the
    * wait besides linked/expiry. A ref (not state) so the async loop can
    * read it on every tick.
    */
@@ -365,10 +366,10 @@ function DeviceFlow({
   const [flow, setFlow] = useState<AssistantSubscriptionStart | null>(null);
   const [waiting, setWaiting] = useState(false);
   const [copied, setCopied] = useState(false);
-  /** H24 — a transient poll miss keeps the wait alive; this note says so honestly. */
+  /** H24 - a transient poll miss keeps the wait alive; this note says so honestly. */
   const [retrying, setRetrying] = useState(false);
 
-  /** H24 — the explicit cancel: end the wait and return to the start button. */
+  /** H24 - the explicit cancel: end the wait and return to the start button. */
   const cancelWait = useCallback(() => {
     cancelRef.current = true;
     setWaiting(false);
@@ -414,12 +415,12 @@ function DeviceFlow({
       // Pace EXACTLY as the server says: its interval (fallback ~3s), hard
       // stop at its expires_in (fallback 10 min so a server without the
       // field cannot poll forever), every tick cancelled on unmount.
-      // H24 fix — the sentinel MUST start falsy: `let outcome = "stopped"`
+      // H24 fix - the sentinel MUST start falsy: `let outcome = "stopped"`
       // made `!outcome` false on the first check, so the loop body (every
       // poll) never ran; the panel fell back to the plain button after the
-      // first sleep — the ~5-second reset the owner reported (the server's
+      // first sleep - the ~5-second reset the owner reported (the server's
       // interval: 5). H24: a transient miss (network error, or the panel's
-      // own failure to authenticate) NEVER ends the wait — the code, link
+      // own failure to authenticate) NEVER ends the wait - the code, link
       // and spinner stay; we back off 5s → 10s → 15s and say "retrying".
       // Only linked / server expiry / an explicit «إلغاء» end the wait.
       const baseDelayMs = Math.max(1000, (start.interval && start.interval > 0 ? start.interval : 3) * 1000);
@@ -427,7 +428,7 @@ function DeviceFlow({
       const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
       let outcome: "linked" | "expired" | null = null;
       let missCount = 0;
-      /** H24 — true for exactly one loop turn after a missed poll, so the
+      /** H24 - true for exactly one loop turn after a missed poll, so the
        * backoff sleep is the ONLY sleep before the retry: without this the
        * bottom-of-loop interval sleep stacks on top (measured 10s/15s/20s
        * instead of the brief's 5s → 10s → 15s). */
@@ -449,15 +450,15 @@ function DeviceFlow({
           justMissed = false;
           setRetrying(false);
         } catch (failure) {
-          // H24 — a failed poll keeps the wait: be honest about it. The
+          // H24 - a failed poll keeps the wait: be honest about it. The
           // backoff sleep happens at the bottom of the loop (the justMissed
-          // gate), NOT inside this catch — see the comment there. Only a
+          // gate), NOT inside this catch - see the comment there. Only a
           // TERMINAL server answer that also cleared the flow on its side
           // (the flow is gone; polling further can only 409 again) ends
           // the wait here: flow_expired (the provider's code window
           // closed) and no_pending_flow (the server says no flow exists
-          // at all). Everything else — a network drop, a 5xx, any other
-          // envelope — is a transient miss: the code, link and spinner
+          // at all). Everything else - a network drop, a 5xx, any other
+          // envelope - is a transient miss: the code, link and spinner
           // STAY, we back off and say "retrying…".
           const code = failure instanceof ApiError ? failure.code : undefined;
           const terminal = code === "flow_expired" || code === "no_pending_flow";
@@ -476,9 +477,9 @@ function DeviceFlow({
           break;
         }
         if (cancelRef.current) break;
-        // H24 — after a missed poll the backoff sleep above already waited
+        // H24 - after a missed poll the backoff sleep above already waited
         // missCount×interval (capped at 15s); do not add the normal interval
-        // on top of it — the retry must land at 5s → 10s → 15s as specced.
+        // on top of it - the retry must land at 5s → 10s → 15s as specced.
         if (justMissed) {
           justMissed = false;
         } else {
@@ -509,7 +510,7 @@ function DeviceFlow({
         <p className="assistant-sub-state" role="status">
           <span className="spinner" aria-hidden="true" /> {t("assistantSubStateWaiting")}
         </p>
-        {/* H24 — a transient miss keeps the wait; this note says so, honestly. */}
+        {/* H24 - a transient miss keeps the wait; this note says so, honestly. */}
         {retrying ? <p className="field-hint" role="status">{t("assistantSubRetrying")}</p> : null}
         <div className="field">
           <span className="field-label">{t("assistantSubCodeLabel")}</span>
@@ -524,9 +525,9 @@ function DeviceFlow({
             : t("assistantSubLinkLabel")}
         </a>
         <span className="field-hint">{t("assistantSubCodeWindowHint")}</span>
-        {/* H24 — the ONLY in-UI way out of the wait: an explicit cancel that
+        {/* H24 - the ONLY in-UI way out of the wait: an explicit cancel that
             ends it and returns to the start button (and a reload restarting
-            the panel is equally fine — nothing needs persisting). */}
+            the panel is equally fine - nothing needs persisting). */}
         <div className="form-actions">
           <button type="button" className="btn btn-ghost btn-sm" onClick={cancelWait}>
             {t("assistantSubCancel")}

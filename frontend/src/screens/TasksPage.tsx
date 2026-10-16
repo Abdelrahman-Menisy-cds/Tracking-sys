@@ -4,8 +4,8 @@ import { Banner, EmptyState } from "../components/ui";
 import PageHeader from "../components/layout/PageHeader";
 
 /**
- * /tasks — Brief H33 honest state. The backend exposes NO tasks endpoints
- * (no task rows, no events, no per-task timers — the mock cycle was deleted
+ * /tasks - Brief H33 honest state. The backend exposes NO tasks endpoints
+ * (no task rows, no events, no per-task timers - the mock cycle was deleted
  * with the fixtures), so the screen keeps its shell and heading and renders
  * the honest unavailable state; nothing is fabricated client-side. The route
  * stays so the link from the rail still resolves once the server ships tasks.

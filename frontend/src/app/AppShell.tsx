@@ -19,6 +19,7 @@ import {
   InfoIcon,
   LogoutIcon,
   MoonIcon,
+  ReportIcon,
   SunIcon,
   UserIcon,
 } from "../components/icons";
@@ -64,7 +65,7 @@ export default function AppShell() {
   } = useApp();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const [isCompact, setIsCompact] = useState(() => window.matchMedia("(max-width: 1023px)").matches);
+  const [isCompact, setIsCompact] = useState(() => window.matchMedia("(max-width: 1023px)") /* ds-allow-hardcode: the compact-mode breakpoint */.matches);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -115,7 +116,7 @@ export default function AppShell() {
   }, [closeProfileMenu, profileMenuOpen]);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(max-width: 1023px)");
+    const mediaQuery = window.matchMedia("(max-width: 1023px)") /* ds-allow-hardcode: the compact-mode breakpoint */;
     const updateCompactMode = () => {
       const nextCompact = mediaQuery.matches;
       setIsCompact(nextCompact);
@@ -172,7 +173,7 @@ export default function AppShell() {
    * The unread badge reads the SERVER's own notifications (the session's rows,
    * no client tenant filter), re-queried when the route changes so marking a
    * notification read on /notifications updates the header on the next
-   * navigation. A server failure renders no badge — it never invents one.
+   * navigation. A server failure renders no badge - it never invents one.
    */
   const notifications = useMemo(() => listNotifications(locale).then((payload) => payload.data), [locale]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -201,7 +202,13 @@ export default function AppShell() {
       ],
     },
     ...(capabilities.canReview
-      ? [{ label: locale === "ar" ? "عمل المراجعة" : "Review work", items: [{ to: "/reviews", label: t("navTeamReviews"), icon: ActivityIcon }] }]
+      ? [{
+          label: locale === "ar" ? "عمل المراجعة" : "Review work",
+          items: [
+            { to: "/reviews", label: t("navTeamReviews"), icon: ActivityIcon },
+            { to: "/reports", label: t("navReports"), icon: ReportIcon },
+          ],
+        }]
       : []),
     ...(capabilities.canSetOrgSchedule && capabilities.canManageLeaveBalance && capabilities.canViewOrgAttendance
       ? [{ label: locale === "ar" ? "الإدارة" : "Administration", items: [{ to: "/admin", label: t("navAdmin"), icon: GlobeIcon }] }]
@@ -214,14 +221,14 @@ export default function AppShell() {
   const currentItem = matchedCurrentItem ?? { to: "", label: t("navHome"), icon: HomeIcon };
   const targetLocale: Locale = locale === "en" ? "ar" : "en";
   const targetTheme: Exclude<Appearance, "system"> = resolvedTheme === "light" ? "dark" : "light";
-  // The icon names the theme you would get, not the one you are in — the same
+  // The icon names the theme you would get, not the one you are in - the same
   // convention as the language button beside it (which shows "AR"/"EN" for the
   // target) and the same thing the aria-label says.
   const ThemeIcon = resolvedTheme === "light" ? MoonIcon : SunIcon;
   /* The signed-in account, as the SERVER describes it. There is no fixture
      identity any more: a session that has not answered yet renders honestly
      empty name/email slots instead of a demo persona. */
-  const localizedName = serverAccount?.full_name ?? "—";
+  const localizedName = serverAccount?.full_name ?? "-";
   const localizedRole = serverAccount
     ? serverAccount.role === "HR" ? t("roleHr") : serverAccount.role === "MANAGER" ? t("roleManager") : t("roleEmployee")
     : t("roleEmployee");
@@ -344,7 +351,7 @@ export default function AppShell() {
                     <div className="profile-menu-header">
                       <span className="profile-menu-meta">{t("signedInAs")}</span>
                       <span className="profile-menu-name"><bdi>{localizedName}</bdi></span>
-                      <span className="profile-menu-meta">{localizedRole} · <bdi>{serverAccount?.email ?? "—"}</bdi></span>
+                      <span className="profile-menu-meta">{localizedRole} · <bdi>{serverAccount?.email ?? "-"}</bdi></span>
                     </div>
                     <button ref={(element) => { profileMenuItemsRef.current[0] = element; }} type="button" className="btn btn-ghost profile-menu-item" role="menuitem" onClick={() => { closeProfileMenu(false); navigate("/profile"); }}>
                       <UserIcon />
@@ -368,7 +375,7 @@ export default function AppShell() {
       </div>
       <TourGuide />
       {/* H18: the floating مدام عفاف button sits beside the tour, one instance for
-          the whole shell — the onboarding gate above returns before this, so it
+          the whole shell - the onboarding gate above returns before this, so it
           never floats over the company onboarding screen. */}
       <AssistantLauncher />
     </>

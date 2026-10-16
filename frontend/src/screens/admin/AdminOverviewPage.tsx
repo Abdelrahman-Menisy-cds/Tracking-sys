@@ -5,11 +5,11 @@ import PageHeader from "../../components/layout/PageHeader";
 import AdminNav from "./AdminNav";
 
 /**
- * Overview page — Brief H33 honest state.
+ * Overview page - Brief H33 honest state.
  *
  * §3 wanted a today-only org attendance snapshot, but the backend exposes NO
  * attendance endpoints (and no leave-balance tool that would power the old
- * per-row adjust action). The frontend must not derive rows from fixtures —
+ * per-row adjust action). The frontend must not derive rows from fixtures -
  * the derived-bucket tables, the adjust dialog and the simulated fetch are
  * all gone with src/mock; what remains is the guarded shell, the snapshot
  * heading, the scope banner and one honest unavailable state.

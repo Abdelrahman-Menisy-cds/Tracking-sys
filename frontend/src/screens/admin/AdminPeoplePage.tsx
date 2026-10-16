@@ -12,12 +12,12 @@ import OrgDepartmentsPanel from "./OrgDepartmentsPanel";
 export { default as AdminPeopleDetailPage } from "./AdminPeopleDetailPage";
 
 /**
- * Per-employee roster — spec §2.1, list-first: search + OperationalTable.
+ * Per-employee roster - spec §2.1, list-first: search + OperationalTable.
  * DATA SOURCE: the SERVER roster (`GET /employees`). The backend scopes the
  * read to the caller's company, so the client neither filters by company nor
  * sends any company id. What the old mock layered on top has NO server
  * endpoint (schedule exceptions, per-employee leave slots), so those columns
- * are gone, honestly — not faked with fixture rows.
+ * are gone, honestly - not faked with fixture rows.
  */
 type RowRecord = Omit<ServerEmployee, "id"> & { id: string };
 
@@ -51,15 +51,15 @@ export default function AdminPeoplePage() {
       render: (row) => (
         <span>
           <bdi><Link to={`/admin/people/${row.id}`}>{row.full_name}</Link></bdi>{" "}
-          <span className="page-meta"><bdi dir="ltr">({row.employee_number ?? "—"})</bdi></span>
+          <span className="page-meta"><bdi dir="ltr">({row.employee_number ?? "-"})</bdi></span>
           {!row.is_active ? (
             <StatusPill tone="danger" label={locale === "ar" ? "غير نشط" : "Inactive"} />
           ) : null}
         </span>
       ),
     },
-    { key: "department", label: locale === "ar" ? "الإدارة" : "Department", render: (row) => locale === "ar" ? (row.department_name_ar ?? "—") : (row.department_name_en ?? row.department_name_ar ?? "—") },
-    { key: "job-title", label: locale === "ar" ? "المسمى الوظيفي" : "Job title", render: (row) => row.job_title || "—" },
+    { key: "department", label: locale === "ar" ? "الإدارة" : "Department", render: (row) => locale === "ar" ? (row.department_name_ar ?? "-") : (row.department_name_en ?? row.department_name_ar ?? "-") },
+    { key: "job-title", label: locale === "ar" ? "المسمى الوظيفي" : "Job title", render: (row) => row.job_title || "-" },
     {
       key: "role",
       label: t("role"),
@@ -73,7 +73,7 @@ export default function AdminPeoplePage() {
     {
       key: "manager",
       label: t("adminPeopleFactManager"),
-      render: (row) => row.manager_name ?? <span className="page-meta">—</span>,
+      render: (row) => row.manager_name ?? <span className="page-meta">-</span>,
     },
     {
       key: "actions",
@@ -137,7 +137,7 @@ export default function AdminPeoplePage() {
           )
         ) : (
           <OperationalTable
-            caption={`${t("adminPeopleTitle")} — ${new Intl.NumberFormat(locale).format(filtered.length)}`}
+            caption={`${t("adminPeopleTitle")} - ${new Intl.NumberFormat(locale).format(filtered.length)}`}
             columns={columns}
             records={filtered}
           />

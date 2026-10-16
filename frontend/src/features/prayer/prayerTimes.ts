@@ -4,7 +4,7 @@
  * exported as an intermediate.
  *
  * Conventions, stated plainly:
- * - Method: Egyptian General Authority of Survey — Fajr twilight angle 19.5°,
+ * - Method: Egyptian General Authority of Survey - Fajr twilight angle 19.5°,
  *   Isha twilight angle 17.5°, Dhuhr at solar transit (+1 min altitude guard,
  *   the standard "sun is not exactly at zenith" convention), Asr via the
  *   Shafi'i shadow factor (one object-length past the noon shadow).
@@ -189,7 +189,7 @@ export function localUtcOffsetHours(date: Date): number {
  * The UTC offset for a calendar date on THIS device, without a Date on hand.
  * D + 12:00 UTC always maps inside the date itself, so reading
  * getTimezoneOffset there gives the offset that governs the whole
- * (non-DST-boundary) day — the offset the prayer computation needs.
+ * (non-DST-boundary) day - the offset the prayer computation needs.
  */
 export const LOCAL_UTC_OFFSET = {
   hoursOnDate(date: { year: number; month: number; day: number }): number {
@@ -310,7 +310,7 @@ export function computePrayerTimes(
 /**
  * FORMULATION B (independent cross-check): the "simple sunrise equation".
  * cos(ω) = (cos(zenith) − sin(φ)·sin(δ)) / (cos(φ)·cos(δ)) applied with the
- * SAME declination but derived from a different expression of the geometry —
+ * SAME declination but derived from a different expression of the geometry -
  * this checks the transit, the hour-angle direction, and the symmetry of the
  * twilight events, not just re-runs A.
  */

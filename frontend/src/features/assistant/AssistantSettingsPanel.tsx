@@ -26,13 +26,13 @@ function viewOf(config: AssistantConfig): SubscriptionView {
 }
 
 /**
- * The employee's OWN assistant-provider widget on /profile — brief H18,
+ * The employee's OWN assistant-provider widget on /profile - brief H18,
  * extended by H19 with a three-way mode picker at the top of the card:
  * «مفتاح API» keeps the base URL + model + key fields exactly as they were;
  * «اشتراك opencode» / «اشتراك Codex» swap them for the subscription login
  * panel (sign-in button, state line, device-flow code + link, import, and
  * once linked the subscription's own model dropdown). The server owns every
- * state transition — this widget renders what the read shape says.
+ * state transition - this widget renders what the read shape says.
  */
 
 type Phase = "loading" | "ready" | "error";
@@ -93,7 +93,7 @@ export default function AssistantSettingsPanel() {
     setNotice(null);
     setProblem(null);
     try {
-      // Only send the key when the operator actually typed one — the server
+      // Only send the key when the operator actually typed one - the server
       // never echoes it, and an empty field with an HR key must NOT erase it
       // by accident (can_replace_key decides whether replacing is allowed).
       const input: { base_url: string; model: string; api_key?: string } = {
@@ -131,7 +131,7 @@ export default function AssistantSettingsPanel() {
     }
   }, [locale, t]);
 
-  // H19 — one writer for subscription bodies: the server's own PUT, and the
+  // H19 - one writer for subscription bodies: the server's own PUT, and the
   // read shape it returns becomes the state (never a locally-derived state).
   const applyWrite = useCallback(
     async (body: Record<string, unknown>): Promise<SubscriptionView> => {
@@ -190,7 +190,7 @@ export default function AssistantSettingsPanel() {
             </Banner>
           ) : null}
 
-          {/* ── H19 — the three-way mode picker, first thing on the card. ── */}
+          {/* ── H19 - the three-way mode picker, first thing on the card. ── */}
           <fieldset className="assistant-mode-picker" aria-label={t("assistantModeLabel")}>
             <legend className="field-label">{t("assistantModeLabel")}</legend>
             <div className="role-segmented" role="group">
@@ -222,7 +222,7 @@ export default function AssistantSettingsPanel() {
 
           {!subActive ? (
             <form className="quiet-inset" onSubmit={(event) => event.preventDefault()}>
-              <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+              <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" /* ds-allow-hardcode: attribute-table column */ }}>
                 <label className="field" style={{ marginBlockEnd: "var(--sp-3)" }}>
                   <span className="field-label">{t("assistantFieldBaseUrl")}</span>
                   <input
