@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useApp } from "../app/AppContext";
-import type { RequestStatus, TimesheetStatus } from "../mock/data";
+import type { RequestStatusType as RequestStatus, TimesheetStatusType as TimesheetStatus } from "../app/serverTypes";
 import { AlertTriangleIcon, BellIcon, CheckIcon, ClockIcon, CloseIcon, DocumentIcon, InfoIcon, RtlArrowBackIcon } from "./icons";
 
 type StatusKey = "stDraft" | "stPendingManager" | "stPendingHr" | "stApproved" | "stRejected" | "stReturned" | "stCancelled" | "stSubmitted" | "unread" | "read";

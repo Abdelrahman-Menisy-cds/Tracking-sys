@@ -6,6 +6,7 @@ import "./styles/global.css";
 import { AppProvider, useApp } from "./app/AppContext";
 import AppShell from "./app/AppShell";
 import LoginPage from "./screens/LoginPage";
+import SignupPage from "./screens/SignupPage";
 import HomePage from "./screens/HomePage";
 import MyRequestsPage, { NewRequestPage } from "./screens/MyRequestsPage";
 import RequestDetailPage from "./screens/RequestDetailPage";
@@ -48,6 +49,10 @@ createRoot(document.getElementById("root")!).render(
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          {/* H34b: the two-step signup wizard — company data + activation code
+              first, then the founding HR account; one fused POST, straight to
+              /. Lives OUTSIDE RequireSession exactly like /login. */}
+          <Route path="/signup" element={<SignupPage />} />
           {/* H17: the onboarding step is a real route of its own. While the gate
               holds, AppShell renders it INSTEAD of the shell; with the flag false
               this element exists for direct visits without a session redirect. */}

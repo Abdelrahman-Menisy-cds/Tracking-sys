@@ -162,3 +162,24 @@ def apply_profile_update(*, profile, validated_data, actor, request_id=""):
             after={field: getattr(profile, field) for field in changed},
         )
     return profile, event
+
+
+def create_founding_profile(*, company, validated_data, founder):
+    """Create a company's COMPLETE profile row at one-shot signup (H34).
+
+    ``validated_data`` is the nested ``company`` payload the signup
+    serializer already validated through ``CompanyProfileWriteSerializer``
+    and gated through ``merged_missing_required`` (same rules as the PATCH
+    view above), so the founded company never answers ``needs_profile=True``
+    and the SPA enters the app without the onboarding step. Self-signup
+    writes NO AuditEvent — the SignupView posture: the founding user IS the
+    result of the flow, not an actor acting on someone else, and the
+    subscription code's use counter is the durable record of it.
+
+    Callers run this inside ``transaction.atomic``; a raise rolls everything
+    back, so a rejected signup leaves zero rows.
+    """
+    profile = CompanyProfile(company=company, **validated_data)
+    profile.updated_by = founder
+    profile.save()
+    return profile

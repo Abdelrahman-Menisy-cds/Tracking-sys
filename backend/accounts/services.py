@@ -9,17 +9,36 @@ from django.contrib.sessions.models import Session
 from django.db import transaction
 from django.utils import timezone
 
+from accounts.company_serializers import create_founding_profile, merged_missing_required
 from accounts.models import Company, SubscriptionCode
 from django.core.exceptions import ValidationError as _django_validation_error
 
 
-def _company_name(email: str, company_name: str | None) -> str:
+class CompanyDataIncomplete(Exception):
+    """Signup's nested company data is missing required profile fields (H34).
+
+    Raised BEFORE any write. ``missing`` lists the CompanyProfile required
+    field names so the view can answer the same per-field shape and wording
+    the /company PATCH view answers.
+    """
+
+    def __init__(self, missing):
+        super().__init__(missing)
+        self.missing = list(missing)
+
+
+def _company_name(email: str, company_name: str | None, company_data: dict | None = None) -> str:
     """The new company's display name: the caller's, else the email's domain.
 
     A tenantless operator code founds a company for whoever redeems it (H30
     §2.5), and the caller may not have named it yet — the domain is the honest
     default, and HR renames it through the company profile afterwards.
+    H34: company-screen data outranks the legacy ``company_name`` field —
+    the nested profile's name is required (completeness gate) and is what
+    the owner typed on the company screen.
     """
+    if company_data and (company_data.get("name") or "").strip():
+        return company_data["name"].strip()[:200]
     if company_name and company_name.strip():
         return company_name.strip()[:200]
     return (email.split("@")[-1].strip() or email)[:200]
@@ -53,21 +72,36 @@ def sign_up(
     code: str,
     password: str,
     company_name: str | None = None,
+    company_data: dict | None = None,
 ):
     """Create an HR account from a valid subscription code, then sign in.
 
-    Story H14 self-service signup. Outcomes:
+    Story H14 self-service signup; H34 extends it with one-shot company
+    registration. Outcomes:
       ("active_account", None)  the email already exists — leave it alone
                                 (never re-role, never reveal that it does).
       (None, "invalid_code")    wrong or inactive code — generic, the UI
                                 renders «الكود غير صحيح».
       (None, "invalid_password") password rejected by the app's validators.
+      (None, "company_not_expected")  the code is bound to a company (join)
+                                but company data was supplied (found) — the
+                                view answers a clear 400; nothing is written.
+      CompanyDataIncomplete     the nested company data is missing required
+                                profile fields — raised BEFORE any write.
       (user, None)              success: role=HR HR account created and the
                                 caller is signed in on the same request. The
                                 account lands in the company the code binds to,
                                 or in a NEW company founded for the caller when
                                 the code is tenantless (H30 §2.5) — so two
                                 self-serve signups never share a tenant.
+
+    With ``company_data`` (the H34 company screen), the founding is one
+    transaction: Company + a COMPLETE CompanyProfile (via
+    create_founding_profile — the same serializer rules the /company PATCH
+    view enforces) + the founding User, so ANY failure rolls all three back
+    and an abandoned signup leaves zero rows. The profile arriving complete
+    is what makes ``needs_company_profile`` False on the response, so the
+    SPA enters the app without the onboarding step.
 
     The lookup order is fixed: code first, then the account lookup, so any
     failure that might leak account existence only happens AFTER the code
@@ -92,6 +126,18 @@ def sign_up(
     except _django_validation_error:
         return None, "invalid_password"
 
+    # H34: a code bound to a company admits the caller into THAT company;
+    # founding a new one through it is a contradiction — refused before any
+    # write (the view answers the clear 400).
+    if company_data is not None and subscription.company is not None:
+        return None, "company_not_expected"
+    if company_data is not None:
+        # Same completeness computation the /company PATCH view gates with;
+        # the founding profile must arrive complete or nothing is written.
+        missing = merged_missing_required(None, company_data)
+        if missing:
+            raise CompanyDataIncomplete(missing)
+
     user_model = get_user_model()
     email = email.strip().lower()
     # Row lock so two concurrent signups with the same email serialize and
@@ -108,7 +154,7 @@ def sign_up(
         # code founds a NEW one, so two signups never share a tenant.
         company = subscription.company
         if company is None:
-            name = _company_name(email, company_name)
+            name = _company_name(email, company_name, company_data)
             company = Company.objects.create(
                 slug=_company_slug(name, email), name=name
             )
@@ -119,6 +165,13 @@ def sign_up(
             is_active=True,
             company=company,
         )
+        if company_data is not None:
+            # H34: the founding profile row — complete by the gate above —
+            # inside the SAME transaction, so a failure here rolls the
+            # company and the account back too.
+            create_founding_profile(
+                company=company, validated_data=company_data, founder=user
+            )
         subscription.record_use()
     # Same session/CSRF rotation path as login (services.sign_in).
     request.session.cycle_key()

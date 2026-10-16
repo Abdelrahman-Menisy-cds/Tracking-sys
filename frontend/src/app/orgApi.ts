@@ -64,6 +64,12 @@ export async function listEmployees(locale: string): Promise<ServerEmployee[]> {
   return Array.isArray(data) ? data : (data?.results ?? []);
 }
 
+/** GET /employees/{id} — one authoritative row (HR only; 404 envelope otherwise). */
+export async function getEmployee(id: number, locale: string): Promise<ServerEmployee> {
+  const payload = await apiRequest<{ data: ServerEmployee }>(`/employees/${id}`, { acceptLanguage: locale });
+  return payload.data;
+}
+
 export async function createEmployee(input: EmployeeInput, locale: string): Promise<ServerEmployee> {
   const payload = await apiRequest<{ data: ServerEmployee }>("/employees", {
     method: "POST",

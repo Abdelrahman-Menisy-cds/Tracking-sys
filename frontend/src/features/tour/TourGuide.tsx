@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
-import { demoUser } from "../../mock/data";
 import type { Dict } from "../../i18n/dict";
 
 /**
@@ -99,9 +98,9 @@ export function tourStorageKey(email: string, tourKey: string): string {
 }
 
 export default function TourGuide() {
-  const { t, role, locale } = useApp();
+  const { t, locale, serverAccount } = useApp();
   const { pathname } = useLocation();
-  const email = demoUser[role]?.email ?? "unknown";
+  const email = serverAccount?.email ?? "unknown";
   const tour = useMemo(() => tourForPath(pathname), [pathname]);
   const storageKey = tourStorageKey(email, tour.key);
 

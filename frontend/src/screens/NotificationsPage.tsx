@@ -1,98 +1,88 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
-import { formatDateTime, useMockList } from "../app/useMockList";
-import { mockFetch } from "../mock/data";
+import { formatDateTime } from "../app/format";
+import { useServerData } from "../app/useServerData";
+import { listNotifications, setNotificationRead } from "../app/notificationsApi";
+import type { ServerNotification } from "../app/serverTypes";
 import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../components/ui";
 import PageHeader from "../components/layout/PageHeader";
-import { TrashIcon } from "../components/icons";
 
+/**
+ * Brief H33 — the notifications page asks the server (GET /notifications;
+ * the backend scopes every row to the caller). The only mutation the
+ * contract exposes is the READ STATE (PATCH /notifications/{id}/read-state):
+ * the old client-side «remove»/«clear» never existed server-side and would
+ * resurrect on the next load, so they are gone rather than faked.
+ */
 export default function NotificationsPage() {
-  const {
-    t,
-    locale,
-    notificationItems,
-    markNotificationRead,
-    removeNotification,
-    clearNotifications,
-  } = useApp();
-  const list = useMockList(() => mockFetch(notificationItems), [notificationItems]);
-  const [confirmClear, setConfirmClear] = useState(false);
-  const confirmationRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
+  const { t, locale } = useApp();
+  const list = useServerData<ServerNotification[]>(() => listNotifications(locale).then((payload) => payload.data), [locale]);
+  const [items, setItems] = useState<ServerNotification[] | null>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
-  const focusAfterRemoveRef = useRef<string | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const [readError, setReadError] = useState<string | null>(null);
+  const [markingId, setMarkingId] = useState<number | null>(null);
   usePageTitle(t("notificationsTitle"));
 
-  useEffect(() => {
-    if (confirmClear) window.setTimeout(() => confirmationRef.current?.focus(), 0);
-  }, [confirmClear]);
+  const notifications = items ?? (list.phase === "ready" ? list.data : []);
 
   useEffect(() => {
-    if (!focusAfterRemoveRef.current || list.phase === "loading") return;
-    const targetId = focusAfterRemoveRef.current;
-    focusAfterRemoveRef.current = null;
-    window.setTimeout(() => {
-      const target = [...(listRef.current?.querySelectorAll<HTMLButtonElement>(".notification-remove") ?? [])]
-        .find((button) => button.dataset.notificationId === targetId);
-      (target ?? listRef.current ?? pageRef.current)?.focus();
-    }, 0);
-  }, [list.phase, notificationItems]);
+    if (list.phase === "ready") setItems(list.data);
+  }, [list]);
 
-  const removeOne = (id: string) => {
-    const currentIndex = notificationItems.findIndex((notification) => notification.id === id);
-    const remaining = notificationItems.filter((notification) => notification.id !== id);
-    focusAfterRemoveRef.current = remaining[currentIndex]?.id ?? remaining[currentIndex - 1]?.id ?? "__page__";
-    removeNotification(id);
+  useEffect(() => {
+    if (!listRef.current) return;
+    if (list.phase === "loading") return;
+    if (!(notifications.length > 0)) pageRef.current?.focus();
+  }, [list.phase, notifications.length]);
+
+  const markRead = async (id: number) => {
+    setMarkingId(id);
+    setReadError(null);
+    try {
+      await setNotificationRead(id, true, locale);
+      // The server decided; the local copy adopts exactly its answer.
+      setItems((current) => (current ?? []).map((notification) => (notification.id === id
+        ? { ...notification, is_read: true, read_at: new Date().toISOString() }
+        : notification)));
+    } catch {
+      setReadError(locale === "ar" ? "تعذّر تسجيل الإشعار كمقروء. أعد المحاولة." : "Could not mark the notification read. Try again.");
+    } finally {
+      setMarkingId(null);
+    }
   };
 
-  const hasNotifications = notificationItems.length > 0;
-  const clearAction = hasNotifications ? (
-    <button className="btn btn-danger-quiet" type="button" onClick={() => setConfirmClear(true)}>
-      <TrashIcon size={17} />
-      {t("clearNotifications")}
-    </button>
-  ) : undefined;
+  const hasNotifications = notifications.length > 0;
 
   return (
     <div className="page" ref={pageRef}>
       <PageHeader
         title={t("notificationsTitle")}
-        subtitle={locale === "ar" ? `${notificationItems.length} إشعارات · بيانات تجريبية غير دائمة` : `${notificationItems.length} notifications · non-persistent demo data`}
-        primaryAction={clearAction}
+        subtitle={locale === "ar" ? `${notifications.length} إشعارات` : `${notifications.length} notifications`}
       />
-      {confirmClear && hasNotifications ? (
-        <div ref={confirmationRef} className="notification-confirmation" tabIndex={-1}>
-          <Banner tone="warning" role="alert">
-            <p>{t("confirmClearNotifications")}</p>
-            <div className="form-actions">
-              <button className="btn btn-danger" type="button" onClick={() => { clearNotifications(); setConfirmClear(false); }}>
-                {t("confirmClear")}
-              </button>
-              <button className="btn btn-secondary" type="button" onClick={() => setConfirmClear(false)}>
-                {t("cancel")}
-              </button>
-            </div>
-          </Banner>
-        </div>
-      ) : null}
+      {readError ? <Banner tone="error" role="alert">{readError}</Banner> : null}
       {list.phase === "loading" ? <SkeletonRows rows={3} /> : null}
       {list.phase === "error" ? <ErrorState onRetry={list.retry} /> : null}
-      {list.phase === "empty" ? <EmptyState message={t("noNotifications")} action={<Link className="btn btn-secondary" to="/">{t("navHome")}</Link>} /> : null}
-      {list.phase === "ready" ? notificationItems.length === 0 ? <EmptyState message={t("noNotifications")} action={<Link className="btn btn-secondary" to="/">{t("navHome")}</Link>} /> : (
-        <div className="work-surface">
+      {list.phase === "ready" && !hasNotifications ? (
+        <EmptyState message={t("noNotifications")} action={<Link className="btn btn-secondary" to="/">{t("navHome")}</Link>} />
+      ) : null}
+      {list.phase === "ready" && hasNotifications ? (
+        <div className="work-surface" ref={gridRef}>
           <ul className="compact-list" ref={listRef} tabIndex={-1}>
-            {notificationItems.map((notification) => {
-              const title = notification.title[locale];
+            {notifications.map((notification) => {
+              const title = notification.title;
+              const available = notification.related_object?.type === "request" && notification.related_object.available;
               return (
-                <li className={`compact-row notification-row${notification.related_object?.available ? " notification-row--link" : ""}`} key={notification.id}>
+                <li className={`compact-row notification-row${available ? " notification-row--link" : ""}`} key={notification.id}>
                   <div>
                     <div className="notification-title">
                       <StatusPill tone={notification.is_read ? "neutral" : "unread"} label={notification.is_read ? t("read") : t("unread")} icon={notification.is_read ? "approved" : "unread"} />
-                      {notification.related_object?.available ? (
+                      {available ? (
                         <Link
                           className="notification-title-link"
-                          to={`/requests/${notification.related_object.id}`}
+                          to={`/requests/${notification.related_object!.id}`}
                           aria-label={`${t("openRelatedRecord")}: ${title}`}
                           onKeyDown={(event) => {
                             if (event.key === " ") {
@@ -105,25 +95,24 @@ export default function NotificationsPage() {
                         </Link>
                       ) : <strong>{title}</strong>}
                     </div>
-                    <p><bdi>{notification.body[locale]}</bdi></p>
+                    <p><bdi>{notification.body}</bdi></p>
                     <div className="muted">{formatDateTime(notification.created_at, locale)}{notification.related_object && !notification.related_object.available ? <> · {t("relatedRecord")}: {t("relatedUnavailable")}</> : null}</div>
                   </div>
                   <div className="notification-actions">
                     <div className="row-actions" aria-label={locale === "ar" ? "إجراءات الإشعار" : "Notification actions"}>
                       <div className="row-action-slot">
-                        {!notification.is_read ? <button className="btn btn-secondary" type="button" onClick={() => markNotificationRead(notification.id)}>{t("markRead")}</button> : null}
+                        {!notification.is_read ? (
+                          <button
+                            className="btn btn-secondary"
+                            type="button"
+                            disabled={markingId === notification.id}
+                            onClick={() => void markRead(notification.id)}
+                          >
+                            {markingId === notification.id ? t("saving") : t("markRead")}
+                          </button>
+                        ) : null}
                       </div>
                     </div>
-                    <button
-                      className="btn btn-danger icon-button notification-remove"
-                      type="button"
-                      data-notification-id={notification.id}
-                      aria-label={`${t("removeNotificationNamed")}${title}`}
-                      title={`${t("removeNotificationNamed")}${title}`}
-                      onClick={() => removeOne(notification.id)}
-                    >
-                      <TrashIcon size={18} />
-                    </button>
                   </div>
                 </li>
               );

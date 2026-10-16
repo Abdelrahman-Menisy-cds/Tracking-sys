@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useApp } from "../../app/AppContext";
-import { formatWallClock } from "../../app/useMockList";
+import { formatWallClock } from "../../app/format";
 import { usePrayerNotices, type PrayerPreferences } from "../../features/prayer/usePrayerNotices";
 import { FloatingNoticeStack, type FloatingNoticeData } from "../../features/prayer/FloatingNoticeStack";
 import { formatPrayerMinutes, type PrayerTimes } from "../../features/prayer/prayerTimes";

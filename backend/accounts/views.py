@@ -31,7 +31,7 @@ class SignupRateThrottle(AnonRateThrottle):
 
 
 from accounts.serializers import CurrentUserSerializer, CurrentUserUpdateSerializer, LoginSerializer, SignupSerializer
-from accounts.services import sign_in, sign_out, sign_up
+from accounts.services import CompanyDataIncomplete, sign_in, sign_out, sign_up
 
 
 class CsrfBootstrapView(APIView):
@@ -87,22 +87,42 @@ class LoginView(APIView):
 
 
 class SignupView(APIView):
-    """POST /api/v1/auth/signup — self-service HR signup (Story H14).
+    """POST /api/v1/auth/signup — self-service HR signup (Stories H14/H34).
 
     Anonymous callers reach this view exactly like LoginView: no
     authentication classes, CSRF enforced explicitly via
     CsrfEnforcedSessionAuthentication.enforce_csrf, throttled by its own
     10/min-anonymous scope.
 
+    The body is the 3-field {email, code, password} (H14) and, since H34,
+    optionally carries a nested ``company`` object (one-shot company
+    registration): company data + activation code + the founding HR
+    credentials in one request, validated and written in ONE transaction —
+    Company + a COMPLETE CompanyProfile + the founding HR user — so a
+    rejected signup leaves zero rows and a successful one answers
+    ``needs_company_profile: false`` (no onboarding step).
+
     success         -> 200 {"data": CurrentUserSerializer, "meta": csrftoken},
                        caller is signed in (sign_in service contract).
     wrong/inactive
-    code            -> 400 invalid_code (generic; «الكود غير صحيح»).
+    code            -> 400 invalid_code (generic; «الكود غير صحيح»); checked
+                       FIRST, so a bad code outranks every other complaint.
     existing email
     +valid code     -> 200 with data {"outcome": "email_in_use"} — account
                        untouched (role preserved), no user data, no
                        enumeration; mirrors login's generic posture.
     weak password   -> 422 validation_error with the app's validator msgs.
+    invalid company
+    field           -> 422 validation_error; fields carry the nested
+                       {"company": {field: [...]}} errors (same rules as
+                       the /company PATCH view's serializer).
+    incomplete
+    company data    -> 400 validation_error "The company profile is missing
+                       required fields." with the per-field shape the
+                       /company PATCH view answers (same computation).
+    bound code
+    + company data  -> 400 company_data_not_expected (join vs found is a
+                       contradiction); nothing is written.
 
     Audit: no AuditEvent is written for self-signup. AuditEvent.actor is a
     required PROTECT FK implying an authenticated responsible actor, and a
@@ -121,19 +141,57 @@ class SignupView(APIView):
         CsrfEnforcedSessionAuthentication().enforce_csrf(request)
         serializer = SignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user, error = sign_up(
-            request=request,
-            email=serializer.validated_data["email"],
-            code=serializer.validated_data["code"],
-            password=serializer.validated_data["password"],
-            company_name=serializer.validated_data.get("company_name"),
-        )
+        try:
+            user, error = sign_up(
+                request=request,
+                email=serializer.validated_data["email"],
+                code=serializer.validated_data["code"],
+                password=serializer.validated_data["password"],
+                company_name=serializer.validated_data.get("company_name"),
+                company_data=serializer.validated_data.get("company"),
+            )
+        except CompanyDataIncomplete as exc:
+            # H34: the same computation and wording the /company PATCH view
+            # answers for an incomplete profile — one rule set, two doors.
+            return Response(
+                error_payload(
+                    code="validation_error",
+                    message="The company profile is missing required fields.",
+                    fields={
+                        "company": {
+                            field: ["This field is required."] for field in exc.missing
+                        }
+                    },
+                    request=request,
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         if error == "invalid_code":
             return Response(
                 error_payload(
                     code="invalid_code",
                     message="الكود غير صحيح.",
                     fields={"code": ["الكود غير صحيح."]},
+                    request=request,
+                ),
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if error == "company_not_expected":
+            # H34: the code says "join an existing company"; the body also
+            # carries company data ("found a new one"). A contradiction the
+            # caller must resolve — refused before anything is written.
+            return Response(
+                error_payload(
+                    code="company_data_not_expected",
+                    message=(
+                        "This activation code is already bound to a company; "
+                        "sign up without company data to join it."
+                    ),
+                    fields={
+                        "company": [
+                            "This activation code is already bound to a company."
+                        ]
+                    },
                     request=request,
                 ),
                 status=status.HTTP_400_BAD_REQUEST,

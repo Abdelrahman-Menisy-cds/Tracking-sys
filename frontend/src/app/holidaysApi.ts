@@ -7,7 +7,7 @@
  * through so the UI can never render one as official.
  */
 import { apiRequest } from "./api";
-import type { PublicHoliday } from "../mock/attendance";
+import type { PublicHoliday } from "./serverTypes";
 
 /** One row as Django serialises it. */
 interface ServerHoliday {

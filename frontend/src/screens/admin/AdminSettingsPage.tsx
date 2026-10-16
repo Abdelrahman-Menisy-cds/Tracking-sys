@@ -1,37 +1,34 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useApp, usePageTitle } from "../../app/AppContext";
-import { formatWeekdayIndex, formatWeekdayOf, formatDate, formatDateLong, formatDateRange, formatWallClockRange, cairoDayIso } from "../../app/useMockList";
+import { formatWeekdayOf, formatDateLong, cairoDayIso } from "../../app/format";
 import { ApiError, type ApiFailureKind } from "../../app/api";
 import { fetchHolidays, isPartial, refreshHolidays, type RefreshSummary } from "../../app/holidaysApi";
-import { Banner, Dialog, EmptyState, ErrorState, SkeletonRows, StatusPill, type StatusTone } from "../../components/ui";
-import OperationalTable, { type OperationalColumn } from "../../components/data/OperationalTable";
+import type { PublicHoliday } from "../../app/serverTypes";
+import { Banner, EmptyState, StatusPill, type StatusTone } from "../../components/ui";
 import PageHeader from "../../components/layout/PageHeader";
-import AdjustLeaveDialog, { leaveTypeKeys } from "./AdjustLeaveDialog";
-import ScheduleEditorDialog from "./ScheduleEditorDialog";
 import AdminNav from "./AdminNav";
 import { CompanyProfilePanel } from "./CompanyProfilePanel";
-import { ChevronDownIcon, EditIcon, FilterIcon, InfoIcon, SearchIcon, TrashIcon } from "../../components/icons";
+import { InfoIcon } from "../../components/icons";
 import type { Dict, Locale } from "../../i18n/dict";
-import type {
-  LeaveBalance,
-  PublicHoliday,
-  WorkSchedule,
-} from "../../mock/attendance";
-import { findDirectoryEntry } from "../../mock/data";
 
 type DictKey = keyof Dict;
 
 /**
- * Organization settings — spec §1 (schedule, leave entitlement table, public
- * holidays register, and the disabled-by-design AI control §1.4), with the
- * §5 mutation lifecycle, §6 RTL rules and §7 responsive layout.
+ * Organization settings — spec §1, now server-backed where the server exists:
+ *
+ *   • §1.3 Public-holidays register: READ from `GET /holidays` and refreshed
+ *     by the §1.4 control (`POST /holidays/refresh`). The manual add/edit/
+ *     delete dialogs had no endpoint behind them — they were demo writes, and
+ *     they are gone; the register is read-only + refresh, invoices proposals
+ *     as proposals, and an empty register is an honest empty state.
+ *   • §1.1 Work schedule + §1.2 leave entitlement: NO endpoints exist. They
+ *     render the honest unavailable state instead of fixture rows.
+ *   • Company identity stays on its real GET/PATCH /company widget.
  */
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const dateIsValid = (value: string): boolean => ISO_DATE.test(value) && Number.isFinite(new Date(`${value}T12:00:00Z`).getTime());
-
-const weekdayLabel = (weekday: number, locale: Locale): string => formatWeekdayIndex(weekday, locale);
 
 const numText = (value: number, locale: Locale): string => new Intl.NumberFormat(locale).format(value);
 
@@ -42,106 +39,32 @@ const fullDate = (value: string, locale: Locale): string =>
 const weekDayOf = (value: string, locale: Locale): string =>
   dateIsValid(value) ? formatWeekdayOf(`${value}T12:00:00Z`, locale) : "";
 
-const cairoDateLocal = (date: Date) => cairoDayIso(date);
-
-type VersionState = "IN_FORCE" | "UPCOMING" | "SUPERSEDED";
-const versionState = (schedule: WorkSchedule, today: string): VersionState => {
-  if (schedule.effective_from > today) return "UPCOMING";
-  if (schedule.effective_to && schedule.effective_to < today) return "SUPERSEDED";
-  return "IN_FORCE";
-};
-const versionMeta: Record<VersionState, { tone: StatusTone; key: DictKey }> = {
-  IN_FORCE: { tone: "success", key: "adminSettingsVersionInForce" },
-  UPCOMING: { tone: "info", key: "adminSettingsVersionUpcoming" },
-  SUPERSEDED: { tone: "neutral", key: "adminSettingsVersionSuperseded" },
-};
-
-type HolidayMutation = "add" | "edit" | "delete";
-
 export default function AdminSettingsPage() {
-  const { t, locale, capabilities, schedules } = useApp();
+  const { t, locale, capabilities } = useApp();
   usePageTitle(t("adminNavSettings"));
-  const today = cairoDateLocal(new Date());
-
-  const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
-  const [attempt, setAttempt] = useState(0);
-
-  // Honest read lifecycle over the committed fixtures (same pattern as Overview).
-  useEffect(() => {
-    if (phase !== "loading") return;
-    const timer = window.setTimeout(() => setPhase("ready"), 350);
-    return () => window.clearTimeout(timer);
-  }, [phase, attempt]);
+  const today = cairoDayIso(new Date());
 
   if (!capabilities.canSetOrgSchedule && !capabilities.canManageLeaveBalance && !capabilities.canManageHolidays) {
     return <Navigate to="/" replace />;
-  }
-
-  if (phase === "error") {
-    return (
-      <div className="page">
-        <AdminNav />
-        <PageHeader title={t("adminNavSettings")} />
-        <ErrorState onRetry={() => { setAttempt((current) => current + 1); setPhase("loading"); }} />
-      </div>
-    );
   }
 
   return (
     <div className="page">
       <AdminNav />
       <PageHeader title={t("adminNavSettings")} subtitle={t("adminSubtitle")} />
-      <Banner tone="info">{t("adminDemoBoundary")}</Banner>
-      {phase === "loading" ? (
-        <section className="work-surface" aria-busy="true">
-          <SkeletonRows rows={3} />
-        </section>
-      ) : (
-        <SettingsBody
-          key={`${attempt}-${locale}`}
-          today={today}
-          t={t as (key: DictKey) => string}
-          locale={locale}
-          schedules={schedules.filter((schedule) => schedule.scope === "ORGANIZATION")}
-          canSchedule={capabilities.canSetOrgSchedule}
-          canLeave={capabilities.canManageLeaveBalance}
-          canHolidays={capabilities.canManageHolidays}
-        />
-      )}
-    </div>
-  );
-}
-
-function SettingsBody({
-  today,
-  t,
-  locale,
-  schedules,
-  canSchedule,
-  canLeave,
-  canHolidays,
-}: {
-  today: string;
-  t: (key: DictKey) => string;
-  locale: Locale;
-  schedules: WorkSchedule[];
-  canSchedule: boolean;
-  canLeave: boolean;
-  canHolidays: boolean;
-}) {
-  return (
-    <div className="dashboard-grid settings-grid">
-      {canSchedule ? <ScheduleCard today={today} t={t} locale={locale} orgSchedules={schedules} /> : null}
-      {canHolidays ? <HolidaysCard t={t} locale={locale} today={today} /> : null}
-      {canLeave ? (
+      <div className="dashboard-grid settings-grid">
+        {capabilities.canSetOrgSchedule ? <ScheduleCard t={t as (key: DictKey) => string} locale={locale} /> : null}
+        {capabilities.canManageHolidays ? <HolidaysCard t={t as (key: DictKey) => string} locale={locale} today={today} /> : null}
+        {capabilities.canManageLeaveBalance ? (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <LeaveSection t={t as (key: DictKey) => string} locale={locale} />
+          </div>
+        ) : null}
+        {/* H17 — the company identity: its own widget card, full width, server-backed
+            (GET/PATCH /company). */}
         <div style={{ gridColumn: "1 / -1" }}>
-          <LeaveSection />
+          <CompanyProfilePanel t={t as (key: DictKey) => string} locale={locale} />
         </div>
-      ) : null}
-      {/* H17 — the company identity: its own widget card, full width, server-backed
-          (GET/PATCH /company) while the sibling fixtures stay mock. */}
-      <div style={{ gridColumn: "1 / -1" }}>
-        <CompanyProfilePanel t={t} locale={locale} />
       </div>
     </div>
   );
@@ -149,340 +72,34 @@ function SettingsBody({
 
 /* ============================ §1.1 Work schedule card ============================ */
 
-function ScheduleCard({ today, t, locale, orgSchedules }: { today: string; t: (key: DictKey) => string; locale: Locale; orgSchedules: WorkSchedule[] }) {
-  const { setWorkSchedule } = useApp();
-  const current = useMemo(
-    () =>
-      orgSchedules
-        .filter((schedule) => schedule.effective_from <= today && (!schedule.effective_to || today <= schedule.effective_to))
-        .sort((l, r) => r.effective_from.localeCompare(l.effective_from))[0] ?? null,
-    [orgSchedules, today],
-  );
-  const versions = useMemo(() => [...orgSchedules].sort((l, r) => r.effective_from.localeCompare(l.effective_from)), [orgSchedules]);
-
-  const [showVersions, setShowVersions] = useState(false);
-  const [editorOpen, setEditorOpen] = useState(false);
-  /** null = "New version"; a schedule = editing/deriving that row in the editor. */
-  const [editing, setEditing] = useState<WorkSchedule | null | undefined>(undefined);
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-
-  const openEditor = (target: WorkSchedule | null) => {
-    setEditing(target);
-    setEditorOpen(true);
-  };
-
-  // First-run empty state (spec §1.1): no schedule at all → editor auto-opens.
-  useEffect(() => {
-    if (current === null && orgSchedules.length === 0) setEditorOpen(true);
-  }, [current, orgSchedules.length]);
-
+function ScheduleCard({ t, locale }: { t: (key: DictKey) => string; locale: Locale }) {
+  const unavailable = locale === "ar"
+    ? "جدول العمل الرسمي للمؤسسة غير متاح: لا توجد نقطة نهاية للجداول على الخادم (قراءة أو كتابة)، فلا يوجد جدول مؤكد ولا إصدارات سابقة. تُستكمل البطاقة عند توفر النقطة."
+    : "The organization's work schedule is not available: no schedules endpoint exists on the server (read or write), so there is no confirmed schedule and no version history. The card completes when the endpoint does.";
   return (
     <section className="work-surface section" aria-labelledby="settings-schedule-heading" id="settings-schedule">
       <div className="section-heading">
         <h2 id="settings-schedule-heading">{t("adminOrgScheduleTitle")}</h2>
         <span className="page-meta">{t("adminCurrentSchedule")}</span>
-        {current ? (
-          <button
-            type="button"
-            className="btn btn-ghost btn-compact icon-only"
-            aria-label={`${t("adminSettingsEditVersion")} — ${formatDate(`${current.effective_from}T12:00:00Z`, locale)}`}
-            onClick={() => openEditor(current)}
-          >
-            <EditIcon />
-          </button>
-        ) : null}
       </div>
-
-      {/* Current schedule summary. The edit control sits in the heading above so the
-          summary itself stays a read-only read-out of what is actually in force. */}
-      <div className="quiet-inset">
-        {current ? (
-          <dl className="decision-facts">
-            <div>
-              <dt>{t("adminWorkingWeekdays")}</dt>
-              <dd>{current.working_weekdays.map((weekday) => weekdayLabel(weekday, locale)).join(locale === "ar" ? "، " : ", ")}</dd>
-            </div>
-            <div>
-              <dt>{t("attendanceExpected")}</dt>
-              <dd>{formatWallClockRange(current.expected_start, current.expected_end, locale)}</dd>
-            </div>
-            <div>
-              <dt>{t("adminExpectedDailyMinutes")}</dt>
-              <dd>{numText(current.expected_daily_minutes, locale)}</dd>
-            </div>
-            <div>
-              <dt>{t("adminGraceMinutes")}</dt>
-              <dd>{numText(current.grace_minutes, locale)}</dd>
-            </div>
-            <div>
-              <dt>{t("adminCurrentSchedule")}</dt>
-              <dd>{formatDateRange(`${current.effective_from}T12:00:00Z`, current.effective_to ? `${current.effective_to}T12:00:00Z` : null, locale)}</dd>
-            </div>
-          </dl>
-        ) : (
-          <p className="page-meta">{t("adminNoCurrentSchedule")}</p>
-        )}
-      </div>
-
-      {feedback ? (
-        <Banner tone={feedback.tone} role={feedback.tone === "error" ? "alert" : "status"}>{feedback.text}</Banner>
-      ) : null}
-
-      <button type="button" className="btn btn-secondary" aria-expanded={showVersions} onClick={() => setShowVersions((open) => !open)}>
-        <ChevronDownIcon />
-        {showVersions ? t("adminSettingsVersionsHide") : t("adminSettingsVersionsShow").replace("%s", numText(versions.length, locale))}
-      </button>
-      {showVersions ? (
-        <ul className="compact-list" style={{ marginBlockStart: "var(--sp-4)" }}>
-          {versions.map((version) => {
-            const meta = versionMeta[versionState(version, today)];
-            return (
-              <li className="compact-row" key={version.id}>
-                <div>
-                  <strong>{formatDateRange(`${version.effective_from}T12:00:00Z`, version.effective_to ? `${version.effective_to}T12:00:00Z` : null, locale)}</strong>
-                  <div className="page-meta">
-                    {version.working_weekdays.map((weekday) => weekdayLabel(weekday, locale)).join(locale === "ar" ? "، " : ", ")}
-                    {" · "}
-                    {formatWallClockRange(version.expected_start, version.expected_end, locale)}
-                    {" · "}
-                    {numText(version.expected_daily_minutes, locale)} +{numText(version.grace_minutes, locale)}
-                  </div>
-                </div>
-                <div className="row-actions">
-                  <StatusPill tone={meta.tone} label={t(meta.key)} />
-                  <button type="button" className="btn btn-ghost btn-compact" onClick={() => openEditor(version)}>
-                    {t("adminSettingsOpenInEditor")}
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-
-      <div className="form-actions" style={{ marginBlockStart: "var(--sp-4)" }}>
-        <button type="button" className="btn btn-primary" onClick={() => openEditor(null)}>
-          {t("adminSettingsNewVersion")}
-        </button>
-      </div>
-
-      {editorOpen ? (
-        <ScheduleEditorDialog
-          today={today}
-          t={t}
-          locale={locale}
-          base={editing === undefined ? null : editing ?? null}
-          onClose={() => { setEditorOpen(false); setEditing(undefined); }}
-          onSaved={(ok, message) => {
-            setEditorOpen(false);
-            setEditing(undefined);
-            setFeedback({ tone: ok ? "success" : "error", text: message });
-          }}
-          saveSchedule={setWorkSchedule}
-        />
-      ) : null}
+      <Banner tone="warning" role="alert">{unavailable}</Banner>
     </section>
   );
 }
 
-/* ==================== §1.2 Leave entitlement table + §Employee rows ==================== */
+/* ==================== §1.2 Leave entitlement table (honest) ==================== */
 
-function LeaveSection() {
-  const { t, locale, directoryLeaveBalances, leaveBalances, leaveBalanceSummary } = useApp();
-  // The three fixture identities carry live balances that the context
-  // mutation actually updates; other directory rows stay at their derived
-  // defaults (see the honest-demo note in the report).
-  const rows = useMemo(() => {
-    const live = new Map(leaveBalances.map((balance) => [`${balance.employee}-${balance.leave_type}`, balance]));
-    const merged = [...directoryLeaveBalances];
-    return merged.map((row) => live.get(`${row.employee}-${row.leave_type}`) ?? row);
-  }, [directoryLeaveBalances, leaveBalances]);
-
-  const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("ALL");
-  const [periodFilter, setPeriodFilter] = useState("ALL");
-  const [adjustTarget, setAdjustTarget] = useState<{ employeeId: string; type: LeaveBalance["leave_type"] } | null>(null);
-  const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
-  const [resetKey, setResetKey] = useState(0);
-
-  const periods = useMemo(() => [...new Set(rows.map((row) => row.period))], [rows]);
-  const filtered = useMemo(
-    () =>
-      rows.filter((row) => {
-        const entry = findDirectoryEntry(row.employee);
-        const name = entry?.name[locale] ?? "";
-        const number = entry?.employee_number ?? "";
-        const matchSearch = !search.trim() || `${name} ${number} ${row.employee}`.toLowerCase().includes(search.trim().toLowerCase());
-        const matchType = typeFilter === "ALL" || row.leave_type === typeFilter;
-        const matchPeriod = periodFilter === "ALL" || row.period === periodFilter;
-        return matchSearch && matchType && matchPeriod;
-      }),
-    [rows, search, typeFilter, periodFilter, locale],
-  );
-
-  const activeFilters = [
-    search.trim() ? { key: "search", label: `"${search.trim()}"` } : null,
-    typeFilter !== "ALL" ? { key: "type", label: t(leaveTypeKeys[typeFilter as LeaveBalance["leave_type"]]) } : null,
-    periodFilter !== "ALL" ? { key: "period", label: `${t("adminPeriod")} ${periodFilter}` } : null,
-  ].filter(Boolean) as { key: string; label: string }[];
-
-  const clearFilter = (key: string) => {
-    if (key === "search") setSearch("");
-    if (key === "type") setTypeFilter("ALL");
-    if (key === "period") setPeriodFilter("ALL");
-  };
-  const clearAllFilters = () => { setSearch(""); setTypeFilter("ALL"); setPeriodFilter("ALL"); };
-
-  const typeLabels = useMemo(() => Object.keys(leaveTypeKeys) as LeaveBalance["leave_type"][], []);
-  const employmentTypeKey = (value: string): DictKey => ({ FULL: "hrEmploymentTypeFull", PART: "hrEmploymentTypePart", HYBRID: "hrEmploymentTypeHybrid", REMOTE: "hrEmploymentTypeRemote" } as const)[value as "FULL" | "PART" | "HYBRID" | "REMOTE"] ?? "hrEmploymentTypeFull";
-
-  const fmt = (value: number): string => new Intl.NumberFormat(locale).format(value);
-
-  type RowRecord = (LeaveBalance & { id: string });
-  const columns: OperationalColumn<RowRecord>[] = [
-    {
-      key: "employee",
-      label: t("employee"),
-      render: (row) => {
-        const entry = findDirectoryEntry(row.employee);
-        return <bdi>{entry?.name[locale] ?? row.employee} ({entry?.employee_number ?? row.employee})</bdi>;
-      },
-    },
-    {
-      key: "type-work",
-      label: t("hrEmploymentType"),
-      render: (row) => {
-        const entry = findDirectoryEntry(row.employee);
-        return entry ? <StatusPill tone="neutral" label={t(employmentTypeKey(entry.employment_type))} /> : null;
-      },
-    },
-    {
-      key: "leave-type",
-      label: t("adminLeaveType"),
-      render: (row) => <StatusPill tone="info" label={t(leaveTypeKeys[row.leave_type])} />,
-    },
-    { key: "entitlement", label: t("adminEntitlement"), render: (row) => fmt(row.entitlement_days) },
-    { key: "carry", label: t("adminCarryOver"), render: (row) => fmt(row.carry_over_days) },
-    { key: "used", label: t("adminUsedDays"), render: (row) => fmt(row.used_days) },
-    { key: "pending", label: t("adminPendingDays"), render: (row) => fmt(row.pending_days) },
-    {
-      key: "remaining",
-      label: t("remainingBalance"),
-      render: (row) => <strong>{fmt(leaveBalanceSummary(row).remaining)}</strong>,
-    },
-    {
-      key: "delta",
-      label: t("adminAdjustmentsTotal"),
-      render: (row) => <bdi dir="ltr">{new Intl.NumberFormat(locale, { signDisplay: "exceptZero" }).format(leaveBalanceSummary(row).adjustments_total)}</bdi>,
-    },
-    {
-      key: "action",
-      label: t("attendanceActionLabel"),
-      render: (row) => (
-        <button
-          type="button"
-          className="btn btn-ghost btn-compact"
-          aria-label={`${t("adminAdjustBalance")} — ${findDirectoryEntry(row.employee)?.name[locale] ?? row.employee}`}
-          onClick={() => setAdjustTarget({ employeeId: row.employee, type: row.leave_type })}
-        >
-          {t("adminAdjustBalance")}
-        </button>
-      ),
-    },
-  ];
-
+function LeaveSection({ t, locale }: { t: (key: DictKey) => string; locale: Locale }) {
+  const unavailable = locale === "ar"
+    ? "جدول مخصص الإجازات غير متاح: لا توجد نقطة نهاية لأرصدة الإجازات على الخادم (قراءة أو تسوية)، فلا توجد صفوف مؤكدة لأي موظف ولا إجراء ضبط. الجدول يُستكمل عند توفر النقطة."
+    : "The leave entitlement table is not available: no leave-balances endpoint exists on the server (read or adjust), so there are no confirmed rows for any employee and no adjust action. The table completes when the endpoint does.";
   return (
     <section className="section" aria-labelledby="settings-leave-heading" id="settings-leave">
       <div className="section-heading">
         <h2 id="settings-leave-heading">{t("adminSettingsLeaveTitle")}</h2>
-        <span className="page-meta">
-          {new Intl.NumberFormat(locale).format(filtered.length)} · {t("adminAllEmployees")}
-        </span>
+        <span className="page-meta">{t("adminAllEmployees")}</span>
       </div>
-
-      <div className="filter-panel">
-      <div className="filter-toolbar">
-        <label className="field">
-          <span className="field-label"><SearchIcon />{t("employee")}</span>
-          <input
-            className="input"
-            type="search"
-            aria-label={t("adminSettingsSearchEmployee")}
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span className="field-label"><FilterIcon />{t("adminLeaveType")}</span>
-          <select className="select" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-            <option value="ALL">{t("attendanceAll")}</option>
-            {typeLabels.map((code) => <option key={code} value={code}>{t(leaveTypeKeys[code])}</option>)}
-          </select>
-        </label>
-        <label className="field">
-          <span className="field-label"><FilterIcon />{t("adminPeriod")}</span>
-          <select className="select" value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>
-            <option value="ALL">{t("attendanceAll")}</option>
-            {periods.map((period) => <option key={period} value={period}>{period}</option>)}
-          </select>
-        </label>
-      </div>
-
-      {activeFilters.length ? (
-        <div className="applied-filters" aria-live="polite">
-          <span>{t("taskFiltersApplied")}</span>
-          {activeFilters.map((filter) => (
-            <span className="filter-chip" key={filter.key}>
-              {filter.label}
-              <button
-                type="button"
-                className="btn btn-ghost btn-compact chip-clear"
-                aria-label={t("attendanceClearFilterAriaTemplate").replace("%s", filter.label)}
-                onClick={() => clearFilter(filter.key)}
-              >
-                ×
-              </button>
-            </span>
-          ))}
-          <button type="button" className="btn btn-secondary" onClick={clearAllFilters}>{t("taskFiltersClearAll")}</button>
-        </div>
-      ) : null}
-      <p className="page-meta tasks-result-count" role="status">{t("taskFiltersShowing").replace("%s", String(filtered.length)).replace("%s", String(rows.length))}</p>
-      </div>
-
-      {confirmMessage ? <Banner tone="success" role="status">{confirmMessage}</Banner> : null}
-
-      {rows.length === 0 ? (
-        <EmptyState message={t("adminOverviewNoEmployees")} />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          message={t("adminSettingsNoFilteredRows")}
-          action={<button type="button" className="btn btn-secondary" onClick={clearAllFilters}>{t("attendanceClearAllFilters")}</button>}
-        />
-      ) : (
-        <div className="table-wide">
-          <OperationalTable
-            caption={`${t("adminSettingsLeaveTitle")} — ${new Intl.NumberFormat(locale).format(filtered.length)}`}
-            columns={columns}
-            records={filtered.map((row) => ({ ...row, id: `${row.employee}-${row.leave_type}-${row.period}` }))}
-          />
-        </div>
-      )}
-
-      {adjustTarget ? (
-        <AdjustLeaveDialog
-          key={`adjust-${resetKey}`}
-          employeeId={adjustTarget.employeeId}
-          employeeName={findDirectoryEntry(adjustTarget.employeeId)?.name[locale]}
-          initialLeaveType={adjustTarget.type}
-          availableTypes={typeLabels}
-          onClose={(outcome) => {
-            setAdjustTarget(null);
-            setResetKey((current) => current + 1);
-            if (outcome.ok) setConfirmMessage(t("adminBalanceAdjusted"));
-          }}
-        />
-      ) : null}
+      <Banner tone="warning" role="alert">{unavailable}</Banner>
     </section>
   );
 }
@@ -497,18 +114,14 @@ type AiControlState =
   | { kind: "failed"; reason: ApiFailureKind; message: string };
 
 function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; locale: Locale; today: string }) {
-  const { publicHolidays } = useApp();
   const year = Number(today.slice(0, 4)) || new Date().getFullYear();
   /**
-   * The register. Server-backed whenever the API answers; the demo fixtures otherwise.
-   * `backing` is what the UI reports as the source — never silently mixed.
+   * The register, from the server only. No fixture fallback, no silent mixing:
+   * a failed read is reported by its real reason and the list stays empty.
    */
-  const [holidays, setHolidays] = useState<PublicHoliday[]>(() => structuredClone(publicHolidays));
-  const [backing, setBacking] = useState<"server" | "demo">("demo");
+  const [holidays, setHolidays] = useState<PublicHoliday[] | null>(null);
   const [loadFailure, setLoadFailure] = useState<{ reason: ApiFailureKind; message: string } | null>(null);
   const [ai, setAi] = useState<AiControlState>({ kind: "idle" });
-  const [feedback, setFeedback] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-  const [dialog, setDialog] = useState<{ kind: HolidayMutation; target: PublicHoliday | null } | null>(null);
 
   /** Read the register from the server. Never falls back to faking a successful load. */
   useEffect(() => {
@@ -517,27 +130,23 @@ function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; local
       .then((rows) => {
         if (cancelled) return;
         setHolidays(rows);
-        setBacking("server");
         setLoadFailure(null);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        const failure = describeApiFailure(error);
-        setBacking("demo");
-        setLoadFailure(failure);
+        setHolidays([]);
+        setLoadFailure(describeApiFailure(error));
       });
     return () => { cancelled = true; };
   }, [year]);
 
   const runRefresh = async () => {
     setAi({ kind: "loading" });
-    setFeedback(null);
     try {
       const summary = await refreshHolidays(year);
       // Re-read rather than trusting what we think changed.
       const rows = await fetchHolidays(year);
       setHolidays(rows);
-      setBacking("server");
       setLoadFailure(null);
       setAi({ kind: "done", summary });
     } catch (error) {
@@ -545,31 +154,17 @@ function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; local
     }
   };
 
-  const sorted = useMemo(
-    () => [...holidays].sort((l, r) => l.date.localeCompare(r.date)),
-    [holidays],
-  );
+  const sorted = useMemo(() => [...(holidays ?? [])].sort((l, r) => l.date.localeCompare(r.date)), [holidays]);
   const pastCount = sorted.filter((holiday) => holiday.date < today).length;
   const upcoming = sorted.filter((holiday) => holiday.date >= today);
   const past = sorted.filter((holiday) => holiday.date < today);
-
-  const applyMutation = (kind: HolidayMutation, value: PublicHoliday) => {
-    setHolidays((current) => {
-      if (kind === "add") return [...current, value];
-      if (kind === "edit") return current.map((holiday) => (holiday.id === value.id ? value : holiday));
-      return current.filter((holiday) => holiday.id !== value.id);
-    });
-  };
 
   return (
     <section className="work-surface section" aria-labelledby="settings-holidays-heading" id="settings-holidays">
       <div className="section-heading">
         <h2 id="settings-holidays-heading">{t("hrHolidaysTitle")}</h2>
         <div className="row-actions">
-          <button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: "add", target: null })}>
-            {t("adminSettingsHolidaysAdd")}
-          </button>
-          {/* §1.4 — the control is real now. It reports what the server actually did. */}
+          {/* §1.4 — the control is real. It reports what the server actually did. */}
           <button
             type="button"
             className="btn btn-secondary has-tooltip"
@@ -590,10 +185,10 @@ function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; local
         {t("adminSettingsAiNote")}
       </span>
 
-      {/* Which register is on screen, stated plainly. */}
-      {backing === "demo" && loadFailure ? (
+      {/* A failed read is stated by its real reason — nothing was rendered instead. */}
+      {loadFailure ? (
         <p className="page-meta" style={{ marginBlockStart: "var(--sp-2)" }}>
-          {describeLoadFallback(loadFailure, t)}
+          {describeLoadFailure(loadFailure, t)}
         </p>
       ) : null}
 
@@ -606,28 +201,14 @@ function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; local
         <Banner tone="error" role="alert">{describeRefreshFailure(ai, t)}</Banner>
       ) : null}
 
-      {feedback ? (
-        <Banner tone={feedback.tone} role={feedback.tone === "error" ? "alert" : "status"}>{feedback.text}</Banner>
-      ) : null}
-
-      {holidays.length === 0 ? (
-        <EmptyState
-          message={t("adminSettingsHolidaysEmpty")}
-          action={<button type="button" className="btn btn-primary" onClick={() => setDialog({ kind: "add", target: null })}>{t("adminSettingsAddFirstHoliday")}</button>}
-        />
+      {holidays === null ? (
+        <EmptyState message={t("adminSettingsHolidaysEmpty")} />
       ) : (
         <>
           {upcoming.length > 0 ? (
             <ul className="compact-list" style={{ marginBlockStart: "var(--sp-2)" }}>
               {upcoming.map((holiday) => (
-                <HolidayRow
-                  key={holiday.id}
-                  holiday={holiday}
-                  t={t}
-                  locale={locale}
-                  onEdit={() => setDialog({ kind: "edit", target: holiday })}
-                  onDelete={() => setDialog({ kind: "delete", target: holiday })}
-                />
+                <HolidayRow key={holiday.id} holiday={holiday} t={t} locale={locale} />
               ))}
             </ul>
           ) : (
@@ -642,14 +223,7 @@ function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; local
               </summary>
               <ul className="compact-list">
                 {past.map((holiday) => (
-                  <HolidayRow
-                    key={holiday.id}
-                    holiday={holiday}
-                    t={t}
-                    locale={locale}
-                    onEdit={() => setDialog({ kind: "edit", target: holiday })}
-                    onDelete={() => setDialog({ kind: "delete", target: holiday })}
-                  />
+                  <HolidayRow key={holiday.id} holiday={holiday} t={t} locale={locale} />
                 ))}
               </ul>
             </details>
@@ -657,31 +231,6 @@ function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; local
           <p className="page-meta" style={{ marginBlockStart: "var(--sp-3)" }}>{t("adminSettingsHolidaysTotal").replace("%s", numText(holidays.length, locale))}</p>
         </>
       )}
-
-      {dialog?.kind === "add" || dialog?.kind === "edit" ? (
-        <HolidayFormDialog
-          t={t}
-          target={dialog.target}
-          onClose={() => setDialog(null)}
-          onSaved={(ok, holiday, message) => {
-            setDialog(null);
-            if (ok && holiday) applyMutation(dialog.kind, holiday);
-            setFeedback({ tone: ok ? "success" : "error", text: message });
-          }}
-        />
-      ) : dialog?.kind === "delete" && dialog.target ? (
-        <HolidayDeleteDialog
-          t={t}
-          locale={locale}
-          target={dialog.target}
-          onClose={() => setDialog(null)}
-          onSaved={(ok, holiday, message) => {
-            setDialog(null);
-            if (ok && holiday) applyMutation("delete", holiday);
-            setFeedback({ tone: ok ? "success" : "error", text: message });
-          }}
-        />
-      ) : null}
     </section>
   );
 }
@@ -692,8 +241,8 @@ function describeApiFailure(error: unknown): { reason: ApiFailureKind; message: 
   return { reason: "unreachable", message: error instanceof Error ? error.message : String(error) };
 }
 
-/** Why the register on screen is the demo one, said without pretending. */
-function describeLoadFallback(failure: { reason: ApiFailureKind }, t: (key: DictKey) => string): string {
+/** Why the register on screen is empty, said without pretending. */
+function describeLoadFailure(failure: { reason: ApiFailureKind }, t: (key: DictKey) => string): string {
   if (failure.reason === "unauthenticated") return t("adminSettingsAiNotSignedIn");
   if (failure.reason === "forbidden") return t("adminSettingsAiNotAllowed");
   return t("adminSettingsAiServerUnreachable");
@@ -727,9 +276,10 @@ function describeRefreshFailure(state: { reason: ApiFailureKind }, t: (key: Dict
   return t("adminSettingsAiFailedServer");
 }
 
-function HolidayRow({ holiday, t, locale, onEdit, onDelete }: { holiday: PublicHoliday; t: (key: DictKey) => string; locale: Locale; onEdit: () => void; onDelete: () => void }) {
-  // Provenance, when the row came from the server. A proposal is NOT an official
-  // holiday, so it gets its own tone and its own label — never the default one.
+/** Server register row — read-only now: no endpoint backs manual edits. */
+function HolidayRow({ holiday, t, locale }: { holiday: PublicHoliday; t: (key: DictKey) => string; locale: Locale }) {
+  // Provenance. A proposal is NOT an official holiday, so it gets its own tone
+  // and its own label — never the default one.
   const badge = holiday.needsConfirmation
     ? { tone: "warning" as StatusTone, label: t("adminSettingsAiProposed") }
     : holiday.isManualOverride
@@ -747,156 +297,6 @@ function HolidayRow({ holiday, t, locale, onEdit, onDelete }: { holiday: PublicH
           </div>
         ) : null}
       </div>
-      <div className="row-actions">
-        <button type="button" className="btn btn-ghost btn-compact icon-button" aria-label={t("adminSettingsHolidayEditAria").replace("%s", holiday.name[locale])} onClick={onEdit}>
-          <EditIcon />
-        </button>
-        <button type="button" className="btn btn-ghost btn-compact icon-button" aria-label={t("adminSettingsHolidayDeleteAria").replace("%s", holiday.name[locale])} onClick={onDelete}>
-          <TrashIcon />
-        </button>
-      </div>
     </li>
   );
 }
-
-function HolidayFormDialog({
-  t,
-  target,
-  onClose,
-  onSaved,
-}: {
-  t: (key: DictKey) => string;
-  target: PublicHoliday | null;
-  onClose: () => void;
-  onSaved: (ok: boolean, holiday: PublicHoliday | null, message: string) => void;
-}) {
-  const [date, setDate] = useState(target?.date ?? "");
-  const [nameAr, setNameAr] = useState(target?.name.ar ?? "");
-  const [nameEn, setNameEn] = useState(target?.name.en ?? "");
-  const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ date?: boolean; name?: boolean }>({});
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const nextErrors: { date?: boolean; name?: boolean } = {};
-    if (!dateIsValid(date)) nextErrors.date = true;
-    if (!nameAr.trim() && !nameEn.trim()) nextErrors.name = true;
-    setErrors(nextErrors);
-    if (Object.keys(nextErrors).length) return;
-    setSubmitting(true);
-    window.setTimeout(() => {
-      const fallbackEnglish = nameEn.trim() || nameAr.trim();
-      const fallbackArabic = nameAr.trim() || nameEn.trim();
-      const holiday: PublicHoliday = {
-        id: target?.id ?? `hol-demo-${date}`,
-        date,
-        name: { ar: fallbackArabic, en: fallbackEnglish },
-        recurring: false,
-      };
-      onSaved(true, holiday, target ? t("adminSettingsHolidayUpdated") : t("adminSettingsHolidayAdded"));
-    }, 200);
-  };
-
-  return (
-    <Dialog
-      title={target ? t("adminSettingsHolidayEditTitle") : t("adminSettingsHolidaysAdd")}
-      busy={submitting}
-      dirty={date !== (target?.date ?? "") || nameAr !== (target?.name.ar ?? "") || nameEn !== (target?.name.en ?? "")}
-      onClose={onClose}
-    >
-      <form noValidate onSubmit={submit} aria-busy={submitting}>
-        <label className="field">
-          <span className="field-label">{t("attendanceDate")}</span>
-          <input
-            className="input"
-            type="date"
-            dir="ltr"
-            value={date}
-            aria-invalid={errors.date ? "true" : undefined}
-            aria-describedby={errors.date ? "holiday-date-error" : undefined}
-            onChange={(event) => setDate(event.target.value)}
-            disabled={submitting}
-          />
-          {errors.date ? <span className="field-error" id="holiday-date-error" role="alert">{t("adminErrorRequired")}</span> : null}
-        </label>
-        <label className="field">
-          <span className="field-label">{t("hrAnnouncementBody")} ({t("adminSettingsNameArabic")})</span>
-          <input
-            className="input"
-            value={nameAr}
-            onChange={(event) => setNameAr(event.target.value)}
-            disabled={submitting}
-            aria-invalid={errors.name ? "true" : undefined}
-          />
-        </label>
-        <label className="field">
-          <span className="field-label">{t("hrAnnouncementBody")} ({t("adminSettingsNameEnglish")})</span>
-          <input
-            className="input"
-            value={nameEn}
-            onChange={(event) => setNameEn(event.target.value)}
-            disabled={submitting}
-            aria-invalid={errors.name ? "true" : undefined}
-          />
-          {errors.name ? <span className="field-error" role="alert">{t("adminErrorRequired")}</span> : null}
-        </label>
-        <div className="dialog-actions">
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>{t("cancel")}</button>
-          <button type="submit" className="btn btn-primary" disabled={submitting}>
-            {submitting ? (
-              <>
-                <span className="spinner" aria-hidden="true" />
-                {t("adminSettingsSavingHoliday")}
-              </>
-            ) : (
-              target ? t("save") : t("adminSettingsHolidaysAdd")
-            )}
-          </button>
-        </div>
-      </form>
-    </Dialog>
-  );
-}
-
-function HolidayDeleteDialog({
-  t,
-  locale,
-  target,
-  onClose,
-  onSaved,
-}: {
-  t: (key: DictKey) => string;
-  locale: Locale;
-  target: PublicHoliday;
-  onClose: () => void;
-  onSaved: (ok: boolean, holiday: PublicHoliday | null, message: string) => void;
-}) {
-  const [submitting, setSubmitting] = useState(false);
-  return (
-    <Dialog title={t("adminSettingsDeleteTitle")} description={t("adminSettingsDeleteDescription")} busy={submitting} onClose={onClose}>
-      <p><strong>{target.name[locale]}</strong> · {fullDate(target.date, locale)}</p>
-      <form noValidate onSubmit={(event) => {
-        event.preventDefault();
-        setSubmitting(true);
-        window.setTimeout(() => onSaved(true, target, t("adminSettingsHolidayDeleted")), 200);
-      }}>
-        <div className="dialog-actions">
-          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={submitting}>{t("cancel")}</button>
-          <button type="submit" className="btn btn-danger-quiet" disabled={submitting}>
-            {submitting ? (
-              <>
-                <span className="spinner" aria-hidden="true" />
-                {t("adminSettingsDeletingHoliday")}
-              </>
-            ) : (
-              t("adminSettingsDeleteBtn")
-            )}
-          </button>
-        </div>
-      </form>
-    </Dialog>
-  );
-}
-
-export const settingsLocale: Locale = "en";
-export const settingsDictProbe: keyof Dict = "adminSettingsAiLabel";

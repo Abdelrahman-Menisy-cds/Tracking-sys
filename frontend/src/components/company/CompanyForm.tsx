@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ApiError } from "../../app/api";
 import {
   REQUIRED_COMPANY_FIELDS,
@@ -149,6 +149,8 @@ export function CompanyForm({
   onSaved,
   onDone,
   compact = false,
+  trailing = null,
+  initialServerErrors,
 }: {
   profile: CompanyProfile | null;
   onSave: (patch: CompanyProfilePatch) => Promise<void>;
@@ -162,6 +164,20 @@ export function CompanyForm({
   /** When submit-level (non-field) failure must be surfaced by the parent page. */
   onDone?: (failure: { message: string } | null) => void;
   compact?: boolean;
+  /**
+   * H34b: extra fields the parent renders INSIDE this form, after the
+   * optional group — the signup wizard puts the activation-code field here so
+   * the code stays the LAST field of the company screen and Enter still
+   * submits the same form. The parent owns that field's state entirely.
+   */
+  trailing?: ReactNode;
+  /**
+   * H34b: per-field server refusals to seed at mount. The fused signup POST
+   * can reject a company field from step 2's submit; the wizard re-enters
+   * this screen (remounted via key) with the collected values AND these
+   * errors so each refusal lands under the field that caused it.
+   */
+  initialServerErrors?: Partial<Record<keyof TextFields | "logo_data_url", string>>;
 }) {
   const seed = profile ?? {
     name: "", activity: "", address: "", phone: "",
@@ -177,7 +193,7 @@ export function CompanyForm({
   const [logo, setLogo] = useState<string>(() => seed.logo_data_url || "");
   const [logoBusy, setLogoBusy] = useState(false);
   const [clientErrors, setClientErrors] = useState<Partial<Record<keyof TextFields | "logo_data_url", string>>>({});
-  const [serverErrors, setServerErrors] = useState<Partial<Record<keyof TextFields | "logo_data_url", string>>>({});
+  const [serverErrors, setServerErrors] = useState<Partial<Record<keyof TextFields | "logo_data_url", string>>>(initialServerErrors ?? {});
   const [banner, setBanner] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -362,6 +378,7 @@ export function CompanyForm({
           </span>
         </div>
       </fieldset>
+      {trailing}
       {banner ? <Banner tone="error" role="alert">{banner}</Banner> : null}
       <div className="form-actions company-form-actions">
         {onCancel ? (

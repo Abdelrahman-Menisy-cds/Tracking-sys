@@ -2,6 +2,8 @@ from django.core.exceptions import ValidationError as django_exceptions_Validati
 from django.core.validators import EmailValidator
 from rest_framework import serializers
 
+from accounts.company_serializers import CompanyProfileWriteSerializer
+
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(trim_whitespace=True)
@@ -13,7 +15,14 @@ class LoginSerializer(serializers.Serializer):
 
 
 class SignupSerializer(serializers.Serializer):
-    """Body of POST /auth/signup: {email, code, password} (Story H14)."""
+    """Body of POST /auth/signup: {email, code, password} (Story H14).
+
+    H34 adds the optional nested ``company`` object (one-shot company
+    registration): company data + the activation code arrive together with
+    the founding HR credentials, and the company is written only once every
+    field validates. Omitted, the pre-H34 3-field body keeps working
+    unchanged (and still founds a company for a tenantless code, H30 §2.5).
+    """
 
     email = serializers.EmailField(trim_whitespace=True)
     code = serializers.CharField(max_length=128, trim_whitespace=True)
@@ -26,9 +35,19 @@ class SignupSerializer(serializers.Serializer):
     # NEW company for the caller. A code already bound to a company ignores it
     # (the caller joins that company), so the field stays optional and the
     # pre-tenancy body {email, code, password} keeps working unchanged.
+    # H34: when the nested ``company`` object is supplied, ITS name names the
+    # founded Company (the caller typed it on the company screen); this
+    # legacy field is the fallback for bodies without ``company``.
     company_name = serializers.CharField(
         required=False, allow_blank=True, max_length=200
     )
+    # H34: the company screen's fields, validated by the EXACT serializer the
+    # /company PATCH view uses (field rules, trimming, phone charset, logo
+    # envelope) so the two paths cannot drift. Every field is optional here —
+    # the completeness gate is the same ``merged_missing_required`` computation
+    # the view runs, applied in the service after the code check, so a wrong
+    # code still answers «الكود غير صحيح.» before any company-field complaint.
+    company = CompanyProfileWriteSerializer(required=False)
 
     def validate_password(self, value):
         """Run the app's own password validators; surface their messages."""

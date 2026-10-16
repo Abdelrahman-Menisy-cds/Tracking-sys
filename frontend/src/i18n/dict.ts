@@ -128,6 +128,12 @@ export const dict = {
     signupPasswordMismatch: "كلمتا المرور مش متطابقتين — جرّب تاني.",
     signupEmailInUse: "البريد الإلكتروني ده مستخدم قبل كده — سجّل الدخول بحسابك.",
     signupErrorGeneric: "تعذّر إنشاء الحساب.",
+    // H34b: الاشتراك بخطوتين — بيانات الشركة (بكود التفعيل آخر حقل) ثم أول حساب
+    signupStepOf: "الخطوة %s من %s",
+    signupCompanyNext: "متابعة",
+    signupAccountTitle: "أول حساب",
+    signupBackToCompany: "رجوع لبيانات الشركة",
+    signupCodeBound: "الكود مربوط فعلاً بشركة ومش ممكن ينشئ شركة جديدة بيه. اتواصل معانا لو ده مش متوقع.",
     // roles
     role: "الدور",
     roleEmployee: "موظف",
@@ -1158,6 +1164,12 @@ export const dict = {
     signupPasswordMismatch: "The two passwords do not match — try again.",
     signupEmailInUse: "That email is already in use — sign in with your account instead.",
     signupErrorGeneric: "Could not create the account.",
+    // H34b: the two-step signup — company data (activation code last) then the founding HR account.
+    signupStepOf: "Step %s of %s",
+    signupCompanyNext: "Continue",
+    signupAccountTitle: "First account",
+    signupBackToCompany: "Back to company details",
+    signupCodeBound: "This code is already bound to a company and cannot found a new one. Contact us if this is unexpected.",
     role: "Role",
     roleEmployee: "Employee",
     roleManager: "Manager",

@@ -1,74 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
-import { stateDemoControl } from "../mock/data";
-
-export type ListState<T> =
-  | { phase: "loading" }
-  | { phase: "error"; retry: () => void }
-  | { phase: "empty"; forced: boolean }
-  | { phase: "ready"; data: T };
-
-export function useMockList<T>(load: () => Promise<T>, deps: unknown[] = []): ListState<T> {
-  const [state, setState] = useState<ListState<T>>({ phase: "loading" });
-  const [attempt, setAttempt] = useState(0);
-  const retry = useCallback(() => {
-    stateDemoControl.fixture = "ready";
-    setAttempt((currentAttempt) => currentAttempt + 1);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const run = async () => {
-      setState({ phase: "loading" });
-      if (stateDemoControl.fixture === "loading") return;
-      if (stateDemoControl.fixture === "error") {
-        setState({ phase: "error", retry });
-        return;
-      }
-      if (stateDemoControl.fixture === "empty") {
-        setState({ phase: "empty", forced: true });
-        return;
-      }
-      // Mutation-only fixtures are deliberately ignored by read queries. They
-      // are consumed exactly once by the decision boundary and never replayed.
-      try {
-        const loadedData = await load();
-        if (!cancelled) setState({ phase: "ready", data: loadedData });
-      } catch {
-        if (!cancelled) setState({ phase: "error", retry });
-      }
-    };
-
-    const handleFixtureChange = () => setAttempt((currentAttempt) => currentAttempt + 1);
-    window.addEventListener("demo-fixture-change", handleFixtureChange);
-    void run();
-    return () => {
-      cancelled = true;
-      window.removeEventListener("demo-fixture-change", handleFixtureChange);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [...deps, attempt, retry]);
-
-  return state;
-}
-
 /**
- * Brief H3 — ONE shared date/time path for every screen (the user saw
- * scrambled values in the RTL UI on every page: «ظبط طريقه عرض الوقت
- * والتاريخ لانه مش مظبوط ف كل الصفحات»). All rules:
+ * Brief H3 (the ONE shared date/time path) and H33 (the mock list hook is gone).
+ *
+ * All rules, unchanged from the original brief:
  *  - LATIN digits always, via `localeTag` (`ar-EG-u-nu-latn` for `ar`).
  *  - A stable shape in BOTH locales, the DATE zero-padded and the clock's HOUR
- *    not («04/10/2026 · 9:24 ص» — one shape everywhere):
- *      date       → DD/MM/YYYY            (14/10/2026)
- *      date+time  → DD/MM/YYYY · h:mm ص   (11/10/2026 · 9:18 ص)
- *      time only  → h:mm ص / h:mm AM
- *  - NO per-row time zone name («غرينتش+3» reorders inside RTL text and
- *    reads as «3+») — the zone is stated once on the page, not per row.
- *  - Every returned value is wrapped in Unicode isolates (LRI … PDI) so it
- *    renders in the same correct order in a text node or RTL paragraph.
- *    Call sites must not add <bdi> or dir overrides. Per-number RTL marks (U+200F) are NOT used — that
- *    pattern is what was broken.
+ *    not («04/10/2026 · 9:24 ص» — one shape everywhere)
+ *  - NO per-row time zone name; the zone is stated once on the page
+ *  - every returned value wraps in Unicode isolates (LRI … PDI); call sites
+ *    must not add <bdi> or dir overrides.
+ *
+ * This module used to live beside the mock list hook (`useMockList.ts`). The
+ * hook was the demo-fixture machinery; the formats are real and stay.
  */
+
 const CAIRO_TIME_ZONE = "Africa/Cairo";
 
 const LRI = "\u2066";
@@ -205,4 +149,15 @@ export function formatMinutes(minutes: number, locale: "ar" | "en"): string {
   const hours = Math.floor(minutes / 60);
   const remainderMinutes = minutes % 60;
   return locale === "ar" ? `${hours}\u00a0ساعة\u00a0و${remainderMinutes}\u00a0دقيقة` : `${hours}\u00a0h\u00a0${remainderMinutes}\u00a0min`;
+}
+
+/**
+ * Resolve a display name that may arrive in either shape:
+ * the server emits plain strings (full_name, requester_name, employee_name),
+ * while a few still-demo surfaces keep {ar, en} labels.
+ */
+export function displayName(name: string | { ar: string; en: string } | undefined | null, locale: "ar" | "en"): string {
+  if (!name) return locale === "ar" ? "غير معروف" : "Unknown";
+  if (typeof name === "string") return name;
+  return name[locale] ?? name.ar;
 }

@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useApp, usePageTitle } from "../../app/AppContext";
-import { cairoDayIso } from "../../app/useMockList";
-import { Banner, EmptyState, ErrorState, SkeletonRows, StatusPill } from "../../components/ui";
+import { useServerData } from "../../app/useServerData";
+import { listEmployees } from "../../app/orgApi";
+import type { ServerEmployee } from "../../app/orgApi";
+import { EmptyState, ErrorState, SkeletonRows, StatusPill } from "../../components/ui";
 import OperationalTable, { type OperationalColumn } from "../../components/data/OperationalTable";
 import PageHeader from "../../components/layout/PageHeader";
 import AdminNav from "./AdminNav";
@@ -10,126 +12,68 @@ import OrgDepartmentsPanel from "./OrgDepartmentsPanel";
 export { default as AdminPeopleDetailPage } from "./AdminPeopleDetailPage";
 
 /**
- * Per-employee roster — spec §2.1. List-first: search + OperationalTable.
- * The exception flag is DERIVED from effective schedule resolution (an
- * EMPLOYEE-scope row in force today that differs from the org default),
- * never from a stored flag column.
+ * Per-employee roster — spec §2.1, list-first: search + OperationalTable.
+ * DATA SOURCE: the SERVER roster (`GET /employees`). The backend scopes the
+ * read to the caller's company, so the client neither filters by company nor
+ * sends any company id. What the old mock layered on top has NO server
+ * endpoint (schedule exceptions, per-employee leave slots), so those columns
+ * are gone, honestly — not faked with fixture rows.
  */
-import type { LeaveBalance } from "../../mock/attendance";
-import type { EmployeeDirectoryEntry } from "../../mock/data";
-import { leaveTypeKeys } from "./AdjustLeaveDialog";
-import type { Dict } from "../../i18n/dict";
-
-type DictKey = keyof Dict;
-
-/**
- * Per-employee area — spec §2.1 roster. List-first: search + OperationalTable.
- * The exception flag is DERIVED: an employee carries the plan when they have
- * an EMPLOYEE-scope schedule row in force today that differs from the resolved
- * org default — never from a stored flag column (§2.1).
- */
-
-const cairoDateLocal = (date: Date) => cairoDayIso(date);
-
-type RowRecord = EmployeeDirectoryEntry & { exception: boolean; balances: LeaveBalance[] };
+type RowRecord = Omit<ServerEmployee, "id"> & { id: string };
 
 export default function AdminPeoplePage() {
-  const { t, locale, capabilities, employeeDirectory, schedules, resolveScheduleFor, directoryLeaveBalances } = useApp();
+  const { t, locale, capabilities } = useApp();
   usePageTitle(t("adminPeopleTitle"));
 
-  const searchAria = t("adminPeopleSearch");
   const [search, setSearch] = useState("");
-  const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
-  const [attempt, setAttempt] = useState(0);
+  const roster = useServerData(() => listEmployees(locale), [locale]);
 
-  useEffect(() => {
-    if (phase !== "loading") return;
-    const timer = window.setTimeout(() => setPhase("ready"), 350);
-    return () => window.clearTimeout(timer);
-  }, [phase, attempt]);
-
-  const rows: RowRecord[] = useMemo(() => {
-    const today = cairoDateLocal(new Date());
-    return employeeDirectory.map((entry) => {
-      const ownException = schedules.some(
-        (schedule) =>
-          schedule.scope === "EMPLOYEE" && schedule.target === entry.id
-          && schedule.effective_from <= today && (!schedule.effective_to || today <= schedule.effective_to),
-      );
-      const orgForToday = resolveScheduleFor(entry.id, today);
-      // Derived flag: the schedule actually in force for the employee differs
-      // from the ORGANIZATION default that would otherwise apply (§2.1).
-      const exception = ownException && orgForToday !== null && (
-        JSON.stringify(orgForToday.working_weekdays) !== JSON.stringify(schedules.find((s) => s.scope === "ORGANIZATION")?.working_weekdays ?? [])
-        || orgForToday.expected_start !== (schedules.find((s) => s.scope === "ORGANIZATION")?.expected_start ?? "")
-      );
-      return {
-        ...entry,
-        exception,
-        balances: directoryLeaveBalances.filter((balance) => balance.employee === entry.id),
-      };
-    });
-  }, [employeeDirectory, schedules, resolveScheduleFor, directoryLeaveBalances]);
-
-  const sorted = useMemo(
-    () => [...rows].sort((l, r) => Number(r.exception) - Number(l.exception) || l.name[locale].localeCompare(r.name[locale])),
-    [rows, locale],
+  /* Server order is authoritative; no client re-sort. */
+  const rosterData = roster.phase === "ready" ? roster.data : null;
+  const rows = useMemo<RowRecord[]>(
+    () => (rosterData ? rosterData.map((entry) => ({ ...entry, id: String(entry.id) })) : []),
+    [rosterData],
   );
 
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return !needle
-      ? sorted
-      : sorted.filter((row) =>
-          `${row.name[locale]} ${row.employee_number}`.toLowerCase().includes(needle),
+      ? rows
+      : rows.filter((row) =>
+          `${row.full_name} ${row.employee_number ?? ""} ${row.email}`.toLowerCase().includes(needle),
         );
-  }, [sorted, search, locale]);
+  }, [rows, search]);
 
   const columns: OperationalColumn<RowRecord>[] = [
     {
       key: "employee",
       label: t("employee"),
-      // §2.1: the exception pill is the second visual after the name.
       render: (row) => (
         <span>
-          <bdi><Link to={`/admin/people/${row.id}`}>{row.name[locale]}</Link></bdi>{" "}
-          <span className="page-meta"><bdi dir="ltr">({row.employee_number})</bdi></span>
-          {row.exception ? (
-            <>
-              {" "}
-              <StatusPill tone="warning" label={t("adminPeopleExceptionPill")} />
-            </>
+          <bdi><Link to={`/admin/people/${row.id}`}>{row.full_name}</Link></bdi>{" "}
+          <span className="page-meta"><bdi dir="ltr">({row.employee_number ?? "—"})</bdi></span>
+          {!row.is_active ? (
+            <StatusPill tone="danger" label={locale === "ar" ? "غير نشط" : "Inactive"} />
           ) : null}
         </span>
       ),
     },
-    { key: "department", label: locale === "ar" ? "الإدارة" : "Department", render: (row) => row.department[locale] },
-    { key: "job-title", label: locale === "ar" ? "المسمى الوظيفي" : "Job title", render: (row) => row.job_title[locale] },
+    { key: "department", label: locale === "ar" ? "الإدارة" : "Department", render: (row) => locale === "ar" ? (row.department_name_ar ?? "—") : (row.department_name_en ?? row.department_name_ar ?? "—") },
+    { key: "job-title", label: locale === "ar" ? "المسمى الوظيفي" : "Job title", render: (row) => row.job_title || "—" },
     {
-      key: "employment-type",
-      label: t("hrEmploymentType"),
-      render: (row) => <StatusPill tone="neutral" label={t(employmentTypeKey(row.employment_type))} />,
+      key: "role",
+      label: t("role"),
+      render: (row) => (
+        <StatusPill
+          tone="neutral"
+          label={row.role === "HR" ? t("roleHr") : row.role === "MANAGER" ? t("roleManager") : t("roleEmployee")}
+        />
+      ),
     },
     {
-      key: "exception",
-      label: t("adminPeopleExceptionAria"),
-      render: (row) => (row.exception ? <StatusPill tone="warning" label={t("adminPeopleExceptionPill")} /> : <span className="page-meta">—</span>),
-    },
-    {
-      key: "leave-slots",
-      label: t("adminPeopleLeaveSlots"),
-      render: (row) =>
-        row.balances.length ? (
-          <span className="row-actions">
-            {row.balances.map((balance) => (
-              <span key={balance.leave_type} className="page-meta">
-                {t(leaveTypeKeys[balance.leave_type])}: {new Intl.NumberFormat(locale).format(balance.entitlement_days - balance.used_days - balance.pending_days)}
-              </span>
-            ))}
-          </span>
-        ) : (
-          <span className="page-meta">—</span>
-        ),
+      key: "manager",
+      label: t("adminPeopleFactManager"),
+      render: (row) => row.manager_name ?? <span className="page-meta">—</span>,
     },
     {
       key: "actions",
@@ -148,7 +92,6 @@ export default function AdminPeoplePage() {
     <div className="page">
       <AdminNav />
       <PageHeader title={t("adminPeopleTitle")} subtitle={t("adminPeopleSubtitle")} />
-      <Banner tone="info">{t("adminDemoBoundary")}</Banner>
 
       {/* Departments and their people live on the employees page, not on the
           organisation settings page: this is where an HR admin comes to manage
@@ -162,27 +105,27 @@ export default function AdminPeoplePage() {
         </div>
 
         <div className="filter-panel">
-        <div className="filter-toolbar">
-          <label className="field">
-            <span className="field-label">{t("employee")}</span>
-            <input
-              className="input"
-              type="search"
-              aria-label={searchAria}
-              placeholder={t("adminPeopleSearch")}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </label>
-        </div>
-        {search.trim() ? <div className="applied-filters tasks-filter-chips" aria-label={t("taskFiltersApplied")}><span className="filter-chip">{t("employee")}: {search.trim()}<button type="button" className="tasks-chip-remove" aria-label={t("taskFilterRemove").replace("%s", t("employee"))} onClick={() => setSearch("")}>×</button></span><button type="button" className="btn btn-secondary" onClick={() => setSearch("")}>{t("taskFiltersClearAll")}</button></div> : null}
-        <p className="page-meta tasks-result-count" role="status">{t("taskFiltersShowing").replace("%s", String(filtered.length)).replace("%s", String(rows.length))}</p>
+          <div className="filter-toolbar">
+            <label className="field">
+              <span className="field-label">{t("employee")}</span>
+              <input
+                className="input"
+                type="search"
+                aria-label={t("adminPeopleSearch")}
+                placeholder={t("adminPeopleSearch")}
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+          </div>
+          {search.trim() ? <div className="applied-filters tasks-filter-chips" aria-label={t("taskFiltersApplied")}><span className="filter-chip">{t("employee")}: {search.trim()}<button type="button" className="tasks-chip-remove" aria-label={t("taskFilterRemove").replace("%s", t("employee"))} onClick={() => setSearch("")}>×</button></span><button type="button" className="btn btn-secondary" onClick={() => setSearch("")}>{t("taskFiltersClearAll")}</button></div> : null}
+          <p className="page-meta tasks-result-count" role="status">{t("taskFiltersShowing").replace("%s", String(filtered.length)).replace("%s", String(rows.length))}</p>
         </div>
 
-        {phase === "loading" ? (
+        {roster.phase === "loading" ? (
           <SkeletonRows rows={8} />
-        ) : phase === "error" ? (
-          <ErrorState onRetry={() => { setAttempt((current) => current + 1); setPhase("loading"); }} />
+        ) : roster.phase === "error" ? (
+          <ErrorState onRetry={roster.retry} />
         ) : filtered.length === 0 ? (
           search.trim() ? (
             <EmptyState
@@ -203,6 +146,3 @@ export default function AdminPeoplePage() {
     </div>
   );
 }
-
-const employmentTypeKey = (value: EmployeeDirectoryEntry["employment_type"]): DictKey =>
-  ({ FULL: "hrEmploymentTypeFull", PART: "hrEmploymentTypePart", HYBRID: "hrEmploymentTypeHybrid", REMOTE: "hrEmploymentTypeRemote" } as const)[value];

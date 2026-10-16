@@ -278,9 +278,14 @@ class SignupSchema(_ViewSchema):
                 },
             }),
             **_json_response("200", "Email already registered; account untouched (non-enumerating).", _data_envelope(SIGNUP_EMAIL_IN_USE)),
-            **_error_response("400", "invalid_code: wrong or inactive subscription code (generic)."),
+            **_error_response(
+                "400",
+                "invalid_code: wrong or inactive subscription code (generic); "
+                "company_data_not_expected: a code bound to a company was sent with company data (H34); "
+                "validation_error: the nested company data is missing required profile fields (H34).",
+            ),
             **_error_response("403", "CSRF check failed on the unsafe method."),
-            **_error_response("422", "Validation failed (e.g. weak password or bad email)."),
+            **_error_response("422", "Validation failed (e.g. weak password, bad email, or an invalid nested company field)."),
             **_error_response("429", "Signup rate limit exceeded (10/min per IP)."),
         },
     }

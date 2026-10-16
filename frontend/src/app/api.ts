@@ -10,6 +10,8 @@
  * bundle, so the OpenCode Go key lives in the backend's `.env` and never here.
  */
 
+import type { CompanyProfilePatch } from "./companyApi";
+
 /** `VITE_API_BASE_URL` when a deployment sets one, else the dev-proxy path. */
 export const API_BASE: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/+$/, "") || "/api/v1";
@@ -76,6 +78,12 @@ type RequestOptions = {
   timeoutMs?: number;
   /** The UI locale, so the server's own validator messages come back in the operator's language. */
   acceptLanguage?: string;
+  /**
+   * Extra endpoint-mandated headers, e.g. Idempotency-Key (the mutating
+   * contract endpoints refuse to run without one). Still ONE HTTP layer:
+   * this only forwards what the caller already decided to send.
+   */
+  headers?: Record<string, string>;
 };
 
 /**
@@ -117,7 +125,15 @@ export async function getIdentity(): Promise<ServerIdentity> {
 }
 
 /**
- * Self-service HR signup (Story H14). Same CSRF bootstrap as login().
+ * Self-service signup (Stories H14 + H34b). Same CSRF bootstrap as login().
+ *
+ * H34b makes the fused body the normal path: the two-step wizard sends the
+ * nested `company` object (the step-1 company screen's fields, activation
+ * code included at the wizard level) together with the founding HR
+ * credentials in ONE request; the backend validates the code first, then
+ * writes Company + a COMPLETE CompanyProfile + the founding HR user in one
+ * transaction and answers signed-in with `needs_company_profile: false` —
+ * so no onboarding step is owed and the caller goes straight to /.
  *
  * Success is a signed-in session: the server creates the HR account and
  * establishes it on the same request (mirroring sign_in), so the payload is
@@ -126,13 +142,19 @@ export async function getIdentity(): Promise<ServerIdentity> {
  * The one non-signup outcome is `email_in_use`: an existing email answered with
  * a valid code returns `{"data": {"outcome": "email_in_use"}}` — non-enumerating,
  * no re-role, no account data. It is NOT a ServerIdentity and must not be
- * adopted as one, so it is raised as an ApiError and the login screen renders
+ * adopted as one, so it is raised as an ApiError and the wizard renders
  * its own line for it.
  */
-export async function signup(email: string, code: string, password: string, locale?: string): Promise<ServerIdentity> {
+export async function signup(
+  email: string,
+  code: string,
+  password: string,
+  locale?: string,
+  company?: CompanyProfilePatch,
+): Promise<ServerIdentity> {
   const payload = await apiRequest<{ data: ServerIdentity | { outcome?: string } }>("/auth/signup", {
     method: "POST",
-    body: { email, code, password },
+    body: company ? { email, code, password, company } : { email, code, password },
     acceptLanguage: locale,
   });
   if ("outcome" in payload.data && payload.data.outcome === "email_in_use") {
@@ -161,7 +183,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   // end to end. A short timeout aborts a call that was going to succeed and
   // reports it as unreachable, which is a lie about what happened.
   const { method = "GET", body, timeoutMs = 600000, acceptLanguage } = options;
-  const headers: Record<string, string> = { Accept: "application/json" };
+  const headers: Record<string, string> = { Accept: "application/json", ...options.headers };
   if (acceptLanguage) headers["Accept-Language"] = acceptLanguage;
 
   if (body !== undefined) headers["Content-Type"] = "application/json";

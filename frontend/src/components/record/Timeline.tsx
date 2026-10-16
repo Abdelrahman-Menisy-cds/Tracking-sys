@@ -1,6 +1,6 @@
 import { useApp } from "../../app/AppContext";
-import { formatDateTime } from "../../app/useMockList";
-import type { RequestEventMock } from "../../mock/data";
+import { formatDateTime } from "../../app/format";
+import type { ServerRecordEvent } from "../../app/serverTypes";
 
 const actionLabels: Record<string, { ar: string; en: string }> = {
   CREATE: { ar: "إنشاء السجل", en: "Record created" },
@@ -21,7 +21,12 @@ const statusLabels: Record<string, { ar: string; en: string }> = {
   CANCELLED: { ar: "ملغى", en: "Cancelled" },
 };
 
-export default function Timeline({ events }: { events: RequestEventMock[] }) {
+/**
+ * The review-history rows come off the server (`ServerRecordEvent`), and the
+ * server does NOT expose who performed an action — only what changed and when.
+ * The actor line is therefore dropped rather than invented.
+ */
+export default function Timeline({ events }: { events: ServerRecordEvent[] }) {
   const { locale, t } = useApp();
   const orderedEvents = [...events].sort((left, right) => Date.parse(left.created_at) - Date.parse(right.created_at));
   return (
@@ -32,7 +37,7 @@ export default function Timeline({ events }: { events: RequestEventMock[] }) {
           <div>
             <strong>{actionLabels[event.action]?.[locale] ?? (locale === "ar" ? "تحديث السجل" : "Record updated")}</strong>
             <div className="muted">
-              <bdi>{event.actor}</bdi> · {formatDateTime(event.created_at, locale)}
+              {formatDateTime(event.created_at, locale)}
             </div>
             <div className="muted">
               {locale === "ar" ? "الحالة السابقة" : "Previous state"}: {event.from_status ? statusLabels[event.from_status]?.[locale] ?? (locale === "ar" ? "حالة سابقة" : "Previous state") : (locale === "ar" ? "لا توجد" : "None")}
