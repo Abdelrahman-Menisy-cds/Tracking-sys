@@ -187,7 +187,11 @@ class UploadIdempotencyTests(AttachmentTestBase):
 class StateGatingTests(AttachmentTestBase):
     def _create_in_state(self, state):
         return EmployeeRequest.objects.create(
-            requester=self.user, request_type=self.request_type, title="T", status=state
+            company=self.user.company,
+            requester=self.user,
+            request_type=self.request_type,
+            title="T",
+            status=state,
         )
 
     def test_upload_submitted_state_409(self):
@@ -217,6 +221,7 @@ class StateGatingTests(AttachmentTestBase):
     def _existing_attachment_in_state(self, state):
         request_obj = self._create_in_state(state)
         return RequestAttachment.objects.create(
+            company=request_obj.company,
             request=request_obj,
             uploaded_by=self.user,
             storage_key=f"attachments/{state}/a.bin",
@@ -344,7 +349,10 @@ class DownloadTests(AttachmentTestBase):
 
     def test_list_and_detail_miss_on_other_users_request(self):
         request_obj = EmployeeRequest.objects.create(
-            requester=self.other, request_type=self.request_type, title="T"
+            company=self.other.company,
+            requester=self.other,
+            request_type=self.request_type,
+            title="T",
         )
         response = self.client.get(reverse("reqs:attachment-list", kwargs={"pk": request_obj.pk}))
         self.assertEqual(response.status_code, 404)

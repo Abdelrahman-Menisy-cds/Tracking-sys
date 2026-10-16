@@ -508,6 +508,7 @@ class CancelAttachmentsPrivateTests(CancelTestBase):
 
         with override_settings(MEDIA_ROOT="/tmp/test-cancel-media"):
             attachment = RequestAttachment.objects.create(
+                company=self.draft.company,
                 request=self.draft,
                 uploaded_by=self.employee,
                 storage_key="attachments/testkey/cleaned.pdf",
