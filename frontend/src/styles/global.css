@@ -215,9 +215,9 @@
   --overlay-scrim: rgb(15 23 42 / .56);
   --selection-bg: var(--accent);
   --selection-text: var(--on-accent);
-  --elevation-1: 0 1px 2px rgb(15 23 42 / .06), 0 var(--space-2) 24px rgb(15 23 42 / .08);
+  --elevation-1: 0 1px 2px rgb(15 23 42 / .06), 0 8px 24px rgb(15 23 42 / .08);
   --elevation-2: 0 4px 10px rgb(15 23 42 / .08), 0 16px 36px rgb(15 23 42 / .10);
-  --elevation-3: 0 10px 28px rgb(15 23 42 / .12), 0 28px var(--logo-size) rgb(15 23 42 / .14);
+  --elevation-3: 0 10px 28px rgb(15 23 42 / .12), 0 28px 72px rgb(15 23 42 / .14);
   --scrollbar-track: var(--surface-inset);
   --scrollbar-thumb: color-mix(in srgb, var(--neutral) 55%, var(--surface));
   --scrollbar-thumb-hover: var(--accent-border);
@@ -717,7 +717,7 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 /* §5.1 the three tokens: the form's width cap, the sticky strip's reserved platform, and the
    period inputs' numerals (native date/time glyphs shrink to 12-13px in WebKit; 16px +
    tabular figures keep both scripts' digits aligned with the rest of the form). */
-.new-request-page { --form-max: 720px; --stick-actions-height: var(--logo-widget-size); --period-numeric: tabular-nums; max-width: min(100%, var(--form-max)); }
+.new-request-page { --form-max: 720px; --stick-actions-height: 64px; --period-numeric: tabular-nums; max-width: min(100%, var(--form-max)); }
 /* Design §1.3: field labels shrink one step on this page only - directions, not body copy. */
 .new-request-page .field-label { font-size: var(--font-size-sm); }
 /* Design §2.2: the four Arabic type names wrap instead of truncating; each option carries its
@@ -1024,11 +1024,11 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .company-form-grid .field { margin-block-end: var(--sp-3); min-inline-size: 0; }
 .company-required-instructions { margin-block-end: var(--sp-2); }
 .company-logo-row { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
-.company-logo-preview { inline-size: var(--logo-size); block-size: var(--logo-size); object-fit: contain; background: var(--surface-subtle); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-sm); padding: var(--sp-1); }
-.company-logo-none { display: inline-flex; align-items: center; justify-content: center; inline-size: var(--logo-size); block-size: var(--logo-size); border: var(--timeline-width) dashed var(--border-control); border-radius: var(--radius-sm); color: var(--text-muted); font-size: var(--font-size-xs); text-align: center; }
+.company-logo-preview { inline-size: 72px; block-size: 72px; object-fit: contain; background: var(--surface-subtle); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-sm); padding: var(--sp-1); }
+.company-logo-none { display: inline-flex; align-items: center; justify-content: center; inline-size: 72px; block-size: 72px; border: var(--timeline-width) dashed var(--border-control); border-radius: var(--radius-sm); color: var(--text-muted); font-size: var(--font-size-xs); text-align: center; }
 /* Settings widget: the identity read-out. */
 .company-widget-identity { display: flex; align-items: center; gap: var(--sp-4); margin-block-end: var(--sp-4); }
-.company-widget-logo { inline-size: var(--logo-widget-size); block-size: var(--logo-widget-size); object-fit: contain; background: var(--surface-subtle); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-sm); padding: var(--sp-1); }
+.company-widget-logo { inline-size: 64px; block-size: 64px; object-fit: contain; background: var(--surface-subtle); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-sm); padding: var(--sp-1); }
 .company-widget-logo-none { display: inline-flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: var(--font-size-xs); }
 .company-widget-name { font-size: var(--font-size-lg); }
 .company-widget-facts { margin-block: var(--space-0); }
