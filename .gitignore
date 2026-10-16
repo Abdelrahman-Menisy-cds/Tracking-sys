@@ -30,3 +30,6 @@ db.sqlite3-*
 .idea/
 _bmad-output/
 /attachments/
+
+# uploaded attachments are runtime data, not source
+backend/attachments/
