@@ -58,6 +58,7 @@ class SubmissionTestBase(APITestCase):
 
     def _add_attachment(self, request_obj, scan_status):
         return RequestAttachment.objects.create(
+            company=request_obj.company,
             request=request_obj,
             uploaded_by=self.user,
             storage_key=f"attachments/{uuid4().hex}/a.bin",

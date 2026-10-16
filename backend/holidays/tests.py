@@ -544,12 +544,16 @@ class HolidayEndpointTests(APITestCase):
         from django.core.cache import cache
 
         self.hr = User.objects.create_user(
-            email="hr-holidays@example.com", password="pass-12345678", role=User.Role.HR
+            email="hr-holidays@example.com",
+            password="pass-12345678",
+            role=User.Role.HR,
+            company=default_company(),
         )
         self.employee = User.objects.create_user(
             email="emp-holidays@example.com",
             password="pass-12345678",
             role=User.Role.EMPLOYEE,
+            company=default_company(),
         )
         cache.clear()
         self.list_url = "/api/v1/holidays"

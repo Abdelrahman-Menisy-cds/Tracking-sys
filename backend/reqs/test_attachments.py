@@ -280,6 +280,7 @@ class StateGatingTests(AttachmentTestBase):
 class DownloadTests(AttachmentTestBase):
     def _clean_attachment(self, *, status_value=RequestAttachment.ScanStatus.CLEAN):
         attachment = RequestAttachment.objects.create(
+            company=self.draft.company,
             request=self.draft,
             uploaded_by=self.user,
             storage_key=f"attachments/dl-{status_value}/{self.draft.pk}.bin",

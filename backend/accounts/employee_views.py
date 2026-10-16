@@ -71,7 +71,7 @@ class EmployeeListView(APIView):
 
     def get(self, request):
         paginator = EmployeePagination()
-        page = paginator.paginate_queryset(_visible_users(request.company).filter(is_active=True), request, view=self)
+        page = paginator.paginate_queryset(_visible_users(request.user.company).filter(is_active=True), request, view=self)
         return paginator.get_paginated_response(EmployeeReadSerializer(page, many=True).data)
 
     def post(self, request):
@@ -101,7 +101,7 @@ class EmployeeDetailView(APIView):
         the same 404 an unknown id gets — no existence signal, no leak.
         """
         try:
-            return _visible_users(request.company).get(pk=target_id)
+            return _visible_users(request.user.company).get(pk=target_id)
         except (User.DoesNotExist, ValueError, TypeError):
             return None
 
