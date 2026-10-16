@@ -148,6 +148,7 @@ def create_attachment_record(*, user, request_obj, storage_key, original_filenam
                              size_bytes, content_sha256, request_id=""):
     attachment = RequestAttachment.objects.create(
         request=request_obj,
+        company=request_obj.company,  # H30 §2.6/§6: explicit tenant anchor
         uploaded_by=user,
         storage_key=storage_key,
         original_filename=original_filename,

@@ -188,6 +188,7 @@ def decide_timesheet(
 
         TimesheetEvent.objects.create(
             timesheet=locked,
+            company=locked.company,  # H30 §2.6: explicit tenant anchor
             actor=reviewer,
             action=_EVENT_ACTION[action],
             from_status=from_status,
@@ -212,6 +213,7 @@ def decide_timesheet(
                     key_hash=key_hash,
                     payload_hash=payload_hash,
                     response_snapshot={"timesheet_id": timesheet_id, "status": to_status},
+                    company=reviewer.company,  # H30 §2.6: explicit tenant anchor
                     user=reviewer,
                 )
         except IntegrityError:
@@ -342,6 +344,7 @@ def reopen_timesheet(
 
         TimesheetEvent.objects.create(
             timesheet=locked,
+            company=locked.company,  # H30 §2.6: explicit tenant anchor
             actor=hr_user,
             action=TimesheetEvent.Action.REOPENED,
             from_status=from_status,
@@ -366,6 +369,7 @@ def reopen_timesheet(
                     key_hash=key_hash,
                     payload_hash=payload_hash,
                     response_snapshot={"timesheet_id": timesheet_id, "status": to_status},
+                    company=hr_user.company,  # H30 §2.6: explicit tenant anchor
                     user=hr_user,
                 )
         except IntegrityError:

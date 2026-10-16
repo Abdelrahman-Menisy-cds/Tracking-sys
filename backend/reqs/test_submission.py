@@ -25,19 +25,19 @@ class SubmissionTestBase(APITestCase):
         self.other = User.objects.create_user(company=default_company(), email="other@example.com", password="pass-12345678")
         EmployeeProfile.objects.create(company=default_company(), user=self.user, manager=self.manager, employee_number="E-001")
         EmployeeProfile.objects.create(company=default_company(), user=self.other, employee_number="E-002")
-        self.type_manager = RequestType.objects.create(
+        self.type_manager = RequestType.objects.create(company=default_company(), 
             name="Equipment", requires_manager_approval=True, requires_hr_approval=False
         )
-        self.type_hr_only = RequestType.objects.create(
+        self.type_hr_only = RequestType.objects.create(company=default_company(), 
             name="Grievance", requires_manager_approval=False, requires_hr_approval=True
         )
-        self.type_both = RequestType.objects.create(
+        self.type_both = RequestType.objects.create(company=default_company(), 
             name="Leave", requires_manager_approval=True, requires_hr_approval=True
         )
-        self.type_none = RequestType.objects.create(
+        self.type_none = RequestType.objects.create(company=default_company(), 
             name="Misconfigured", requires_manager_approval=False, requires_hr_approval=False
         )
-        self.type_inactive = RequestType.objects.create(name="Old", is_active=False)
+        self.type_inactive = RequestType.objects.create(company=default_company(), name="Old", is_active=False)
         self.draft = EmployeeRequest.objects.create(
             requester=self.user, request_type=self.type_manager, title="New laptop"
         )

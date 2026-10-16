@@ -28,7 +28,15 @@ class Command(BaseCommand):
             )
         code, created = SubscriptionCode.objects.update_or_create(
             code=value,
-            defaults={"label": options["label"], "is_active": True},
+            defaults={
+                "label": options["label"],
+                "is_active": True,
+                # H30 §2.5: an operator-issued bootstrap code is TENANTLESS —
+                # redeeming it founds a NEW company for the caller. Binding it
+                # to a company here would make every signup join that one
+                # company, which is the very leak R3 removes.
+                "company": None,
+            },
         )
         verb = "created" if created else "refreshed"
         self.stdout.write(f"  {verb}  subscription code {code.code!r} (label={code.label!r}, active={code.is_active})")

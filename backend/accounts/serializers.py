@@ -22,6 +22,13 @@ class SignupSerializer(serializers.Serializer):
         trim_whitespace=False,
         style={"input_type": "password"},
     )
+    # H30 §2.3: only meaningful for a tenantless operator code, which founds a
+    # NEW company for the caller. A code already bound to a company ignores it
+    # (the caller joins that company), so the field stays optional and the
+    # pre-tenancy body {email, code, password} keeps working unchanged.
+    company_name = serializers.CharField(
+        required=False, allow_blank=True, max_length=200
+    )
 
     def validate_password(self, value):
         """Run the app's own password validators; surface their messages."""

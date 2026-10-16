@@ -12,9 +12,16 @@ from django.db import models
 
 
 class RequestType(models.Model):
-    """HR-configurable request type. HR config UI arrives in a later story."""
+    """HR-configurable request type. HR config UI arrives in a later story.
 
-    name = models.CharField(max_length=100, unique=True)
+    H30 §2.6 step 5: ``name`` uniqueness is PER COMPANY — two companies may
+    both define "Annual Leave", and the seed rows (reqs/0008) backfill into
+    the ``__default__`` company. The row has no in-row tenant anchor, so
+    every creator passes ``company`` explicitly.
+    """
+
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
+    name = models.CharField(max_length=100)
     description = models.TextField(blank=True, default="")
     requires_manager_approval = models.BooleanField(default=False)
     requires_hr_approval = models.BooleanField(default=False)
@@ -22,6 +29,9 @@ class RequestType(models.Model):
 
     class Meta:
         ordering = ("name",)
+        constraints = [
+            models.UniqueConstraint(fields=("company", "name"), name="uniq_requesttype_company_name"),
+        ]
 
     def __str__(self) -> str:
         return self.name
@@ -40,6 +50,9 @@ class EmployeeRequest(models.Model):
         CANCELLED = "CANCELLED", "Cancelled"
 
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    # H30 §2.6 step 5: the tenant anchor, mirrored from ``requester.company``
+    # at save time (never a guess, never cross-company).
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     requester = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -85,6 +98,13 @@ class EmployeeRequest(models.Model):
     def __str__(self) -> str:
         return f"{self.title} ({self.status})"
 
+    def save(self, *args, **kwargs):
+        # H30 §2.6: company mirrors the requester's — filled here so no
+        # creation path can anchor a request to no company or the wrong one.
+        if self.company_id is None and self.requester_id is not None:
+            self.company = self.requester.company
+        super().save(*args, **kwargs)
+
 
 class RequestEvent(models.Model):
     """Append-only history: one row per create/edit action (constitution §4)."""
@@ -103,6 +123,8 @@ class RequestEvent(models.Model):
         on_delete=models.CASCADE,
         related_name="events",
     )
+    # H30 §2.6 step 5: tenant anchor mirrored from the parent request.
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -122,6 +144,12 @@ class RequestEvent(models.Model):
 
     def __str__(self) -> str:
         return f"{self.action} on {self.request_id} by {self.actor_id}"
+
+    def save(self, *args, **kwargs):
+        # H30 §2.6: company mirrors the parent request's (parent-anchored).
+        if self.company_id is None and self.request_id is not None:
+            self.company = self.request.company
+        super().save(*args, **kwargs)
 
 
 class RequestAttachment(models.Model):
@@ -154,6 +182,9 @@ class RequestAttachment(models.Model):
         on_delete=models.CASCADE,
         related_name="attachments",
     )
+    # H30 §2.6 step 5 + §6: tenant anchor mirrored from the parent request —
+    # a corrupted bulk query can never join attachment bytes across companies.
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -201,6 +232,8 @@ class AttachmentIdempotencyRecord(models.Model):
     key_hash = models.CharField(max_length=64, unique=True, db_index=True)
     payload_hash = models.CharField(max_length=64)
     response_snapshot = models.JSONField()
+    # H30 §2.6 step 5: tenant anchor mirrored from the uploading user.
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -211,6 +244,11 @@ class AttachmentIdempotencyRecord(models.Model):
     class Meta:
         verbose_name = "attachment idempotency record"
         verbose_name_plural = "attachment idempotency records"
+
+    def save(self, *args, **kwargs):
+        if self.company_id is None and self.user_id is not None:
+            self.company = self.user.company
+        super().save(*args, **kwargs)
 
 
 class SubmissionIdempotencyRecord(models.Model):
@@ -223,6 +261,8 @@ class SubmissionIdempotencyRecord(models.Model):
     key_hash = models.CharField(max_length=64, unique=True, db_index=True)
     payload_hash = models.CharField(max_length=64)
     response_snapshot = models.JSONField()
+    # H30 §2.6 step 5: tenant anchor mirrored from the submitting user.
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -233,6 +273,11 @@ class SubmissionIdempotencyRecord(models.Model):
     class Meta:
         verbose_name = "submission idempotency record"
         verbose_name_plural = "submission idempotency records"
+
+    def save(self, *args, **kwargs):
+        if self.company_id is None and self.user_id is not None:
+            self.company = self.user.company
+        super().save(*args, **kwargs)
 
 
 class DecisionIdempotencyRecord(models.Model):
@@ -249,6 +294,8 @@ class DecisionIdempotencyRecord(models.Model):
     key_hash = models.CharField(max_length=64, db_index=True)
     payload_hash = models.CharField(max_length=64)
     response_snapshot = models.JSONField()
+    # H30 §2.6 step 5: tenant anchor mirrored from the deciding reviewer.
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -262,6 +309,11 @@ class DecisionIdempotencyRecord(models.Model):
         ]
         verbose_name = "decision idempotency record"
         verbose_name_plural = "decision idempotency records"
+
+    def save(self, *args, **kwargs):
+        if self.company_id is None and self.user_id is not None:
+            self.company = self.user.company
+        super().save(*args, **kwargs)
 
 
 class CancelIdempotencyRecord(models.Model):
@@ -277,6 +329,8 @@ class CancelIdempotencyRecord(models.Model):
     key_hash = models.CharField(max_length=64, db_index=True)
     payload_hash = models.CharField(max_length=64)
     response_snapshot = models.JSONField()
+    # H30 §2.6 step 5: tenant anchor mirrored from the cancelling requester.
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -290,3 +344,8 @@ class CancelIdempotencyRecord(models.Model):
         ]
         verbose_name = "cancel idempotency record"
         verbose_name_plural = "cancel idempotency records"
+
+    def save(self, *args, **kwargs):
+        if self.company_id is None and self.user_id is not None:
+            self.company = self.user.company
+        super().save(*args, **kwargs)

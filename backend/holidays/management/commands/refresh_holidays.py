@@ -20,6 +20,7 @@ import datetime
 from django.core.management.base import BaseCommand
 
 from holidays.services import NagerUnavailableError, refresh_public_holidays
+from tenants.context import default_company
 
 
 class Command(BaseCommand):
@@ -34,7 +35,9 @@ class Command(BaseCommand):
         country = str(options["country"]).upper()
 
         try:
-            summary = refresh_public_holidays(year, country)
+            # Operator surface (H30 §2.5-convention): the command refreshes the
+            # __default__ company's register — the pre-per-company-signup org.
+            summary = refresh_public_holidays(year, country, company=default_company())
         except NagerUnavailableError as exc:
             # Nothing was written. Non-zero so a scheduler treats it as a failure.
             self.stderr.write(f"{country} {year}: Nager.Date unreachable, nothing written: {exc}")

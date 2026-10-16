@@ -218,11 +218,17 @@ def create_timesheet(
         raise DuplicateWeek(existing)
 
     entries_validated = _normalize_entries(entries, week_start)
-    sheet = Timesheet.objects.create(employee=employee, week_start=week_start)
+    sheet = Timesheet.objects.create(
+        employee=employee,
+        company=employee.company,  # H30 §2.6: explicit tenant anchor
+        week_start=week_start,
+    )
     TimeEntry.objects.bulk_create(
         [
             TimeEntry(
                 timesheet=sheet,
+                # bulk_create bypasses save() — the anchor must be explicit.
+                company=sheet.company,  # H30 §2.6: explicit tenant anchor
                 work_date=entry["work_date"],
                 duration_minutes=entry["duration_minutes"],
                 unpaid_break_minutes=entry["unpaid_break_minutes"],
@@ -233,6 +239,7 @@ def create_timesheet(
     )
     TimesheetEvent.objects.create(
         timesheet=sheet,
+        company=sheet.company,  # H30 §2.6: explicit tenant anchor
         actor=employee,
         action=TimesheetEvent.Action.CREATED,
         from_status=None,
@@ -242,6 +249,7 @@ def create_timesheet(
         key_hash=key_hash,
         payload_hash=payload_hash,
         response_snapshot={"timesheet_id": str(sheet.pk)},
+        company=employee.company,  # H30 §2.6: explicit tenant anchor
         user=employee,
     )
     return sheet

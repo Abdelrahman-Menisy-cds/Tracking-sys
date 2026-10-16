@@ -45,7 +45,7 @@ class AttachmentTestBase(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
         self.other = User.objects.create_user(company=default_company(), email="other@example.com", password="pass-12345678")
-        self.request_type = RequestType.objects.create(name="Leave")
+        self.request_type = RequestType.objects.create(company=default_company(), name="Leave")
         self.draft = EmployeeRequest.objects.create(
             requester=self.user, request_type=self.request_type, title="T"
         )

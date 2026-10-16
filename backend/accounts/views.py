@@ -126,6 +126,7 @@ class SignupView(APIView):
             email=serializer.validated_data["email"],
             code=serializer.validated_data["code"],
             password=serializer.validated_data["password"],
+            company_name=serializer.validated_data.get("company_name"),
         )
         if error == "invalid_code":
             return Response(

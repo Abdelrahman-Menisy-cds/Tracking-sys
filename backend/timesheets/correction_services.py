@@ -190,6 +190,7 @@ def submit_timesheet(
 
         TimesheetEvent.objects.create(
             timesheet=locked,
+            company=locked.company,  # H30 §2.6: explicit tenant anchor
             actor=employee,
             action=TimesheetEvent.Action.SUBMITTED,
             from_status=previous_status,
@@ -216,6 +217,7 @@ def submit_timesheet(
                     key_hash=key_hash,
                     payload_hash=payload_hash,
                     response_snapshot={"timesheet_id": str(locked.pk)},
+                    company=employee.company,  # H30 §2.6: explicit tenant anchor
                     user=employee,
                 )
         except IntegrityError:

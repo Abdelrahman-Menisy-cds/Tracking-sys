@@ -148,6 +148,7 @@ class AttachmentListView(_AttachmentMutationMixin, APIView):
             key_hash=key_hash,
             payload_hash=payload_hash,
             response_snapshot=response_body,
+            company=request.user.company,  # H30 §2.6: explicit tenant anchor
             user=request.user,
         )
         return Response(response_body, status=status.HTTP_201_CREATED)

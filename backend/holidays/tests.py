@@ -36,6 +36,7 @@ from holidays.fixtures.nager_eg_2026 import (
 from holidays.llm import LLMEmptyContentError, has_arabic_script
 from holidays.models import PublicHoliday
 from holidays.nager import NagerError, fetch_public_holidays, _normalize_holidays
+from tenants.context import default_company
 
 User = get_user_model()
 
@@ -312,7 +313,7 @@ class RefreshServiceTests(APITestCase):
         }
 
     def test_first_refresh_imports_official_rows_and_proposals(self):
-        summary = services.refresh_public_holidays(2026, "EG")
+        summary = services.refresh_public_holidays(2026, "EG", company=default_company())
 
         assert summary["added"] == 15
         assert summary["updated"] == 0
@@ -341,11 +342,11 @@ class RefreshServiceTests(APITestCase):
         assert christmas.name_local == "عيد الميلاد المجيد"  # Nager's own, untouched
 
     def test_second_refresh_is_idempotent_no_new_rows_no_duplicates(self):
-        services.refresh_public_holidays(2026, "EG")
+        services.refresh_public_holidays(2026, "EG", company=default_company())
         first_snapshot = _snapshot_rows()
         first_count = PublicHoliday.objects.filter(country_code="EG", year=2026).count()
 
-        summary = services.refresh_public_holidays(2026, "EG")
+        summary = services.refresh_public_holidays(2026, "EG", company=default_company())
 
         assert summary["added"] == 0
         assert summary["proposed_missing"] == 0
@@ -367,7 +368,7 @@ class RefreshServiceTests(APITestCase):
 
     def test_manual_override_survives_byte_for_byte_and_is_reported(self):
         # HR hand-edited the row the refresh payload would overwrite.
-        manual = PublicHoliday.objects.create(
+        manual = PublicHoliday.objects.create(company=default_company(), 
             country_code="EG",
             date=date(2026, 5, 1),
             name="Labour Day",
@@ -384,7 +385,7 @@ class RefreshServiceTests(APITestCase):
             "is_manual_override": manual.is_manual_override,
         }
 
-        summary = services.refresh_public_holidays(2026, "EG")
+        summary = services.refresh_public_holidays(2026, "EG", company=default_company())
 
         assert summary["manual_preserved"] == 1
         manual.refresh_from_db()
@@ -404,7 +405,7 @@ class RefreshServiceTests(APITestCase):
         )
 
     def test_llm_proposals_are_stored_not_official_and_not_duplicated(self):
-        services.refresh_public_holidays(2026, "EG")
+        services.refresh_public_holidays(2026, "EG", company=default_company())
 
         proposals = PublicHoliday.objects.filter(
             country_code="EG", year=2026, source=PublicHoliday.Source.LLM
@@ -436,7 +437,7 @@ class RefreshServiceTests(APITestCase):
         )
         self._translate2.start()
 
-        services.refresh_public_holidays(2026, "EG")
+        services.refresh_public_holidays(2026, "EG", company=default_company())
 
         # Exactly the four English-fallback names, batched in ONE call.
         self.assertEqual(set(sent_names), set(NON_ARABIC_LOCAL_NAMES))
@@ -454,7 +455,7 @@ class RefreshServiceTests(APITestCase):
             "holidays.services.propose_missing_islamic_holidays",
             side_effect=services.LLMUnavailableError("provider down"),
         ):
-            summary = services.refresh_public_holidays(2026, "EG")
+            summary = services.refresh_public_holidays(2026, "EG", company=default_company())
 
         assert summary["llm_available"] is False
         assert summary["added"] == 15  # the official import still landed
@@ -470,7 +471,7 @@ class RefreshServiceTests(APITestCase):
 
     def test_no_llm_names_kept_from_previous_run_are_not_downgraded(self):
         # First run with LLM fills Arabic; second run with dead LLM keeps it.
-        services.refresh_public_holidays(2026, "EG")
+        services.refresh_public_holidays(2026, "EG", company=default_company())
         good = PublicHoliday.objects.get(country_code="EG", date=date(2026, 5, 27), name="Eid Al-Adha")
         assert good.name_local == "عيد الأضحى المبارك"
 
@@ -483,7 +484,7 @@ class RefreshServiceTests(APITestCase):
             "holidays.services.propose_missing_islamic_holidays",
             side_effect=services.LLMUnavailableError("down"),
         ):
-            summary = services.refresh_public_holidays(2026, "EG")
+            summary = services.refresh_public_holidays(2026, "EG", company=default_company())
 
         good.refresh_from_db()
         assert good.name_local == "عيد الأضحى المبارك"  # not downgraded
@@ -502,7 +503,7 @@ class RefreshServiceTests(APITestCase):
             "holidays.services.propose_missing_islamic_holidays",
             side_effect=services.LLMEmptyContentError("content is None"),
         ):
-            summary = services.refresh_public_holidays(2026, "EG")
+            summary = services.refresh_public_holidays(2026, "EG", company=default_company())
         assert summary["llm_available"] is False
         assert summary["added"] == 15
         assert len(summary["warnings"]) >= 1
@@ -514,7 +515,7 @@ class RefreshServiceTests(APITestCase):
             side_effect=NagerError("connection reset"),
         ):
             try:
-                services.refresh_public_holidays(2026, "EG")
+                services.refresh_public_holidays(2026, "EG", company=default_company())
             except services.NagerUnavailableError as exc:
                 assert "connection reset" in str(exc)
             else:  # pragma: no cover
@@ -583,11 +584,11 @@ class HolidayEndpointTests(APITestCase):
 
     def test_register_get_returns_rows_for_year_and_country(self):
         self.client.force_login(self.hr)
-        PublicHoliday.objects.create(
+        PublicHoliday.objects.create(company=default_company(), 
             country_code="EG", date=date(2026, 5, 1), name="Labour Day", year=2026,
             name_local="عيد العمال",
         )
-        PublicHoliday.objects.create(
+        PublicHoliday.objects.create(company=default_company(), 
             country_code="EG", date=date(2027, 5, 1), name="Labour Day", year=2027
         )
 
@@ -607,7 +608,7 @@ class HolidayEndpointTests(APITestCase):
     def test_register_get_defaults_to_current_year_eg(self):
         self.client.force_login(self.hr)
         year = date.today().year
-        PublicHoliday.objects.create(
+        PublicHoliday.objects.create(company=default_company(), 
             country_code="EG", date=date(year, 5, 1), name="Labour Day", year=year
         )
 

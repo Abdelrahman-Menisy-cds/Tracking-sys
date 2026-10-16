@@ -90,7 +90,7 @@ class HolidayRefreshView(APIView):
         year = serializer.validated_data.get("year") or date.today().year
         country = serializer.validated_data.get("country") or DEFAULT_COUNTRY
         try:
-            summary = refresh_public_holidays(year, country)
+            summary = refresh_public_holidays(year, country, company=request.user.company)
         except NagerUnavailableError as exc:
             return Response(
                 error_payload(

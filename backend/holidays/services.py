@@ -51,7 +51,14 @@ def _truncate(value):
     return value.strip()[:NAME_MAX_LENGTH]
 
 
-def refresh_public_holidays(year, country_code):
+def refresh_public_holidays(year, country_code, *, company):
+    """Refresh one company's holiday register for (country, year).
+
+    H30 §2.6 step 7: the register is PER COMPANY — ``company`` is the acting
+    HR's company, threaded from the view (the only caller). Every read and
+    write below is scoped to it, so two companies refreshing the same country
+    never collide and never see each other's rows.
+    """
     country_code = str(country_code).strip().upper()
     warnings = []
 
@@ -103,10 +110,10 @@ def refresh_public_holidays(year, country_code):
             proposal["name_local"] = translations.get(proposal["name"], "")
 
     # 4. Upsert official rows (never touching manual overrides).
-    added, updated, unchanged, manual_preserved = _upsert_official(rows, country_code)
+    added, updated, unchanged, manual_preserved = _upsert_official(rows, country_code, company)
 
     # 5. Store proposals — never as official rows.
-    proposed_missing = _store_proposals(year, country_code, proposals)
+    proposed_missing = _store_proposals(year, country_code, proposals, company)
 
     return {
         "year": year,
@@ -121,15 +128,15 @@ def refresh_public_holidays(year, country_code):
     }
 
 
-def _upsert_official(rows, country_code):
-    """Upsert Nager rows keyed on (country_code, date, name).
+def _upsert_official(rows, country_code, company):
+    """Upsert Nager rows keyed on (company, country_code, date, name).
 
     Rows HR edited by hand (is_manual_override=True) are left byte-for-byte
     untouched and reported preserved. An existing row's Arabic name_local is
     never downgraded to a non-Arabic value (a degraded refresh without the
     LLM keeps earlier localisation). Runs in one transaction; select_for_update
-    serialises concurrent double-clicks, and the unique constraint on the
-    natural key arbitrates any residual race.
+    serialises concurrent double-clicks, and the per-company unique constraint
+    on the natural key arbitrates any residual race.
     """
     added = updated = unchanged = preserved = 0
     with transaction.atomic():
@@ -144,7 +151,7 @@ def _upsert_official(rows, country_code):
             new_local = _truncate(item.get("local_name") or "")
             current = (
                 PublicHoliday.objects.select_for_update()
-                .filter(country_code=country_code, date=holiday_date, name=name)
+                .filter(company=company, country_code=country_code, date=holiday_date, name=name)
                 .first()
             )
             if current is not None and current.is_manual_override:
@@ -152,6 +159,7 @@ def _upsert_official(rows, country_code):
                 continue
             if current is None:
                 PublicHoliday.objects.create(
+                    company=company,
                     country_code=country_code,
                     date=holiday_date,
                     name=name,
@@ -179,20 +187,21 @@ def _upsert_official(rows, country_code):
     return added, updated, unchanged, preserved
 
 
-def _store_proposals(year, country_code, proposals):
+def _store_proposals(year, country_code, proposals, company):
     """Create LLM-proposed rows; never update or present them as official.
 
-    A proposal is stored only when its name is not already in the register
-    for the year (so the second refresh proposes nothing) and its exact
-    natural key is free. Malformed or out-of-year dates were already dropped
-    by the LLM client; this is the belt-and-braces second gate.
+    A proposal is stored only when its name is not already in the COMPANY's
+    register for the year (so the second refresh proposes nothing) and its
+    exact per-company natural key is free. Malformed or out-of-year dates
+    were already dropped by the LLM client; this is the belt-and-braces
+    second gate.
     """
     if not proposals:
         return 0
     existing_names = {
         normalize_name(name)
         for name in PublicHoliday.objects.filter(
-            country_code=country_code, year=year
+            company=company, country_code=country_code, year=year
         ).values_list("name", flat=True)
     }
     created = 0
@@ -207,10 +216,11 @@ def _store_proposals(year, country_code, proposals):
         if holiday_date.year != year:
             continue
         if PublicHoliday.objects.filter(
-            country_code=country_code, date=holiday_date, name=name
+            company=company, country_code=country_code, date=holiday_date, name=name
         ).exists():
             continue
         PublicHoliday.objects.create(
+            company=company,
             country_code=country_code,
             date=holiday_date,
             name=name,

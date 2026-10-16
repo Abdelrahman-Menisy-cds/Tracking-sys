@@ -29,7 +29,7 @@ import datetime
 import json
 import threading
 import time
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest import mock
 
 import pytest
@@ -277,7 +277,15 @@ class _StubHandler(BaseHTTPRequestHandler):
                 "account_header": self.headers.get("chatgpt-account-id"),
                 "originator": self.headers.get("originator"),
                 "beta": self.headers.get("OpenAI-Beta"),
-                "body": self._read_body(),
+                # `payload` (read ONCE at the top of do_POST) — NOT
+                # self._read_body() again: the second read re-requested
+                # Content-Length bytes the buffered reader had already
+                # consumed, so the handler blocked forever on the socket
+                # while the client blocked on the SSE response — the full
+                # suite hung at the first codex /responses chat (until the
+                # client's 300s CHAT_TIMEOUT_SECONDS, which nothing here
+                # was patient enough to see).
+                "body": payload,
             })
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
@@ -309,7 +317,9 @@ class _StubHandler(BaseHTTPRequestHandler):
 
 @pytest.fixture(scope="module")
 def stub_server():
-    server = HTTPServer(("127.0.0.1", 0), _StubHandler)
+    # ThreadingHTTPServer (daemon threads): one stuck connection can never
+    # starve the accept loop — a request is always served on its own thread.
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _StubHandler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     base = f"http://127.0.0.1:{server.server_port}"

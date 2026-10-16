@@ -25,6 +25,11 @@ class PublicHoliday(models.Model):
         MANUAL = "MANUAL", "Manual entry"
 
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    # H30 §2.6 step 7: the holiday register is PER COMPANY — two companies
+    # refresh the same country independently. The row has no in-row tenant
+    # anchor, so every creator passes ``company`` explicitly (refresh: the
+    # acting HR's company).
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     country_code = models.CharField(max_length=2, db_index=True)
     date = models.DateField(db_index=True)
     name = models.CharField(max_length=200)
@@ -51,8 +56,8 @@ class PublicHoliday(models.Model):
         ordering = ("date", "name")
         constraints = [
             models.UniqueConstraint(
-                fields=["country_code", "date", "name"],
-                name="uniq_holiday_country_date_name",
+                fields=["company", "country_code", "date", "name"],
+                name="uniq_holiday_company_country_date_name",
             )
         ]
         verbose_name = "public holiday"

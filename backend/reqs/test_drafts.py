@@ -14,8 +14,8 @@ class Story21Base(APITestCase):
     def setUp(self):
         self.user = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
         self.other = User.objects.create_user(company=default_company(), email="other@example.com", password="pass-12345678")
-        self.type_active = RequestType.objects.create(name="Leave", requires_hr_approval=True)
-        self.type_inactive = RequestType.objects.create(name="Old", is_active=False)
+        self.type_active = RequestType.objects.create(company=default_company(), name="Leave", requires_hr_approval=True)
+        self.type_inactive = RequestType.objects.create(company=default_company(), name="Old", is_active=False)
         self.list_url = reverse("reqs:request-list")
         self.client.force_login(self.user)
         from django.core.cache import cache as django_cache

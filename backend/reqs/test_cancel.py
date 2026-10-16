@@ -50,7 +50,7 @@ class CancelTestBase(APITestCase):
         cache.clear()
         self.employee = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
         self.other = User.objects.create_user(company=default_company(), email="other@example.com", password="pass-12345678")
-        self.type_manager = RequestType.objects.create(
+        self.type_manager = RequestType.objects.create(company=default_company(), 
             name="Equipment", requires_manager_approval=True, requires_hr_approval=False
         )
         self.draft = _make_request(
@@ -326,7 +326,7 @@ class CancelConcurrencyTests(APITestCase):
     def setUp(self):
         cache.clear()
         self.employee = User.objects.create_user(company=default_company(), email="emp@example.com", password="pass-12345678")
-        self.type_manager = RequestType.objects.create(
+        self.type_manager = RequestType.objects.create(company=default_company(), 
             name="Equipment", requires_manager_approval=True, requires_hr_approval=False
         )
         self.draft = _make_request(

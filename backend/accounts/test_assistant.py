@@ -546,7 +546,7 @@ def test_read_tool_runs_without_confirmation(client_csrf):
     client, token = client_csrf
     user = _mk_user("h18.read@example.com", role=User.Role.HR)
     _configured(user)
-    rtype = RequestType.objects.create(name="Leave", requires_manager_approval=True)
+    rtype = RequestType.objects.create(company=default_company(), name="Leave", requires_manager_approval=True)
     from reqs.services import create_draft
 
     create_draft(requester=user, request_type=rtype, title="عطلة")
@@ -600,7 +600,7 @@ def test_write_tool_pends_and_does_not_change_data_until_confirm(client_csrf):
     client, token = client_csrf
     user = _mk_user("h18.write@example.com", role=User.Role.HR)
     _configured(user)
-    rtype = RequestType.objects.create(name="Leave", requires_manager_approval=False)
+    rtype = RequestType.objects.create(company=default_company(), name="Leave", requires_manager_approval=False)
 
     captured = {}
 
@@ -678,7 +678,7 @@ def test_confirm_token_reused_is_rejected(client_csrf):
     client, token = client_csrf
     user = _mk_user("h18.replay@example.com", role=User.Role.HR)
     _configured(user)
-    rtype = RequestType.objects.create(name="Leave")
+    rtype = RequestType.objects.create(company=default_company(), name="Leave")
     from accounts.assistant_tools import WRITE_TOOLS
 
     validated = WRITE_TOOLS["create_request"][0](user, {"request_type_id": rtype.pk, "title": "ت"})["validated"]
@@ -756,7 +756,7 @@ def test_employee_cannot_confirm_decide_request(client_csrf):
     _configured(employee)
     # A request the employee has NO scope over (an HR-made record, requester
     # is a different user; the employee is not the manager_at_submission).
-    rtype = RequestType.objects.create(name="Leave", requires_hr_approval=True)
+    rtype = RequestType.objects.create(company=default_company(), name="Leave", requires_hr_approval=True)
     EmployeeRequest.objects.create(
         requester=requester,
         request_type=rtype,
@@ -795,7 +795,7 @@ def test_confirmed_write_produces_audit_event(client_csrf):
     client, token = client_csrf
     user = _mk_user("h18.audit@example.com", role=User.Role.HR)
     _configured(user)
-    rtype = RequestType.objects.create(name="Leave")
+    rtype = RequestType.objects.create(company=default_company(), name="Leave")
     assert AuditEvent.objects.count() == 0
 
     from accounts.assistant_tools import WRITE_TOOLS
@@ -936,7 +936,7 @@ def test_read_request_types_lists_active_types_with_ids():
     active, _ = RequestType.objects.get_or_create(
         name="إجازة اعتيادية", defaults={"requires_hr_approval": False}
     )
-    inactive = RequestType.objects.create(name="قديم h20", is_active=False)
+    inactive = RequestType.objects.create(company=default_company(), name="قديم h20", is_active=False)
 
     result = read_request_types(user, {})
     ids = [row["id"] for row in result["request_types"]]
@@ -971,7 +971,7 @@ def test_leave_balance_counts_approved_requests_per_leave_type():
     user = _mk_user("h20.balance@example.com")
     annual, _ = RequestType.objects.get_or_create(name="إجازة اعتيادية")
     sick, _ = RequestType.objects.get_or_create(name="إجازة مرضية")
-    task = RequestType.objects.create(name="تصحيح h20")
+    task = RequestType.objects.create(company=default_company(), name="تصحيح h20")
     d1 = create_draft(requester=user, request_type=annual, title="عطلة 1")
     d2 = create_draft(requester=user, request_type=annual, title="عطلة 2")
     create_draft(requester=user, request_type=sick, title="مرضية")

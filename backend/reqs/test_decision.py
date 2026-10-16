@@ -62,13 +62,13 @@ class DecisionTestBase(APITestCase):
         self.other = User.objects.create_user(company=default_company(), email="other@example.com", password="pass-12345678")
         EmployeeProfile.objects.create(company=default_company(), user=self.employee, manager=self.manager, employee_number="E-001")
         EmployeeProfile.objects.create(company=default_company(), user=self.other, employee_number="E-002")
-        self.type_manager = RequestType.objects.create(
+        self.type_manager = RequestType.objects.create(company=default_company(), 
             name="Equipment", requires_manager_approval=True, requires_hr_approval=False
         )
-        self.type_both = RequestType.objects.create(
+        self.type_both = RequestType.objects.create(company=default_company(), 
             name="Leave", requires_manager_approval=True, requires_hr_approval=True
         )
-        self.type_hr_only = RequestType.objects.create(
+        self.type_hr_only = RequestType.objects.create(company=default_company(), 
             name="Grievance", requires_manager_approval=False, requires_hr_approval=True
         )
         self.pending = _make_request(
@@ -446,7 +446,7 @@ class DecisionIdempotencyConcurrencyTests(APITestCase):
             email="mgr@example.com", password="pass-12345678", role=User.Role.MANAGER
         )
         EmployeeProfile.objects.create(company=default_company(), user=self.employee, manager=self.manager, employee_number="E-001")
-        self.type_manager = RequestType.objects.create(
+        self.type_manager = RequestType.objects.create(company=default_company(), 
             name="Equipment", requires_manager_approval=True, requires_hr_approval=False
         )
         self.pending = EmployeeRequest.objects.create(
@@ -642,7 +642,7 @@ class InactiveReviewerDefenseInDepthTests(APITestCase):
         self.hr = User.objects.create_user(company=default_company(), 
             email="hr@example.com", password="pass-12345678", role=User.Role.HR
         )
-        self.type_hr_only = RequestType.objects.create(
+        self.type_hr_only = RequestType.objects.create(company=default_company(), 
             name="Grievance", requires_manager_approval=False, requires_hr_approval=True
         )
         self.hr_pending = EmployeeRequest.objects.create(

@@ -90,6 +90,7 @@ def create_notification(
             with transaction.atomic():
                 return Notification.objects.create(
                     recipient=recipient,
+                    company=recipient.company,  # H30 §2.6: explicit tenant anchor
                     kind=kind,
                     title=title[:255],
                     body=body,

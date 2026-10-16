@@ -9,6 +9,10 @@ class Notification(models.Model):
         on_delete=models.CASCADE,
         related_name="notifications",
     )
+    # H30 §2.6 step 8: the tenant anchor, DENORMALIZED from ``recipient``
+    # (mirrored at save time); every creator path funnels through
+    # notifications/services.py::create_notification, which sets it too.
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     kind = models.CharField(max_length=64)
     title = models.CharField(max_length=255)
     body = models.TextField(blank=True)
@@ -43,3 +47,9 @@ class Notification(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+    def save(self, *args, **kwargs):
+        # H30 §2.6: company mirrors the recipient's (denormalized anchor).
+        if self.company_id is None and self.recipient_id is not None:
+            self.company = self.recipient.company
+        super().save(*args, **kwargs)

@@ -127,6 +127,7 @@ def submit_request(*, requester, request_obj: EmployeeRequest, version: int):
         )
         RequestEvent.objects.create(
             request=locked,
+            company=locked.company,  # H30 §2.6: explicit tenant anchor
             actor=requester,
             action=RequestEvent.Action.SUBMITTED,
             from_status=previous_status,
@@ -215,5 +216,6 @@ def record_idempotency(*, user, key_hash: str, payload_hash: str, snapshot: dict
         key_hash=key_hash,
         payload_hash=payload_hash,
         response_snapshot=snapshot,
+        company=user.company,  # H30 §2.6: explicit tenant anchor
         user=user,
     )

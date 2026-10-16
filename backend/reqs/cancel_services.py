@@ -128,6 +128,7 @@ def cancel_request(
 
         RequestEvent.objects.create(
             request=locked,
+            company=locked.company,  # H30 §2.6: explicit tenant anchor
             actor=requester,
             action=RequestEvent.Action.CANCELLED,
             from_status=from_status,
@@ -156,6 +157,7 @@ def cancel_request(
                     response_snapshot={
                         "data": EmployeeRequestSerializer(locked).data
                     },
+                    company=requester.company,  # H30 §2.6: explicit tenant anchor
                     user=requester,
                 )
         except IntegrityError:

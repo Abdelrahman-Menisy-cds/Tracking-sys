@@ -23,17 +23,22 @@ class TenantManager(models.Manager):
     def of(self, user_or_company):
         """Scope to a company.
 
-        Accepts either a company instance (User.gif.company) or an
-        authenticated user (anonymous resolves to no company — an empty set,
-        matching the middleware's deny-before-view contract).
-        """
-        from tenants.context import current_company
+        Accepts a company instance, or an authenticated user (whose
+        ``company`` is the anchor). Anonymous, ``None``, or otherwise
+        company-less callers resolve to an EMPTY set — fail-closed, matching
+        the middleware's deny-before-view contract.
 
-        user = user_or_company
-        try:
-            company = user.company
-        except AttributeError:
-            company = current_company(user)
+        The company instance is branched on by TYPE, not by duck-typing a
+        ``.company`` attribute: a ``Company`` has no ``.company`` of its own,
+        so the attribute probe used to fall through to
+        ``current_company(company)``, find no ``is_authenticated``, and
+        silently answer an empty queryset for the caller's OWN company.
+        """
+        from accounts.models import Company
+
+        if isinstance(user_or_company, Company):
+            return self.company_all(user_or_company)
+        company = getattr(user_or_company, "company", None)
         if company is None:
             return self.get_queryset().none()
         return self.get_queryset().filter(company=company)

@@ -138,7 +138,9 @@ class Department(models.Model):
     """
 
     company = models.ForeignKey("Company", on_delete=models.PROTECT)
-    code = models.CharField(max_length=32, unique=True)
+    # H30 §2.6 step 5: department codes are company-internal — per-company
+    # uniqueness (uniq_department_company_code), not global.
+    code = models.CharField(max_length=32)
     name_ar = models.CharField(max_length=120)
     name_en = models.CharField(max_length=120, blank=True, default="")
     manager = models.ForeignKey(
@@ -155,6 +157,9 @@ class Department(models.Model):
         ordering = ["code"]
         verbose_name = "department"
         verbose_name_plural = "departments"
+        constraints = [
+            models.UniqueConstraint(fields=["company", "code"], name="uniq_department_company_code"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.name_ar or self.name_en} ({self.code})"
@@ -185,7 +190,9 @@ class EmployeeProfile(models.Model):
         blank=True,
         related_name="direct_reports",
     )
-    employee_number = models.CharField(max_length=32, unique=True, null=True, blank=True)
+    # H30 §2.6 step 5: employee numbers are company-internal — per-company
+    # uniqueness, conditional on the number being set at all.
+    employee_number = models.CharField(max_length=32, null=True, blank=True)
     job_title = models.CharField(max_length=100, blank=True, default="")
     # Nullable so the migration cannot break a single existing row: everyone who
     # predates departments simply has none until HR assigns one.
@@ -200,6 +207,13 @@ class EmployeeProfile(models.Model):
     class Meta:
         verbose_name = "employee profile"
         verbose_name_plural = "employee profiles"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "employee_number"],
+                condition=models.Q(employee_number__isnull=False),
+                name="uniq_employeeprofile_company_employee_number",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.user.email} (#{self.employee_number or '-'})"

@@ -9,12 +9,51 @@ from django.contrib.sessions.models import Session
 from django.db import transaction
 from django.utils import timezone
 
-from accounts.models import SubscriptionCode
+from accounts.models import Company, SubscriptionCode
 from django.core.exceptions import ValidationError as _django_validation_error
-from tenants.context import default_company
 
 
-def sign_up(*, request, email: str, code: str, password: str):
+def _company_name(email: str, company_name: str | None) -> str:
+    """The new company's display name: the caller's, else the email's domain.
+
+    A tenantless operator code founds a company for whoever redeems it (H30
+    §2.5), and the caller may not have named it yet — the domain is the honest
+    default, and HR renames it through the company profile afterwards.
+    """
+    if company_name and company_name.strip():
+        return company_name.strip()[:200]
+    return (email.split("@")[-1].strip() or email)[:200]
+
+
+def _company_slug(name: str, email: str) -> str:
+    """A unique slug for a new company (H30 §2.1: the stable identifier).
+
+    Built from the email's domain first: a non-latin name (Arabic, say)
+    slugifies to nothing, while the domain is what actually identifies the
+    organisation signing up. Falls back to the name, then to "company".
+    """
+    import re
+
+    def slugify(value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:40]
+
+    base = slugify(email.split("@")[-1]) or slugify(name) or "company"
+    slug = base
+    suffix = 2
+    while Company.objects.filter(slug=slug).exists():
+        slug = f"{base}-{suffix}"[:64]
+        suffix += 1
+    return slug
+
+
+def sign_up(
+    *,
+    request,
+    email: str,
+    code: str,
+    password: str,
+    company_name: str | None = None,
+):
     """Create an HR account from a valid subscription code, then sign in.
 
     Story H14 self-service signup. Outcomes:
@@ -24,7 +63,11 @@ def sign_up(*, request, email: str, code: str, password: str):
                                 renders «الكود غير صحيح».
       (None, "invalid_password") password rejected by the app's validators.
       (user, None)              success: role=HR HR account created and the
-                                caller is signed in on the same request.
+                                caller is signed in on the same request. The
+                                account lands in the company the code binds to,
+                                or in a NEW company founded for the caller when
+                                the code is tenantless (H30 §2.5) — so two
+                                self-serve signups never share a tenant.
 
     The lookup order is fixed: code first, then the account lookup, so any
     failure that might leak account existence only happens AFTER the code
@@ -60,14 +103,21 @@ def sign_up(*, request, email: str, code: str, password: str):
             # Non-enumerating: identical outcome to a fresh signup; role and
             # account are untouched.
             return existing, "active_account"
+        # H30 §2.5: the subscription code IS the company door. A code bound to
+        # a company admits the caller into THAT company; a tenantless operator
+        # code founds a NEW one, so two signups never share a tenant.
+        company = subscription.company
+        if company is None:
+            name = _company_name(email, company_name)
+            company = Company.objects.create(
+                slug=_company_slug(name, email), name=name
+            )
         user = user_model.objects.create_user(
             email=email,
             password=password,
             role=User.Role.HR,
             is_active=True,
-            # H30 plan §2.2 (R1 interim): the operator-code flow admits HR into
-            # the one default company; R3's two-branch signup replaces this.
-            company=default_company(),
+            company=company,
         )
         subscription.record_use()
     # Same session/CSRF rotation path as login (services.sign_in).

@@ -383,3 +383,62 @@ def test_deactivation_with_sibling_fields_persists_both(db):
     event = AuditEvent.objects.get(subject=employee, action="employee.updated")
     assert event.after["is_active"] is False
     assert event.after["full_name"] == "Renamed While Off"
+
+
+# --- H30 R2 (§2.6 step 5 / §8.3): company-internal numbering is per-company ---
+
+def _other_company(slug="b-co"):
+    from accounts.models import Company
+
+    return Company.objects.create(slug=slug, name="Company B")
+
+
+def test_duplicate_employee_number_across_companies_is_legal(db):
+    """H30 §8.3: employee #E-1 in company A no longer blocks E-1 in company B
+    (the global unique=True flipped to (company, employee_number))."""
+    from accounts.models import Company
+
+    company_b = _other_company()
+    user_b = User.objects.create_user(company=company_b, email="b-hire@x.test", password="pw-1234567890")
+    EmployeeProfile.objects.create(company=default_company(), user=make_user("a-hire@x.test"), employee_number="E-1")
+    EmployeeProfile.objects.create(company=company_b, user=user_b, employee_number="E-1")  # must NOT raise
+    assert EmployeeProfile.objects.filter(employee_number="E-1").count() == 2
+
+
+def test_duplicate_employee_number_within_one_company_is_rejected(db):
+    from django.db import IntegrityError, transaction
+
+    EmployeeProfile.objects.create(company=default_company(), user=make_user("a1@x.test"), employee_number="E-9")
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            EmployeeProfile.objects.create(
+                company=default_company(), user=make_user("a2@x.test"), employee_number="E-9"
+            )
+
+
+def test_multiple_null_employee_numbers_within_one_company_are_legal(db):
+    """The conditional constraint: unset numbers never collide (plan §2.6
+    step 5: 'nullable columns need UniqueConstraint with condition')."""
+    EmployeeProfile.objects.create(company=default_company(), user=make_user("n1@x.test"))
+    EmployeeProfile.objects.create(company=default_company(), user=make_user("n2@x.test"))
+    assert EmployeeProfile.objects.filter(employee_number__isnull=True).count() == 2
+
+
+def test_duplicate_department_code_across_companies_is_legal(db):
+    from accounts.models import Company, Department
+
+    company_b = _other_company()
+    Department.objects.create(company=default_company(), code="SALES", name_ar="مبيعات")
+    Department.objects.create(company=company_b, code="SALES", name_ar="مبيعات ب")  # must NOT raise
+    assert Department.objects.filter(code="SALES").count() == 2
+
+
+def test_duplicate_department_code_within_one_company_is_rejected(db):
+    from django.db import IntegrityError, transaction
+
+    from accounts.models import Department
+
+    Department.objects.create(company=default_company(), code="HR", name_ar="موارد بشرية")
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            Department.objects.create(company=default_company(), code="HR", name_ar="مكرر")

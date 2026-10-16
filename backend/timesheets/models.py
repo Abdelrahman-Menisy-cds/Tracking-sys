@@ -58,6 +58,11 @@ class Timesheet(models.Model):
         REJECTED = "REJECTED", "Rejected"
 
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    # H30 §2.6 step 6: the tenant anchor, mirrored from ``employee.company``
+    # at save time. ``uniq_timesheet_employee_week_start`` needs NO flip: an
+    # employee belongs to exactly one company, so (employee, week_start) is
+    # per-company by construction.
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     employee = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -90,6 +95,13 @@ class Timesheet(models.Model):
     def __str__(self) -> str:
         return f"{self.employee_id}:{self.week_start} ({self.status})"
 
+    def save(self, *args, **kwargs):
+        # H30 §2.6: company mirrors the employee's — no creation path can
+        # anchor a sheet to no company or the wrong one.
+        if self.company_id is None and self.employee_id is not None:
+            self.company = self.employee.company
+        super().save(*args, **kwargs)
+
 
 class TimeEntry(models.Model):
     """One daily duration record; canonical integer minutes, no rounding."""
@@ -99,6 +111,8 @@ class TimeEntry(models.Model):
         on_delete=models.CASCADE,
         related_name="entries",
     )
+    # H30 §2.6 step 6: tenant anchor mirrored from the parent timesheet.
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     work_date = models.DateField(db_index=True)
     duration_minutes = models.IntegerField()
     unpaid_break_minutes = models.IntegerField(default=0)
@@ -122,6 +136,12 @@ class TimeEntry(models.Model):
     def __str__(self) -> str:
         return f"{self.timesheet_id}:{self.work_date}"
 
+    def save(self, *args, **kwargs):
+        # H30 §2.6: company mirrors the parent timesheet's (parent-anchored).
+        if self.company_id is None and self.timesheet_id is not None:
+            self.company = self.timesheet.company
+        super().save(*args, **kwargs)
+
 
 class TimesheetEvent(models.Model):
     """Append-only per-action history for a Timesheet, shape-mirrors RequestEvent."""
@@ -140,6 +160,8 @@ class TimesheetEvent(models.Model):
         on_delete=models.CASCADE,
         related_name="events",
     )
+    # H30 §2.6 step 6: tenant anchor mirrored from the parent timesheet.
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -156,6 +178,12 @@ class TimesheetEvent(models.Model):
         verbose_name = "timesheet event"
         verbose_name_plural = "timesheet events"
 
+    def save(self, *args, **kwargs):
+        # H30 §2.6: company mirrors the parent timesheet's (parent-anchored).
+        if self.company_id is None and self.timesheet_id is not None:
+            self.company = self.timesheet.company
+        super().save(*args, **kwargs)
+
 
 class TimesheetSubmitIdempotencyRecord(models.Model):
     """Stored submit-timesheet idempotency: one key+user, payload hash, snapshot.
@@ -170,6 +198,8 @@ class TimesheetSubmitIdempotencyRecord(models.Model):
     key_hash = models.CharField(max_length=64, db_index=True)
     payload_hash = models.CharField(max_length=64)
     response_snapshot = models.JSONField()
+    # H30 §2.6 step 6: tenant anchor mirrored from the submitting employee.
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -184,6 +214,11 @@ class TimesheetSubmitIdempotencyRecord(models.Model):
         verbose_name = "timesheet submit idempotency record"
         verbose_name_plural = "timesheet submit idempotency records"
 
+    def save(self, *args, **kwargs):
+        if self.company_id is None and self.user_id is not None:
+            self.company = self.user.company
+        super().save(*args, **kwargs)
+
 
 class TimesheetCreateIdempotencyRecord(models.Model):
     """Stored create-timesheet idempotency: one key+user, payload hash, 201 snapshot.
@@ -196,6 +231,8 @@ class TimesheetCreateIdempotencyRecord(models.Model):
     key_hash = models.CharField(max_length=64, db_index=True)
     payload_hash = models.CharField(max_length=64)
     response_snapshot = models.JSONField()
+    # H30 §2.6 step 6: tenant anchor mirrored from the creating employee.
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -209,6 +246,11 @@ class TimesheetCreateIdempotencyRecord(models.Model):
         ]
         verbose_name = "timesheet create idempotency record"
         verbose_name_plural = "timesheet create idempotency records"
+
+    def save(self, *args, **kwargs):
+        if self.company_id is None and self.user_id is not None:
+            self.company = self.user.company
+        super().save(*args, **kwargs)
 
 
 class TimesheetDecisionIdempotencyRecord(models.Model):
@@ -226,6 +268,8 @@ class TimesheetDecisionIdempotencyRecord(models.Model):
     key_hash = models.CharField(max_length=64, db_index=True)
     payload_hash = models.CharField(max_length=64)
     response_snapshot = models.JSONField()
+    # H30 §2.6 step 6: tenant anchor mirrored from the deciding reviewer.
+    company = models.ForeignKey("accounts.Company", on_delete=models.PROTECT)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -239,3 +283,8 @@ class TimesheetDecisionIdempotencyRecord(models.Model):
         ]
         verbose_name = "timesheet decision idempotency record"
         verbose_name_plural = "timesheet decision idempotency records"
+
+    def save(self, *args, **kwargs):
+        if self.company_id is None and self.user_id is not None:
+            self.company = self.user.company
+        super().save(*args, **kwargs)

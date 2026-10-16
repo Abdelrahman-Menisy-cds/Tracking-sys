@@ -71,7 +71,7 @@ def test_create_notification_stores_recipient_kind_and_text():
 
 @pytest.mark.django_db
 def test_create_notification_does_not_change_source_state():
-    request_type = RequestType.objects.create(name="Leave", requires_hr_approval=False)
+    request_type = RequestType.objects.create(company=default_company(), name="Leave", requires_hr_approval=False)
     user = User.objects.create_user(company=default_company(), email="c2@example.com", password="secure-password")
     request_obj = EmployeeRequest.objects.create(
         requester=user, request_type=request_type, title="T", status=EmployeeRequest.Status.APPROVED, version=2
@@ -151,7 +151,7 @@ def test_request_decision_notification_created_after_commit():
     from reqs.decision_notifications import _notify_requester
 
     user = User.objects.create_user(company=default_company(), email="emp42@example.com", password="secure-password")
-    request_type = RequestType.objects.create(name="Sick", requires_hr_approval=False)
+    request_type = RequestType.objects.create(company=default_company(), name="Sick", requires_hr_approval=False)
     request_obj = EmployeeRequest.objects.create(
         requester=user, request_type=request_type, title="R", status=EmployeeRequest.Status.APPROVED, version=3
     )
@@ -171,7 +171,7 @@ def test_decision_hook_failure_does_not_break_the_committed_outcome():
     from reqs.decision_notifications import notify_requester_of_decision
 
     user = User.objects.create_user(company=default_company(), email="emp43@example.com", password="secure-password")
-    request_type = RequestType.objects.create(name="Sick2", requires_hr_approval=False)
+    request_type = RequestType.objects.create(company=default_company(), name="Sick2", requires_hr_approval=False)
     request_obj = EmployeeRequest.objects.create(
         requester=user, request_type=request_type, title="R2", status=EmployeeRequest.Status.APPROVED, version=3
     )
@@ -222,7 +222,7 @@ def test_decision_notification_targets_the_requester_only():
         email="mgr45@example.com", password="secure-password", role=User.Role.MANAGER
     )
     EmployeeProfile.objects.create(company=default_company(), user=requester, manager=manager)
-    request_type = RequestType.objects.create(name="Leave45", requires_hr_approval=False)
+    request_type = RequestType.objects.create(company=default_company(), name="Leave45", requires_hr_approval=False)
     request_obj = EmployeeRequest.objects.create(
         requester=requester,
         request_type=request_type,
@@ -310,7 +310,7 @@ def test_detail_is_scoped_and_safe_404_for_other_users(client_as_owner, owner, i
 
 @pytest.mark.django_db
 def test_detail_includes_related_object_reference(client_as_owner, owner):
-    request_type = RequestType.objects.create(name="Rel", requires_hr_approval=False)
+    request_type = RequestType.objects.create(company=default_company(), name="Rel", requires_hr_approval=False)
     request_obj = EmployeeRequest.objects.create(
         requester=owner, request_type=request_type, title="R", status=EmployeeRequest.Status.APPROVED
     )
@@ -462,7 +462,7 @@ def test_endpoints_require_authentication():
 
 @pytest.mark.django_db
 def test_related_object_unavailable_for_hidden_record():
-    request_type = RequestType.objects.create(name="Hidden", requires_hr_approval=False)
+    request_type = RequestType.objects.create(company=default_company(), name="Hidden", requires_hr_approval=False)
     requester = User.objects.create_user(company=default_company(), email="hidden-emp@example.com", password="secure-password")
     manager = User.objects.create_user(company=default_company(), 
         email="hidden-mgr@example.com", password="secure-password", role=User.Role.MANAGER
@@ -513,7 +513,7 @@ def test_list_marks_unavailable_links_safely(owner, intruder):
 
 @pytest.mark.django_db
 def test_removed_related_object_becomes_unavailable(owner):
-    request_type = RequestType.objects.create(name="Gone", requires_hr_approval=False)
+    request_type = RequestType.objects.create(company=default_company(), name="Gone", requires_hr_approval=False)
     request_obj = EmployeeRequest.objects.create(
         requester=owner, request_type=request_type, title="G", status=EmployeeRequest.Status.APPROVED
     )

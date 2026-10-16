@@ -219,6 +219,7 @@ def decide_request(
 
         RequestEvent.objects.create(
             request=locked,
+            company=locked.company,  # H30 §2.6: explicit tenant anchor
             actor=reviewer,
             action=_EVENT_ACTION[action],
             from_status=from_status,
@@ -251,6 +252,7 @@ def decide_request(
                     key_hash=key_hash,
                     payload_hash=payload_hash,
                     response_snapshot={"data": EmployeeRequestSerializer(locked).data},
+                    company=reviewer.company,  # H30 §2.6: explicit tenant anchor
                     user=reviewer,
                 )
         except IntegrityError:

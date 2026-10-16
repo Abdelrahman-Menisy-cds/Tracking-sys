@@ -11,6 +11,7 @@ def create_draft(*, requester, request_type, title, details=""):
 
     request = EmployeeRequest.objects.create(
         id=uuid4(),
+        company=requester.company,  # H30 §2.6: explicit tenant anchor
         requester=requester,
         request_type=request_type,
         title=title,
@@ -19,6 +20,7 @@ def create_draft(*, requester, request_type, title, details=""):
     )
     RequestEvent.objects.create(
         request=request,
+        company=request.company,  # H30 §2.6: explicit tenant anchor
         actor=requester,
         action=RequestEvent.Action.CREATED,
         from_status=None,
@@ -39,6 +41,7 @@ def edit_draft(*, request, editor, title, details=""):
     request.save(update_fields=["title", "details", "updated_at", "version"])
     RequestEvent.objects.create(
         request=request,
+        company=request.company,  # H30 §2.6: explicit tenant anchor
         actor=editor,
         action=RequestEvent.Action.EDITED,
         from_status=previous_status,

@@ -45,10 +45,10 @@ class ReviewBase(APITestCase):
         EmployeeProfile.objects.create(company=default_company(), user=self.employee, manager=self.manager, employee_number="E-001")
         EmployeeProfile.objects.create(company=default_company(), user=self.employee2, manager=self.manager_other, employee_number="E-002")
 
-        self.type_manager = RequestType.objects.create(
+        self.type_manager = RequestType.objects.create(company=default_company(), 
             name="Equipment", requires_manager_approval=True, requires_hr_approval=False
         )
-        self.type_hr = RequestType.objects.create(
+        self.type_hr = RequestType.objects.create(company=default_company(), 
             name="Grievance", requires_manager_approval=False, requires_hr_approval=True
         )
 

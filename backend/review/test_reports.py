@@ -62,7 +62,7 @@ class ReportBase(APITestCase):
         EmployeeProfile.objects.create(company=default_company(), user=self.employee, manager=self.manager, employee_number="E-001")
         EmployeeProfile.objects.create(company=default_company(), user=self.employee2, manager=self.other_mgr, employee_number="E-002")
 
-        self.rtype = RequestType.objects.create(name="Equipment", requires_manager_approval=True)
+        self.rtype = RequestType.objects.create(company=default_company(), name="Equipment", requires_manager_approval=True)
         self.submitted = EmployeeRequest.objects.create(
             requester=self.employee,
             request_type=self.rtype,
