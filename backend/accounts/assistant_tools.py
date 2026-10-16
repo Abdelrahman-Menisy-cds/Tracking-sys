@@ -130,7 +130,11 @@ def read_my_leave_balance(user, args):
     """
     from reqs.models import RequestType
 
-    leave_types = RequestType.objects.filter(is_active=True, name__icontains="إجازة").order_by("name")
+    # H30 §3: the request-type catalog is per company (reqs §2.6 step 5), so
+    # an unscoped read here would offer another tenant's leave types.
+    leave_types = RequestType.objects.filter(
+        company=user.company, is_active=True, name__icontains="إجازة"
+    ).order_by("name")
     balances = []
     for row in leave_types:
         approved = EmployeeRequest.objects.filter(
@@ -258,12 +262,12 @@ def read_employee_directory(user, args):
 
 
 def read_departments(user, args):
-    """HR: the departments."""
+    """HR: the departments of the caller's own company (H30 §3)."""
     if user.role != "HR":
         return {"ok": False, "error": "Only HR can read the departments."}
     from accounts.models import Department
 
-    rows = Department.objects.all().order_by("code")
+    rows = Department.objects.filter(company=user.company).order_by("code")
     return {
         "ok": True,
         "departments": [
@@ -295,7 +299,9 @@ def write_create_request(user, args):
         return {"error": "validation_error", "field": "title", "message": "title is required."}
     from reqs.models import RequestType
 
-    if not RequestType.objects.filter(pk=request_type, is_active=True).exists():
+    if not RequestType.objects.filter(
+        pk=request_type, company=user.company, is_active=True
+    ).exists():
         return {"error": "validation_error", "field": "request_type_id", "message": "Unknown or inactive request type."}
     return {
         "validated": {
@@ -370,7 +376,11 @@ def _execute_decide_request(user, validated):
     )
     from django.http import Http404
 
-    request_obj = EmployeeRequest.objects.filter(pk=validated["request_id"]).first()
+    # A tool never trusts an id from the model (H30 §5.2): it resolves the row
+    # INSIDE the caller's company, so a foreign id is simply not found.
+    request_obj = EmployeeRequest.objects.filter(
+        pk=validated["request_id"], company=user.company
+    ).first()
     if request_obj is None:
         raise Http404("request not found")
     from hashlib import sha256
@@ -423,7 +433,11 @@ def _execute_decide_timesheet(user, validated):
     from hashlib import sha256
     from uuid import uuid4
 
-    sheet = Timesheet.objects.filter(pk=validated["timesheet_id"]).first()
+    # Same rule as the request above: the id is only ever resolved within the
+    # caller's own company (H30 §5.2).
+    sheet = Timesheet.objects.filter(
+        pk=validated["timesheet_id"], company=user.company
+    ).first()
     if sheet is None:
         raise Http404("timesheet not found")
     key = str(uuid4())

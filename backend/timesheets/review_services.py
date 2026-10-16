@@ -77,6 +77,10 @@ def _authorize_reviewer(locked: Timesheet, reviewer) -> str:
         raise PermissionError("self_decision")
     if not reviewer.is_active:
         raise LookupError("out_of_scope")
+    if reviewer.company_id != locked.employee.company_id:
+        # H30 §3: a decision never crosses the tenant boundary, whatever the
+        # role — HR of one company must not decide another company's sheet.
+        raise LookupError("out_of_scope")
     if reviewer.role == User.Role.HR:
         return "hr"
     if reviewer.role == User.Role.MANAGER:

@@ -32,15 +32,17 @@ def _safe_denial(request):
     )
 
 
-def _visible_users():
-    """Organization-wide HR read visibility (policy items 2 and 6).
+def _visible_users(company):
+    """The workforce list of ONE company (H30 §3: the tenant is the boundary).
 
     Employees and managers only — HR actors and any superuser/staff
-    break-glass account are excluded from the workforce list.
+    break-glass account are excluded from the workforce list. ``company`` is
+    the caller's, resolved by TenantMiddleware: without it this list was the
+    whole database, so HR of one company read every other company's staff.
     """
     return (
         User.objects.select_related("employee_profile")
-        .filter(is_staff=False, is_superuser=False)
+        .filter(company=company, is_staff=False, is_superuser=False)
         .exclude(role=User.Role.HR)
         .order_by("id")
     )
@@ -69,7 +71,7 @@ class EmployeeListView(APIView):
 
     def get(self, request):
         paginator = EmployeePagination()
-        page = paginator.paginate_queryset(_visible_users().filter(is_active=True), request, view=self)
+        page = paginator.paginate_queryset(_visible_users(request.company).filter(is_active=True), request, view=self)
         return paginator.get_paginated_response(EmployeeReadSerializer(page, many=True).data)
 
     def post(self, request):
@@ -92,20 +94,25 @@ class EmployeeDetailView(APIView):
             return []
         return super().get_throttles()
 
-    def _resolve_target(self, target_id):
+    def _resolve_target(self, request, target_id):
+        """The target employee, only within the caller's company (H30 §3).
+
+        Resolving through the caller's company turns a cross-tenant id into
+        the same 404 an unknown id gets — no existence signal, no leak.
+        """
         try:
-            return _visible_users().get(pk=target_id)
+            return _visible_users(request.company).get(pk=target_id)
         except (User.DoesNotExist, ValueError, TypeError):
             return None
 
     def get(self, request, target_id):
-        target = self._resolve_target(target_id)
+        target = self._resolve_target(request, target_id)
         if target is None:
             return _safe_denial(request)
         return Response({"data": EmployeeReadSerializer(target).data})
 
     def patch(self, request, target_id):
-        target = self._resolve_target(target_id)
+        target = self._resolve_target(request, target_id)
         if target is None:
             return _safe_denial(request)
         serializer = EmployeeUpdateSerializer(data=request.data, partial=True)

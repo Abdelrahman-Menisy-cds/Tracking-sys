@@ -112,12 +112,15 @@ def _get_own_config(user) -> AssistantConfig:
     return config  # noqa: RET504 - return the same row the caller will use
 
 
-def _get_employee(target_id):
+def _get_employee(company, target_id):
     """The HR-visible workforce account, else None (same visibility as the
-    employee admin list: HR actors and break-glass accounts excluded)."""
+    employee admin list: HR actors and break-glass accounts excluded), and
+    only inside the caller's own company (H30 §3) — a foreign id resolves to
+    the same 404 an unknown id gets."""
     return (
         User.objects.filter(
             pk=target_id,
+            company=company,
             is_staff=False,
             is_superuser=False,
         )
@@ -293,7 +296,7 @@ class AssistantHRConfigView(APIView):
     def _authorized_target(self, request, target_id):
         if request.user.role != User.Role.HR:
             return None, _hr_denied(request)
-        target = _get_employee(target_id)
+        target = _get_employee(request.user.company, target_id)
         if target is None:
             return None, _error(
                 request, "not_found", "Not found.", {}, status.HTTP_404_NOT_FOUND

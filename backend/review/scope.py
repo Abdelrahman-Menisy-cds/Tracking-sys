@@ -92,11 +92,17 @@ def scope_requests(manager):
     if not manager.is_active:
         return EmployeeRequest.objects.none()
     if manager.role == User.Role.HR:
-        # HR read scope = organization records; drafts are not yet records.
-        return EmployeeRequest.objects.exclude(status=EmployeeRequest.Status.DRAFT)
+        # HR read scope = the organization records of THEIR OWN company
+        # (H30 §3): an unscoped queryset here showed every tenant's records,
+        # which is the cross-company leak this whole plan exists to remove.
+        # Drafts are not yet records.
+        return EmployeeRequest.objects.filter(company=manager.company).exclude(
+            status=EmployeeRequest.Status.DRAFT
+        )
     if manager.role == User.Role.MANAGER:
         scoped_ids = _scoped_employee_ids(manager)
         return EmployeeRequest.objects.filter(
+            company=manager.company,
             requester_id__in=scoped_ids,
             status__in=MANAGER_REQUEST_HISTORY_STATES,
         )
@@ -110,10 +116,11 @@ def scope_timesheets(manager):
     if not manager.is_active:
         return Timesheet.objects.none()
     if manager.role == User.Role.HR:
-        return Timesheet.objects.all()
+        return Timesheet.objects.filter(company=manager.company)
     if manager.role == User.Role.MANAGER:
         scoped_ids = _scoped_employee_ids(manager)
         return Timesheet.objects.filter(
+            company=manager.company,
             employee_id__in=scoped_ids,
             status__in=MANAGER_TIMESHEET_HISTORY_STATES,
         )
