@@ -1045,7 +1045,7 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 
 /* Floating launcher - bottom INLINE-END corner (RTL-aware via logical props). */
 .assistant-launcher-wrap { position: fixed; inset-block-end: var(--sp-6); inset-inline-end: var(--sp-6); z-index: 50; }
-.assistant-launcher { display: inline-flex; align-items: center; justify-content: center; inline-size: var(--logo-widget-size); block-size: var(--logo-widget-size); padding: var(--sp-1); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-pill); background: var(--surface); box-shadow: var(--elevation-3); cursor: pointer; transition: opacity var(--motion-rest) ease, transform var(--motion-fast) ease, box-shadow var(--motion-rest) ease; }
+.assistant-launcher { display: inline-flex; align-items: center; justify-content: center; inline-size: 64px; block-size: 64px; /* ds-allow-hardcode: floating launcher size, not the company-logo widget token */ padding: var(--sp-1); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-pill); background: var(--surface); box-shadow: var(--elevation-3); cursor: pointer; transition: opacity var(--motion-rest) ease, transform var(--motion-fast) ease, box-shadow var(--motion-rest) ease; }
 .assistant-launcher-face { inline-size: 100%; block-size: 100%; object-fit: cover; border-radius: var(--radius-pill); }
 .assistant-launcher:hover { transform: translateY(-2px); } /* ds-allow-hardcode: launcher press lift */
 .assistant-launcher-muted { opacity: 0.38; cursor: not-allowed; box-shadow: var(--elevation-1); }
