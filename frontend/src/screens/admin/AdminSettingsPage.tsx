@@ -1,11 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useApp, usePageTitle } from "../../app/AppContext";
-import { formatWeekdayOf, formatDateLong, cairoDayIso } from "../../app/format";
+import { cairoDayIso, formatDateLong, formatWeekdayIndex, formatWeekdayOf } from "../../app/format";
 import { ApiError, type ApiFailureKind } from "../../app/api";
 import { fetchHolidays, isPartial, refreshHolidays, type RefreshSummary } from "../../app/holidaysApi";
+import {
+  clockText,
+  createWorkSchedule,
+  fetchWorkSchedules,
+  emptyScheduleDraft,
+  payloadFromDraft,
+  scheduleFieldIssues,
+  type ScheduleDayDraft,
+  type ServerWorkSchedule,
+  type WorkScheduleDraft,
+  type WorkScheduleIssues,
+} from "../../app/workSchedulesApi";
 import type { PublicHoliday } from "../../app/serverTypes";
-import { Banner, EmptyState, StatusPill, type StatusTone } from "../../components/ui";
+import { Banner, Dialog, EmptyState, SkeletonRows, StatusPill, type StatusTone } from "../../components/ui";
 import PageHeader from "../../components/layout/PageHeader";
 import AdminNav from "./AdminNav";
 import { CompanyProfilePanel } from "./CompanyProfilePanel";
@@ -22,8 +34,12 @@ type DictKey = keyof Dict;
  *     delete dialogs had no endpoint behind them - they were demo writes, and
  *     they are gone; the register is read-only + refresh, invoices proposals
  *     as proposals, and an empty register is an honest empty state.
- *   • §1.1 Work schedule + §1.2 leave entitlement: NO endpoints exist. They
- *     render the honest unavailable state instead of fixture rows.
+ *   • §1.1 Work schedule: READ from `GET /work-schedules` and created through
+ *     `POST /work-schedules` with the whole week in one request (H39 - HR
+ *     only, the server enforces it again). A failed read is not «no schedule»:
+ *     the failure states stay separate. Scope deliberately excludes PATCH/
+ *     DELETE UI and leave entitlement; the leave table still has no endpoint
+ *     and keeps the honest unavailable state instead of fixture rows.
  *   • Company identity stays on its real GET/PATCH /company widget.
  */
 
@@ -72,18 +88,406 @@ export default function AdminSettingsPage() {
 
 /* ============================ §1.1 Work schedule card ============================ */
 
+/**
+ * H39 phase 2 - the card reads GET /work-schedules and creates through
+ * POST /work-schedules with the whole week in ONE request. Honesty states stay
+ * separated: loading is a skeleton, a failed read names its real reason with a
+ * retry and never renders as «no schedule yet», a genuinely empty tenant gets
+ * the empty state plus the add button, and only the ``is_active`` row reads as
+ * the schedule in force. The add button exists for HR (the card itself only
+ * renders when capabilities.canSetOrgSchedule) - the server refuses writes
+ * again, so the role UI shows here is informational, never the security check.
+ */
 function ScheduleCard({ t, locale }: { t: (key: DictKey) => string; locale: Locale }) {
-  const unavailable = locale === "ar"
-    ? "جدول العمل الرسمي للمؤسسة غير متاح: لا توجد نقطة نهاية للجداول على الخادم (قراءة أو كتابة)، فلا يوجد جدول مؤكد ولا إصدارات سابقة. تُستكمل البطاقة عند توفر النقطة."
-    : "The organization's work schedule is not available: no schedules endpoint exists on the server (read or write), so there is no confirmed schedule and no version history. The card completes when the endpoint does.";
+  const [schedules, setSchedules] = useState<ServerWorkSchedule[] | null>(null);
+  const [failure, setFailure] = useState<{ reason: ApiFailureKind; message: string } | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [savedNotice, setSavedNotice] = useState(false);
+
+  /** Read the schedules from the server. Never fakes a successful load. */
+  useEffect(() => {
+    let cancelled = false;
+    fetchWorkSchedules(locale)
+      .then((rows) => {
+        if (cancelled) return;
+        setSchedules(rows);
+        setFailure(null);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        // A failed read hides the list: the empty state must not be reachable
+        // from a refusal, only from a genuine empty tenant.
+        setSchedules([]);
+        setFailure(describeApiFailure(error));
+      });
+    return () => { cancelled = true; };
+  }, [locale, attempt]);
+
+  const addButton = (
+    <button className="btn btn-primary" type="button" onClick={() => setDialogOpen(true)}>
+      {t("adminScheduleAdd")}
+    </button>
+  );
+
+  const active = schedules?.find((row) => row.is_active) ?? null;
+  const inactiveCount = (schedules ?? []).filter((row) => !row.is_active).length;
+  const orderedDays = useMemo(
+    () => (active ? [...active.days].sort((left, right) => left.weekday - right.weekday) : []),
+    [active],
+  );
+
   return (
     <section className="work-surface section" aria-labelledby="settings-schedule-heading" id="settings-schedule">
       <div className="section-heading">
         <h2 id="settings-schedule-heading">{t("adminOrgScheduleTitle")}</h2>
-        <span className="page-meta">{t("adminCurrentSchedule")}</span>
+        {schedules && !failure ? <span className="page-meta">{t("adminCurrentSchedule")}</span> : null}
       </div>
-      <Banner tone="warning" role="alert">{unavailable}</Banner>
+
+      {savedNotice ? <Banner tone="success" role="status">{t("adminScheduleSaved")}</Banner> : null}
+
+      {/* Loading is a skeleton - never an empty card pretending data went missing. */}
+      {schedules === null && !failure ? <SkeletonRows rows={2} /> : null}
+
+      {/* A failed read states what ACTUALLY happened, keyed on the failure kind. */}
+      {failure ? (
+        <div>
+          <Banner tone="error" role="alert">{describeScheduleFailure(failure, t)}</Banner>
+          <div style={{ marginBlockStart: "var(--sp-3)" }}>
+            <button className="btn btn-secondary" type="button" onClick={() => setAttempt((count) => count + 1)} disabled={schedules === null}>
+              {t("retry")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {schedules && !failure && active ? (
+        <>
+          <div className="section-heading">
+            <h3 className="schedule-name">{active.name}</h3>
+            <StatusPill tone="success" label={t("adminScheduleActivePill")} icon="approved" />
+          </div>
+          <p className="page-meta">
+            {t("adminSchedulePeriodLabel")}: {fullDate(active.effective_from, locale)}
+            {active.effective_to ? ` — ${fullDate(active.effective_to, locale)}` : ""}
+          </p>
+          <ul className="compact-list" style={{ marginBlockStart: "var(--sp-2)" }}>
+            {orderedDays.map((day) => (
+              <ScheduleDayRow key={day.weekday} day={day} t={t} locale={locale} />
+            ))}
+          </ul>
+          {inactiveCount > 0 ? (
+            <p className="page-meta" style={{ marginBlockStart: "var(--sp-3)" }}>
+              {t("adminScheduleInactiveNote").replace("%s", numText(inactiveCount, locale))}
+            </p>
+          ) : null}
+        </>
+      ) : schedules && !failure ? (
+        <EmptyState message={t("adminScheduleEmpty")} action={addButton} />
+      ) : null}
+
+      {dialogOpen ? (
+        <ScheduleFormDialog
+          t={t}
+          locale={locale}
+          onClose={() => setDialogOpen(false)}
+          onSaved={() => {
+            setDialogOpen(false);
+            setSavedNotice(true);
+            // Re-read rather than trusting what we think changed.
+            setAttempt((count) => count + 1);
+          }}
+        />
+      ) : null}
     </section>
+  );
+}
+
+/** One weekday of the schedule in force - clock times keep Latin digits (dir=ltr). */
+function ScheduleDayRow({ day, t, locale }: { day: ServerWorkSchedule["days"][number]; t: (key: DictKey) => string; locale: Locale }) {
+  const from = clockText(day.start_time);
+  const to = clockText(day.end_time);
+  return (
+    <li className="compact-row">
+      <div>
+        <strong>{formatWeekdayIndex(day.weekday, locale)}</strong>
+        {day.is_working_day ? (
+          <div className="page-meta">
+            <bdi dir="ltr">{from ?? "—"}</bdi> – <bdi dir="ltr">{to ?? "—"}</bdi>
+            {day.break_minutes > 0 ? ` · ${t("adminScheduleBreakCount").replace("%s", numText(day.break_minutes, locale))}` : ""}
+          </div>
+        ) : (
+          <div className="page-meta">{t("adminScheduleRestDay")}</div>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/* ============================ §1.1 the week form ============================ */
+
+/** The per-day refusal, printed next to its row with the field named in words. */
+const DAY_FIELD_LABEL: Record<string, DictKey> = {
+  start_time: "adminScheduleDayFrom",
+  end_time: "adminScheduleDayTo",
+  break_minutes: "adminScheduleBreakLabel",
+};
+
+function dayIssueText(entry: Record<string, string[]>, t: (key: DictKey) => string): string {
+  return Object.entries(entry)
+    .map(([field, messages]) => `${DAY_FIELD_LABEL[field] ? t(DAY_FIELD_LABEL[field]) : field}: ${messages.join(" · ")}`)
+    .join(" · ");
+}
+
+/**
+ * The form's own side of the contract (the server re-checks everything): the
+ * required trio, the range order, at least one working day, and for every
+ * working day a from < to pair. Returns the WorkScheduleIssues shape so the
+ * client refusals and the server's `fields` render through one path.
+ */
+function validateScheduleDraft(draft: WorkScheduleDraft, t: (key: DictKey) => string): WorkScheduleIssues | null {
+  const scalar: Record<string, string[]> = {};
+  const day: Record<number, Record<string, string[]>> = {};
+  const daysGeneral: string[] = [];
+  let workingDays = 0;
+  if (!draft.name.trim()) scalar.name = [t("adminErrorRequired")];
+  if (!draft.effectiveFrom) scalar.effective_from = [t("adminErrorRequired")];
+  if (draft.effectiveFrom && draft.effectiveTo && draft.effectiveTo < draft.effectiveFrom) {
+    scalar.effective_to = [t("adminErrorDates")];
+  }
+  draft.days.forEach((row, weekday) => {
+    if (!row.working) return;
+    workingDays += 1;
+    const perDay: Record<string, string[]> = {};
+    if (!row.from || !row.to) {
+      if (!row.from) perDay.start_time = [t("adminErrorRequired")];
+      if (!row.to) perDay.end_time = [t("adminErrorRequired")];
+    } else if (row.to <= row.from) {
+      perDay.end_time = [t("adminErrorTimeRange")];
+    }
+    if (Object.keys(perDay).length) day[weekday] = perDay;
+  });
+  if (workingDays === 0) daysGeneral.push(t("adminErrorWeekdays"));
+  const empty = Object.keys(scalar).length === 0 && Object.keys(day).length === 0 && daysGeneral.length === 0;
+  return empty ? null : { scalar, day, daysGeneral };
+}
+
+/**
+ * Why a save did NOT land, said without pretending. The form never reprints the
+ * server's own per-field messages here - those travel as WorkScheduleIssues and
+ * render next to their fields; this is only the non-field remainder.
+ */
+function describeSaveFailure(failure: unknown, t: (key: DictKey) => string): string {
+  if (failure instanceof ApiError) {
+    if (failure.kind === "unauthenticated" || failure.kind === "forbidden") return t("adminScheduleActionDenied");
+    if (failure.kind === "unreachable") return t("adminScheduleFailureUnreachable");
+    if (failure.message) return `${t("adminScheduleSaveFailed")} ${failure.message}`;
+  }
+  return t("adminScheduleSaveFailed");
+}
+
+function ScheduleFormDialog({
+  t,
+  locale,
+  onClose,
+  onSaved,
+}: {
+  t: (key: DictKey) => string;
+  locale: Locale;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [draft, setDraft] = useState<WorkScheduleDraft>(emptyScheduleDraft);
+  const [issues, setIssues] = useState<WorkScheduleIssues | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  const patch = (changes: Partial<WorkScheduleDraft>) => {
+    setDirty(true);
+    setDraft((current) => ({ ...current, ...changes }));
+  };
+  const patchDay = (weekday: number, changes: Partial<ScheduleDayDraft>) => {
+    setDirty(true);
+    setDraft((current) => ({
+      ...current,
+      days: current.days.map((row, index) => (index === weekday ? { ...row, ...changes } : row)),
+    }));
+  };
+
+  const submit = async () => {
+    setProblem(null);
+    const local = validateScheduleDraft(draft, t);
+    if (local) {
+      setIssues(local);
+      return;
+    }
+    setIssues(null);
+    setSaving(true);
+    try {
+      await createWorkSchedule(payloadFromDraft(draft), locale);
+      onSaved();
+    } catch (failure) {
+      const mapped = scheduleFieldIssues(failure);
+      if (mapped) setIssues(mapped);
+      else setProblem(describeSaveFailure(failure, t));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const dayName = (weekday: number) => formatWeekdayIndex(weekday, locale);
+
+  return (
+    <Dialog
+      title={t("adminScheduleAdd")}
+      description={t("adminScheduleDialogHint")}
+      busy={saving}
+      dirty={dirty}
+      onClose={onClose}
+    >
+      <form noValidate onSubmit={(event) => { event.preventDefault(); submit(); }}>
+        <label className="field" htmlFor="schedule-form-name" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">
+            {t("adminScheduleNameLabel")} <span className="field-required">*</span>
+          </span>
+          <input
+            id="schedule-form-name"
+            className="input"
+            autoFocus
+            value={draft.name}
+            aria-invalid={issues?.scalar.name ? "true" : undefined}
+            onChange={(event) => patch({ name: event.target.value })}
+          />
+          {issues?.scalar.name ? <span className="field-error" role="alert">{issues.scalar.name.join(" · ")}</span> : null}
+        </label>
+
+        <div className="schedule-period">
+          <label className="field" htmlFor="schedule-form-effective-from">
+            <span className="field-label">
+              {t("adminEffectiveFrom")} <span className="field-required">*</span>
+            </span>
+            <input
+              id="schedule-form-effective-from"
+              className="input"
+              dir="ltr"
+              type="date"
+              value={draft.effectiveFrom}
+              aria-invalid={issues?.scalar.effective_from ? "true" : undefined}
+              onChange={(event) => patch({ effectiveFrom: event.target.value })}
+            />
+            {issues?.scalar.effective_from ? (
+              <span className="field-error" role="alert">{issues.scalar.effective_from.join(" · ")}</span>
+            ) : null}
+          </label>
+          <label className="field" htmlFor="schedule-form-effective-to">
+            <span className="field-label">{t("adminEffectiveTo")}</span>
+            {/* The optional end cannot precede the start - linked both ways. */}
+            <input
+              id="schedule-form-effective-to"
+              className="input"
+              dir="ltr"
+              type="date"
+              min={draft.effectiveFrom || undefined}
+              value={draft.effectiveTo}
+              aria-invalid={issues?.scalar.effective_to ? "true" : undefined}
+              onChange={(event) => patch({ effectiveTo: event.target.value })}
+            />
+            {issues?.scalar.effective_to ? (
+              <span className="field-error" role="alert">{issues.scalar.effective_to.join(" · ")}</span>
+            ) : null}
+          </label>
+        </div>
+
+        <label className="field" htmlFor="schedule-form-active" style={{ marginBlockEnd: "var(--sp-4)" }}>
+          <span className="field-label">{t("adminScheduleActiveCheckbox")}</span>
+          <input
+            id="schedule-form-active"
+            type="checkbox"
+            checked={draft.isActive}
+            onChange={(event) => patch({ isActive: event.target.checked })}
+          />
+          <span className="field-hint">{t("adminScheduleActiveCheckboxHint")}</span>
+        </label>
+
+        <fieldset className="quiet-inset schedule-days" disabled={saving}>
+          <legend className="visually-hidden">{t("adminScheduleDaysHeading")}</legend>
+          {/* The header row is layout only; every real input owns its own labelled name. */}
+          <div className="schedule-day-row" aria-hidden="true">
+            <span className="page-meta">{t("adminScheduleDaysHeading")}</span>
+            <span className="page-meta">{t("adminScheduleDayWorking")}</span>
+            <span className="page-meta">{t("adminScheduleDayFrom")}</span>
+            <span className="page-meta">{t("adminScheduleDayTo")}</span>
+            <span className="page-meta">{t("adminScheduleBreakLabel")}</span>
+          </div>
+          {issues?.daysGeneral.map((line) => (
+            <span className="field-error schedule-days-general" role="alert" key={line}>{line}</span>
+          ))}
+          {draft.days.map((row, weekday) => (
+            <div className="schedule-day-row" key={weekday}>
+              <span className="schedule-day-name">{dayName(weekday)}</span>
+              <label className="admin-weekday">
+                {/* ds-allow-native-checkbox: single boolean toggle; segmented work is out of scope */}
+                <input
+                  type="checkbox"
+                  checked={row.working}
+                  aria-label={`${dayName(weekday)} - ${t("adminScheduleDayWorking")}`}
+                  onChange={(event) => patchDay(weekday, { working: event.target.checked })}
+                />
+              </label>
+              <input
+                className="input"
+                dir="ltr"
+                type="time"
+                value={row.from}
+                disabled={!row.working}
+                aria-label={`${dayName(weekday)} - ${t("adminScheduleDayFrom")}`}
+                aria-invalid={issues?.day[weekday]?.start_time ? "true" : undefined}
+                onChange={(event) => patchDay(weekday, { from: event.target.value })}
+              />
+              <input
+                className="input"
+                dir="ltr"
+                type="time"
+                min={row.from || undefined}
+                value={row.to}
+                disabled={!row.working}
+                aria-label={`${dayName(weekday)} - ${t("adminScheduleDayTo")}`}
+                aria-invalid={issues?.day[weekday]?.end_time ? "true" : undefined}
+                onChange={(event) => patchDay(weekday, { to: event.target.value })}
+              />
+              <input
+                className="input"
+                dir="ltr"
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                value={row.breakMinutes}
+                disabled={!row.working}
+                aria-label={`${dayName(weekday)} - ${t("adminScheduleBreakLabel")}`}
+                aria-invalid={issues?.day[weekday]?.break_minutes ? "true" : undefined}
+                onChange={(event) => patchDay(weekday, { breakMinutes: event.target.value })}
+              />
+              {issues?.day[weekday] ? (
+                <span className="field-error" role="alert">{dayIssueText(issues.day[weekday], t)}</span>
+              ) : null}
+            </div>
+          ))}
+        </fieldset>
+
+        {problem ? <Banner tone="error" role="alert" >{problem}</Banner> : null}
+
+        <div className="dialog-actions">
+          <button className="btn btn-secondary" type="button" disabled={saving} onClick={onClose}>
+            {t("cancel")}
+          </button>
+          <button className="btn btn-primary" type="submit" disabled={saving} aria-busy={saving}>
+            {saving ? t("saving") : t("save")}
+          </button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 
@@ -239,6 +643,15 @@ function HolidaysCard({ t, locale, today }: { t: (key: DictKey) => string; local
 function describeApiFailure(error: unknown): { reason: ApiFailureKind; message: string } {
   if (error instanceof ApiError) return { reason: error.kind, message: error.message };
   return { reason: "unreachable", message: error instanceof Error ? error.message : String(error) };
+}
+
+/** Why the schedule list could not be read - keyed on the real failure kind. */
+function describeScheduleFailure(failure: { reason: ApiFailureKind; message: string }, t: (key: DictKey) => string): string {
+  if (failure.reason === "unauthenticated") return t("adminScheduleFailureAuth");
+  if (failure.reason === "forbidden") return t("adminScheduleFailureForbidden");
+  if (failure.reason === "unreachable") return t("adminScheduleFailureUnreachable");
+  if (failure.reason === "invalid" && failure.message) return `${t("adminScheduleFailureServer")} ${failure.message}`;
+  return t("adminScheduleFailureServer");
 }
 
 /** Why the register on screen is empty, said without pretending. */

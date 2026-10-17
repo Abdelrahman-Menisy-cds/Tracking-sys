@@ -316,6 +316,22 @@ button { cursor: pointer; }
 .settings-grid { align-items: start; }
 .settings-grid > .work-surface { display: flex; flex-direction: column; }
 .settings-grid > .work-surface > :last-child { margin-block-start: auto; }
+/* H39 schedule card + form: the from/to pair shares one row; the six
+   weekday inputs share one grid so the week reads as a table on wide
+   screens and stacks on narrow ones. */
+.schedule-name { margin: 0; min-width: 0; }
+.schedule-period { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); margin-block-end: var(--sp-4); }
+.schedule-period .field { margin: 0; }
+.schedule-days { display: grid; gap: var(--sp-2); }
+.schedule-day-row { display: grid; grid-template-columns: minmax(5.5em, 1fr) auto minmax(5.5em, 1fr) minmax(5.5em, 1fr) minmax(6em, 1fr); gap: var(--sp-2); align-items: center; }
+.schedule-days-general { grid-column: 1 / -1; }
+/* ds-allow-hardcode: the refusal line spans the row's five tracks */
+.schedule-day-row > .field-error { grid-column: 1 / -1; margin: 0; }
+@media (max-width: 639px) {
+  .schedule-period { grid-template-columns: 1fr; }
+  .schedule-day-row { grid-template-columns: 1fr; }
+  .schedule-day-row[aria-hidden="true"] { display: none; }
+}
 /* Ten-column leave table: give it the width it needs and keep every cell on one
    line. The wrapper already scrolls, so nothing is lost off-screen. */
 .table-wide table { min-width: 1120px; } /* ds-allow-hardcode: evidence-table min width; the wrapper scrolls */
