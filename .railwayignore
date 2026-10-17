@@ -1,0 +1,37 @@
+# railway up uploads this directory from the dev machine before the image is
+# built. The image rebuilds all of it itself (see the Dockerfile: npm ci +
+# build:demo for the SPA, pip install for the backend), so shipping the venv,
+# node_modules, the build output and the git history only made the upload time
+# out - the tree is 3.2G and the transfer never finished.
+#
+# Mirrors .dockerignore, plus the build outputs that the image produces on its
+# own. Kept in sync with it deliberately: an upload that carries something the
+# image ignores is just wasted bandwidth.
+
+# --- rebuilt inside the image ---------------------------------------------
+.venv/
+**/.venv/
+node_modules/
+**/node_modules/
+frontend/dist/
+**/dist/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# --- dev caches ------------------------------------------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.git/
+
+# --- secrets — never leave the machine -------------------------------------
+.env
+.env.*
+**/.env
+**/.env.*
+**/auth.json
+**/auth.lock
+
+# --- noise -----------------------------------------------------------------
+*.log
