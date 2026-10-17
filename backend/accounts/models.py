@@ -571,3 +571,109 @@ class AssistantConfig(models.Model):
         """'subscription' when a provider is linked, else 'api' (derived —
         one source of truth, no extra flag)."""
         return "subscription" if self.subscription_provider else "api"
+
+
+class WorkSchedule(models.Model):
+    """The organization's official work week (Story H39, phase 1).
+
+    The enterprise-settings card had nothing to read or write — no model, no
+    endpoint — so it honestly reported "no schedule, no version history".
+    This is the server half of that card.
+
+    ``company`` is mandatory: every row belongs to exactly one tenant and
+    every read is filtered by it (the cb74a25 lesson — an unscoped settings
+    read crossed tenants).
+
+    One ACTIVE schedule per company at any time (brief H39): enforced by the
+    partial unique index below and kept consistent by the service, which
+    deactivates the previous active inside the same transaction as the new
+    activation. Deactivation (the DELETE endpoint) flips ``is_active`` and
+    KEEPS the row — the settings card explicitly wants a version trail, and
+    an inactive schedule is exactly that history.
+    """
+
+    company = models.ForeignKey("Company", on_delete=models.PROTECT, related_name="work_schedules")
+    name = models.CharField(max_length=120)
+    effective_from = models.DateField()
+    # Open-ended until HR sets an end (e.g. the Ramadan variant ends, the
+    # official schedule does not).
+    effective_to = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=False, db_index=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="work_schedules_created",
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_active", "-created_at", "-id"]  # the active row first
+        verbose_name = "work schedule"
+        verbose_name_plural = "work schedules"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company"],
+                condition=models.Q(is_active=True),
+                name="uniq_workschedule_company_active",
+            ),
+            # NULL end (open-ended) can never violate the range: SQL compares
+            # NULL as unknown, so the isnull branch is required, not cosmetic.
+            models.CheckConstraint(
+                condition=models.Q(effective_to__isnull=True)
+                | models.Q(effective_from__lte=models.F("effective_to")),
+                name="workschedule_effective_range",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        state = "active" if self.is_active else "inactive"
+        return f"{self.name} ({self.company.slug}, {state})"
+
+
+class WorkScheduleDay(models.Model):
+    """One weekday row of a WorkSchedule (Story H39).
+
+    ``weekday`` follows the brief's convention — 0=Sunday … 6=Saturday, the
+    JS ``getDay()`` order the SPA already uses — NOT Python's ``weekday()``
+    (Monday-first). The check constraint pins 0-6 so the convention is
+    stored, not just documented.
+
+    A working day carries start/end (end strictly after start — the
+    serializer rejects otherwise); a rest day carries none, and a PATCH that
+    marks a day non-working normalizes its times to NULL rather than keeping
+    a contradictory pair.
+    """
+
+    schedule = models.ForeignKey("WorkSchedule", on_delete=models.PROTECT, related_name="days")
+    weekday = models.PositiveSmallIntegerField()
+    is_working_day = models.BooleanField(default=True)
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    break_minutes = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["weekday"]
+        verbose_name = "work schedule day"
+        verbose_name_plural = "work schedule days"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["schedule", "weekday"],
+                name="uniq_workscheduleday_schedule_weekday",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(weekday__gte=0) & models.Q(weekday__lte=6),
+                name="workscheduleday_weekday_0_6",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(is_working_day=False)
+                | (models.Q(start_time__isnull=False) & models.Q(end_time__isnull=False)),
+                name="workscheduleday_working_has_times",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        kind = "working" if self.is_working_day else "rest"
+        return f"{self.schedule_id} day {self.weekday} ({kind})"

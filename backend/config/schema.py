@@ -37,6 +37,7 @@ from accounts.employee_serializers import (
 )
 from accounts.serializers import CurrentUserSerializer, CurrentUserUpdateSerializer, LoginSerializer, SignupSerializer
 from accounts.views import SignupView
+from accounts.work_schedule_serializers import WorkScheduleReadSerializer, WorkScheduleWriteSerializer
 from notifications.serializers import NotificationReadStateSerializer, NotificationSerializer
 from reqs import serializers as reqs_serializers
 from review.serializers import (
@@ -100,6 +101,12 @@ TIME_ENTRY_CORRECTION_REQUEST = _component(ts_serializers.TimeEntryCorrectionSer
 ENTRY_DELETE_REQUEST = _component(ts_serializers.EntryDeleteSerializer(), "EntryDeleteRequest")
 TIMESHEET_DECISION_REQUEST = _component(ts_serializers.TimesheetDecisionSerializer(), "TimesheetDecisionRequest")
 TIMESHEET_REOPEN_REQUEST = _component(ts_serializers.TimesheetReopenSerializer(), "TimesheetReopenRequest")
+
+# Story H39: work schedules (read shape carries the nested day set; the write
+# shape is the same serializer the view instantiates, partial for PATCH).
+WORK_SCHEDULE = _component(WorkScheduleReadSerializer(), "WorkSchedule")
+WORK_SCHEDULE_CREATE_REQUEST = _component(WorkScheduleWriteSerializer(), "WorkScheduleCreateRequest")
+WORK_SCHEDULE_UPDATE_REQUEST = _component(WorkScheduleWriteSerializer(partial=True), "WorkScheduleUpdateRequest")
 
 # Attachment payloads are plain dicts built in reqs.attachment_views._attachment_payload
 # (no serializer class exists); the keys below are copied from that function so the
@@ -1097,6 +1104,52 @@ class HolidayRefreshSchema(_ViewSchema):
     }
 
 
+# Story H39: the work-schedule endpoints (HR only, uniform 404 for non-HR).
+class WorkScheduleListSchema(_ViewSchema):
+    request_bodies = {
+        "post": _body(_object_ref("WorkScheduleCreateRequest")),
+    }
+    responses = {
+        # WorkScheduleListView: {"data": [WorkSchedule]}; POST creates the
+        # schedule and its days in one transaction (201).
+        "get": {
+            **_json_response("200", "The company's work schedules, the active one flagged.", _data_envelope({"type": "array", "items": _object_ref("WorkSchedule")})),
+            **_error_response("404", "Non-HR callers receive the uniform 404 (no existence disclosure)."),
+        },
+        "post": {
+            **_json_response("201", "Schedule created with its day set (the company's first schedule activates itself).", _data_envelope(_object_ref("WorkSchedule"))),
+            **_error_response("422", "Missing name/effective_from/days, or invalid day rows."),
+            **_error_response("429", "Mutation rate limit exceeded (60/min)."),
+            **_error_response("404", "Non-HR callers receive the uniform 404 (no existence disclosure)."),
+        },
+    }
+
+
+class WorkScheduleDetailSchema(_ViewSchema):
+    request_bodies = {
+        "patch": _body(_object_ref("WorkScheduleUpdateRequest")),
+    }
+    responses = {
+        # WorkScheduleDetailView: GET one with days; PATCH edits scalars
+        # and/or replaces the day set; DELETE deactivates (soft delete).
+        "get": {
+            **_json_response("200", "One schedule with its days.", _data_envelope(_object_ref("WorkSchedule"))),
+            **_error_response("404", "Unknown id, another company's schedule, or a non-HR caller (uniform 404)."),
+        },
+        "patch": {
+            **_json_response("200", "Schedule updated (days replaced when sent).", _data_envelope(_object_ref("WorkSchedule"))),
+            **_error_response("404", "Unknown id, another company's schedule, or a non-HR caller (uniform 404)."),
+            **_error_response("422", "Invalid field values or invalid day rows."),
+            **_error_response("429", "Mutation rate limit exceeded (60/min)."),
+        },
+        "delete": {
+            **_json_response("200", "Schedule deactivated (soft delete; the row remains as version history).", _data_envelope(_object_ref("WorkSchedule"))),
+            **_error_response("404", "Unknown id, another company's schedule, or a non-HR caller (uniform 404)."),
+            **_error_response("429", "Mutation rate limit exceeded (60/min)."),
+        },
+    }
+
+
 def _report_meta():
     """meta keys returned by review.reports.resolve_report (read verbatim)."""
     return {
@@ -1236,6 +1289,8 @@ _PATH_PARAMETER_TYPES = {
     # accounts/urls.py, notifications/urls.py
     "target_id": ("path", "integer"),
     "notification_id": ("path", "integer"),
+    # accounts/urls.py (Story H39)
+    "schedule_id": ("path", "integer"),
     # reqs/urls.py, timesheets/urls.py, review/urls.py
     "pk": ("path", "string", "uuid"),
     "entry_id": ("path", "string"),
@@ -1249,7 +1304,7 @@ def _attach_schema(view_cls, schema_cls):
 
 
 def _wire_schemas():
-    from accounts import assistant_views, company_views, employee_views, views as accounts_views
+    from accounts import assistant_views, company_views, employee_views, views as accounts_views, work_schedule_views
     from notifications import views as notification_views
     from reqs import attachment_views, views as reqs_views
     from review import report_views, views as review_views
@@ -1263,6 +1318,8 @@ def _wire_schemas():
     _attach_schema(company_views.CompanyProfileView, CompanySchema)
     _attach_schema(employee_views.EmployeeListView, EmployeeSchema)
     _attach_schema(employee_views.EmployeeDetailView, EmployeeDetailSchema)
+    _attach_schema(work_schedule_views.WorkScheduleListView, WorkScheduleListSchema)
+    _attach_schema(work_schedule_views.WorkScheduleDetailView, WorkScheduleDetailSchema)
     _attach_schema(assistant_views.AssistantConfigView, AssistantConfigSchema)
     _attach_schema(assistant_views.AssistantTestView, AssistantTestSchema)
     _attach_schema(assistant_views.AssistantChatView, AssistantChatSchema)

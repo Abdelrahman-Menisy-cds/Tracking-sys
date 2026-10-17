@@ -10,7 +10,7 @@ would prove nothing about what the app actually does.
 """
 import pytest
 
-from accounts.models import Company, Department, User
+from accounts.models import Company, Department, User, WorkSchedule
 from reqs.models import EmployeeRequest, RequestType
 from timesheets.models import Timesheet
 
@@ -141,3 +141,102 @@ def test_holidays_register_is_one_company_only(two_companies):
     names = {row["name"] for row in response.json()["data"]}
     assert "holiday-a" in names
     assert "holiday-b" not in names
+
+
+def _create_schedule(client, name):
+    """POST /work-schedules through the REAL endpoint (never an ORM row)."""
+    response = client.post(
+        "/api/v1/work-schedules",
+        {
+            "name": name,
+            "effective_from": "2026-11-01",
+            "days": [
+                {"weekday": wd, "is_working_day": wd < 5,
+                 "start_time": "08:00:00" if wd < 5 else None,
+                 "end_time": "16:00:00" if wd < 5 else None}
+                for wd in range(7)
+            ],
+        },
+        format="json",
+    )
+    assert response.status_code == 201, response.json()
+    return response.json()["data"]
+
+
+def _schedule_clients(two_companies):
+    """Each HR creates one schedule through the API; both clients stay open.
+
+    APIClient (not the plain Django Client): the schedule body is JSON and
+    the plain Client multipart-encodes nested lists into unusable strings.
+    """
+    from rest_framework.test import APIClient
+
+    clients = {}
+    schedules = {}
+    for key in ("a", "b"):
+        client = APIClient()
+        client.force_login(two_companies[key]["hr"])
+        clients[key] = client
+        schedules[key] = _create_schedule(client, f"دوام {key}")
+    return clients, schedules
+
+
+def test_work_schedules_list_is_one_company_only(two_companies):
+    """GET /api/v1/work-schedules as HR of A returns A's schedule and never
+    B's (Story H39; department_views.py shipped this exact bug class until
+    cb74a25 — the schedule list is built scoped from day one)."""
+    from rest_framework.test import APIClient
+
+    for key in ("a", "b"):
+        client = APIClient()
+        client.force_login(two_companies[key]["hr"])
+        response = client.post(
+            "/api/v1/work-schedules",
+            {
+                "name": f"دوام {key}",
+                "effective_from": "2026-11-01",
+                "days": [{"weekday": 0, "is_working_day": False}],
+            },
+            format="json",
+        )
+        assert response.status_code == 201, response.json()
+    viewer = APIClient()
+    viewer.force_login(two_companies["a"]["hr"])
+    response = viewer.get("/api/v1/work-schedules")
+    assert response.status_code == 200
+    names = {row["name"] for row in response.json()["data"]}
+    assert "دوام a" in names
+    assert "دوام b" not in names
+
+
+def test_foreign_work_schedule_detail_is_404(two_companies):
+    """A schedule id from another company answers the shared 404 envelope."""
+    clients, schedules = _schedule_clients(two_companies)
+    response = clients["a"].get(f"/api/v1/work-schedules/{schedules['b']['id']}")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+
+
+def test_foreign_work_schedule_patch_is_404_and_untouched(two_companies):
+    """PATCHing another company's schedule is a 404, and the schedule is
+    unchanged — a guessed id must neither read nor write across tenants."""
+    clients, schedules = _schedule_clients(two_companies)
+    response = clients["a"].patch(
+        f"/api/v1/work-schedules/{schedules['b']['id']}",
+        {"name": "captured", "is_active": True},
+        format="json",
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+    schedule = WorkSchedule.objects.get(pk=schedules["b"]["id"])
+    assert schedule.name == "دوام b"
+    assert schedule.is_active is True
+
+
+def test_foreign_work_schedule_delete_is_404(two_companies):
+    """DELETE on another company's schedule neither deactivates it nor
+    discloses that it exists."""
+    clients, schedules = _schedule_clients(two_companies)
+    response = clients["a"].delete(f"/api/v1/work-schedules/{schedules['b']['id']}")
+    assert response.status_code == 404
+    assert WorkSchedule.objects.get(pk=schedules["b"]["id"]).is_active is True
