@@ -105,7 +105,19 @@ class Command(BaseCommand):
             types = []
             for name in ("إجازة اعتيادية", "إذن", "سلفة", "شهادة خبرة"):
                 rtype, _ = RequestType.objects.get_or_create(
-                    company=company, name=name, defaults={"is_active": True}
+                    company=company,
+                    name=name,
+                    defaults={
+                        "is_active": True,
+                        # H43: the company's HR user has no manager on file, so
+                        # manager-only routing can never submit a request in
+                        # this tenant. HR-queue routing is the one route that
+                        # works for the demo's own workflow end to end — and
+                        # without ANY routing the submit service refuses every
+                        # request (the source of the H43 confusing failure).
+                        "requires_manager_approval": False,
+                        "requires_hr_approval": True,
+                    },
                 )
                 types.append(rtype)
             wrote.append(f"{len(types)} أنواع طلبات")

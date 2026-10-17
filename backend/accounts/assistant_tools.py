@@ -334,16 +334,32 @@ def _execute_create_request(user, validated):
             submit_request,
         )
 
+        # H43: a failed SUBMIT is policy the USER must read, never a machine
+        # token. The old shape shipped "not submitted (validation_error:
+        # request_type)" — the code/field pair — and the model quoted it
+        # verbatim into the chat. The message strings below are real
+        # sentences (SubmissionError's own localized message or an
+        # equivalent here); the draft stays honestly intact and no
+        # developer vocabulary reaches the reply.
         try:
             submitted = submit_request(requester=user, request_obj=draft, version=draft.version)
             result["status"] = submitted.status
         except SubmissionError as exc:
-            result["submit_result"] = f"not submitted ({exc.code}: {exc.field})"
+            result["submitted"] = False
+            result["message"] = str(exc.message)
         except SubmitVersionConflict:
-            result["submit_result"] = "not submitted (version_conflict)"
+            result["submitted"] = False
+            result["message"] = (
+                "The request changed in the meantime, so the submit was not "
+                "completed; it remains saved as a draft."
+            )
         except PermissionError:
             # State moved under us (DRAFT was no longer submittable on commit).
-            result["submit_result"] = "not submitted (state conflict)"
+            result["submitted"] = False
+            result["message"] = (
+                "The submit was not completed because the request is no "
+                "longer in a submittable state; it remains saved as a draft."
+            )
     return {"ok": True, **result}
 
 

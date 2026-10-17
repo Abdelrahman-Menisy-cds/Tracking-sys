@@ -675,6 +675,126 @@ def test_write_tool_pends_and_does_not_change_data_until_confirm(client_csrf):
 
 
 # ---------------------------------------------------------------------------
+# H43 — create_request with submit=true: the FULL flow must complete.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_confirm_create_request_with_submit_routes_successfully(client_csrf):
+    """H43: create + submit in ONE confirmed action really lands PENDING_*.
+
+    The regression from the user snapshot: the confirm created the draft but
+    the submit died and the reply said "not submitted (validation_error:
+    request_type)". With the routing configured (the demo seed omitted it),
+    the same end-to-end path — chat -> pending token -> confirm — must reach
+    PENDING_MANAGER with no error and no developer strings.
+    """
+    client, token = client_csrf
+    user = _mk_user("h43.submit@example.com")
+    _configured(user)
+    manager = _mk_user("h43.mgr@example.com", role=User.Role.MANAGER)
+    EmployeeProfile.objects.create(
+        company=default_company(), user=user, manager=manager, employee_number="H43-E1"
+    )
+    rtype = RequestType.objects.create(company=default_company(), name="Leave H43", requires_manager_approval=True)
+
+    def fake_chat_round(**kwargs):
+        return {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "call_h43",
+                    "type": "function",
+                    "function": {
+                        "name": "create_request",
+                        "arguments": json.dumps(
+                            {"request_type_id": rtype.pk, "title": "إجازة 5 أيام", "submit": True}
+                        ),
+                    },
+                }
+            ],
+        }
+
+    client.force_login(user)
+    with mock.patch("accounts.assistant_provider.chat_round", side_effect=fake_chat_round):
+        response = _post(client, token, "/api/v1/assistant/chat", {"messages": [{"role": "user", "content": "احجز لي إجازة وأرسلها"}]})
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["pending_action"] is not None
+    assert data["pending_action"]["args"]["submit"] is True
+    token_value = data["pending_action"]["token"]
+
+    confirmed = _post(client, token, f"/api/v1/assistant/actions/{token_value}/confirm", {})
+    assert confirmed.status_code == 200
+    body = confirmed.json()["data"]
+    assert body["tool"] == "create_request"
+    result = body["result"]
+    assert result["ok"] is True
+    # The one-shot submit actually completed.
+    assert result["status"] == EmployeeRequest.Status.PENDING_MANAGER
+    assert "submitted" not in result  # the honest-failure key only, never on success
+    row = EmployeeRequest.objects.get(requester=user)
+    assert row.status == EmployeeRequest.Status.PENDING_MANAGER
+    assert str(row.pk) == result["request_id"]
+    # No developer vocabulary anywhere in the confirm response.
+    assert "validation_error" not in confirmed.content.decode()
+    assert "not submitted (" not in confirmed.content.decode()
+
+
+@pytest.mark.django_db
+def test_confirm_create_request_submit_without_reviewer_stays_honest_draft(client_csrf):
+    """H43 regression: a type with NO reviewer (exactly the demo shape) can
+    still confirm its DRAFT, and the reply carries a human sentence instead
+    of `not submitted (validation_error: request_type)`."""
+    client, token = client_csrf
+    user = _mk_user("h43.noreview@example.com")
+    _configured(user)
+    rtype = RequestType.objects.create(company=default_company(), name="Leave H43 nobridge")
+
+    def fake_chat_round(**kwargs):
+        return {
+            "role": "assistant",
+            "content": "سأنشئ الطلب وأرسله.",
+            "tool_calls": [
+                {
+                    "id": "call_h43b",
+                    "type": "function",
+                    "function": {
+                        "name": "create_request",
+                        "arguments": json.dumps(
+                            {"request_type_id": rtype.pk, "title": "إجازة شتوية", "submit": True}
+                        ),
+                    },
+                }
+            ],
+        }
+
+    client.force_login(user)
+    with mock.patch("accounts.assistant_provider.chat_round", side_effect=fake_chat_round):
+        response = _post(client, token, "/api/v1/assistant/chat", {"messages": [{"role": "user", "content": "احجز لي إجازة وأرسلها"}]})
+    assert response.status_code == 200
+    token_value = response.json()["data"]["pending_action"]["token"]
+
+    confirmed = _post(client, token, f"/api/v1/assistant/actions/{token_value}/confirm", {})
+    # The confirm itself succeeded: the DIRECT creative work (the draft the
+    # user delegated) is intact and reported honestly.
+    assert confirmed.status_code == 200
+    result = confirmed.json()["data"]["result"]
+    assert result["ok"] is True
+    assert result["status"] == EmployeeRequest.Status.DRAFT  # stays a draft, truthfully
+    assert result["submitted"] is False
+    assert isinstance(result["message"], str) and "reviewer" in result["message"]
+    row = EmployeeRequest.objects.get(requester=user)
+    assert row.status == EmployeeRequest.Status.DRAFT
+    # The exact user-visible regression is banned forever in this path.
+    decoded = confirmed.content.decode()
+    assert "validation_error" not in decoded
+    assert "request_type" not in decoded
+    assert "not submitted (" not in decoded
+
+
+# ---------------------------------------------------------------------------
 # AC 7 — token rejected: reused / expired / different user / tampered args
 # ---------------------------------------------------------------------------
 
