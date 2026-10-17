@@ -13,6 +13,7 @@ import {
   type PendingAssistantAction,
 } from "../../app/assistantApi";
 import { renderAssistantMarkdown } from "./assistantMarkdown";
+import { describeConfirmResult, formatArgKey, formatServerValue } from "./displayValues";
 import { CloseIcon } from "../../components/icons";
 
 /**
@@ -64,6 +65,14 @@ function failureText(error: unknown, t: (key: keyof Dict) => string): string {
   return t("assistantErrNetwork");
 }
 
+/** H41 - a failed CONFIRM is honest too: expiry and replay get their own
+ * lines from dict, and «إعادة المحاولة» re-presses the SAME token. */
+function confirmFailureText(error: unknown, t: (key: keyof Dict) => string): string {
+  if (error instanceof ApiError && error.code === "expired") return t("assistantErrActionExpired");
+  if (error instanceof ApiError && error.code === "already_used") return t("assistantErrActionUsed");
+  return failureText(error, t);
+}
+
 /** H40 - the ready-made questions the empty state offers; one fills the composer. */
 const SUGGESTION_KEYS = [
   "assistantSuggestionBalance",
@@ -89,6 +98,8 @@ export default function AssistantPanel({ config, open, onClose }: AssistantPanel
   const cancelledRef = useRef(false);
   /** The text whose send failed, so «إعادة المحاولة» resends exactly it. */
   const failedTextRef = useRef<string | null>(null);
+  /** H41 - the token whose confirm failed, so retry re-presses it (not the chat). */
+  const failedConfirmRef = useRef<string | null>(null);
 
   // The panel is a dialog while open: Escape closes, focus starts at the composer.
   useEffect(() => {
@@ -195,6 +206,12 @@ export default function AssistantPanel({ config, open, onClose }: AssistantPanel
   };
 
   const retryFailed = () => {
+    // H41 - a failed confirm retries the confirm itself, not the chat send.
+    if (failedConfirmRef.current) {
+      const token = failedConfirmRef.current;
+      void confirm(token);
+      return;
+    }
     const text = failedTextRef.current;
     if (!text || thinking) return;
     void runChat(text, "retry");
@@ -206,16 +223,25 @@ export default function AssistantPanel({ config, open, onClose }: AssistantPanel
     setErrorLine(null);
     try {
       const result = await confirmAssistantAction(token);
-      // The action ran: the card gives way to what the system said back.
+      failedConfirmRef.current = null;
+      // H41 - the confirm body's `result` is an OBJECT (verified against
+      // accounts/assistant_chat.py). describeConfirmResult renders it as the
+      // promised formal receipt - headline + رقم + status - never
+      // "[object Object]"; an unrecognized shape falls back to the honest
+      // generic line from dict.
       setEntries((current) =>
         current.map((entry) => {
           if (entry.pending?.token !== token) return entry;
           const { pending: _pending, ...rest } = entry;
-          return { ...rest, content: `${rest.content}\n${result.result || t("assistantActionDone")}` };
+          return {
+            ...rest,
+            content: `${rest.content}\n${describeConfirmResult(result.tool, result.result, t)}`,
+          };
         }),
       );
     } catch (failure) {
-      setErrorLine(failureText(failure, t));
+      failedConfirmRef.current = token;
+      setErrorLine(confirmFailureText(failure, t));
     } finally {
       setConfirming(false);
     }
@@ -322,8 +348,8 @@ export default function AssistantPanel({ config, open, onClose }: AssistantPanel
                         <dl className="assistant-action-args">
                           {Object.entries(entry.pending.args).map(([key, value]) => (
                             <div key={key} className="assistant-action-arg">
-                              <dt><bdi dir="ltr">{key}</bdi></dt>
-                              <dd><bdi>{String(value)}</bdi></dd>
+                              <dt>{formatArgKey(key, t)}</dt>
+                              <dd><bdi>{formatServerValue(value, t)}</bdi></dd>
                             </div>
                           ))}
                         </dl>

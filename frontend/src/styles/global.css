@@ -1094,7 +1094,10 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
    (margin-block-start:auto collapses to 0 once the content overflows, so the
    scroll range stays fully reachable.) */
 .assistant-transcript-list { display: grid; gap: var(--sp-3); align-content: start; margin-block-start: auto; }
-.assistant-message { max-inline-size: 88%; }
+/* H41 - grid-item minimums: without min-inline-size: 0 the message box can
+   be pushed wider than the panel by its content, clipping Arabic line ends
+   and spawning a horizontal scrollbar. */
+.assistant-message { max-inline-size: 88%; min-inline-size: 0; }
 .assistant-message-user { justify-self: var(--justify-end, end); padding: var(--sp-3) var(--sp-4); border: var(--timeline-width) solid var(--accent-border, var(--card-border)); border-radius: var(--radius-surface); background: var(--accent-soft, var(--surface)); }
 .assistant-message-assistant { justify-self: start; max-inline-size: min(88%, 65ch); /* ds-allow-hardcode: the brief's ~65ch reading measure for long replies */ padding: var(--sp-3) var(--sp-4); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--elevation-1); }
 .assistant-message-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -1103,6 +1106,11 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .assistant-md-para:last-child, .assistant-md-list:last-child { margin-block-end: 0; }
 .assistant-md-list { margin: 0 0 var(--sp-2); padding-inline-start: var(--sp-5); }
 .assistant-md-list li { margin-block: var(--sp-1); }
+/* H41 - replies may arrive as a markdown pipe table: one real <table>, the
+   width inherited from the bubble, no raw "|" rows ever painted. */
+.assistant-md-table { display: table; margin: 0 0 var(--sp-2); max-inline-size: 100%; border-collapse: collapse; font-size: var(--font-size-sm); }
+.assistant-md-table th, .assistant-md-table td { border: var(--timeline-width) solid var(--card-border); padding: var(--sp-1) var(--sp-2); text-align: start; overflow-wrap: anywhere; }
+.assistant-md-table th { background: var(--surface-subtle); }
 .assistant-inline-code { font-family: var(--font-mono, monospace); font-size: var(--font-size-xs, 0.85em); padding-inline: 0.3em; border-radius: var(--radius-surface, 4px); background: var(--surface-inset); border: var(--timeline-width) solid var(--card-border); }
 .assistant-typing { color: var(--text-muted); font-style: italic; }
 /* H40 - the ONE waiting state lives here: dots + text in the bubble, and a
@@ -1133,13 +1141,16 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 /* H40 - a failed send is an honest card (same danger card as the settings), with retry. */
 .assistant-error-card { display: grid; gap: var(--sp-2); justify-items: start; }
 .assistant-error-card p { margin: 0; font-size: var(--font-size-sm); }
-/* The confirmation card: nothing runs until تأكيد. */
-.assistant-action-card { display: grid; gap: var(--sp-2); justify-items: start; margin-block-start: var(--sp-2); padding: var(--sp-3); border: var(--timeline-width) solid var(--warning-border); border-radius: var(--radius-surface); background: var(--warning-soft); }
-.assistant-action-name { font-family: var(--font-mono, monospace); font-size: var(--font-size-xs); }
-.assistant-action-args { display: grid; gap: var(--sp-1); margin: 0; }
-.assistant-action-arg { display: flex; gap: var(--sp-2); }
+/* The confirmation card: nothing runs until تأكيد. H41 - the card TAKES its
+   width from its parent: max-inline-size: 100% + min-inline-size: 0 (the
+   classic flex/grid overflow pair) and overflow-wrap: anywhere break long
+   tokens so Arabic lines stay whole and no horizontal scrollbar appears. */
+.assistant-action-card { display: grid; gap: var(--sp-2); justify-items: start; margin-block-start: var(--sp-2); max-inline-size: 100%; min-inline-size: 0; overflow-wrap: anywhere; padding: var(--sp-3); border: var(--timeline-width) solid var(--warning-border); border-radius: var(--radius-surface); background: var(--warning-soft); }
+.assistant-action-name { font-family: var(--font-mono, monospace); font-size: var(--font-size-xs); overflow-wrap: anywhere; }
+.assistant-action-args { display: grid; gap: var(--sp-1); margin: 0; min-inline-size: 0; }
+.assistant-action-arg { display: flex; gap: var(--sp-2); min-inline-size: 0; }
 .assistant-action-arg dt { color: var(--text-muted); min-inline-size: 40%; }
-.assistant-action-arg dd { margin: 0; }
+.assistant-action-arg dd { margin: 0; min-inline-size: 0; overflow-wrap: anywhere; }
 .assistant-composer { display: flex; align-items: flex-end; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-block-start: var(--timeline-width) solid var(--card-border); }
 .assistant-composer-input { flex: 1; resize: none; min-block-size: var(--control-min-h); }
 /* H40 - the Enter/Shift+Enter contract lives under the field, in the UI language. */

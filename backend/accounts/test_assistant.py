@@ -663,6 +663,12 @@ def test_write_tool_pends_and_does_not_change_data_until_confirm(client_csrf):
     body = confirmed.json()["data"]
     assert body["tool"] == "create_request"
     assert body["result"]["ok"] is True
+    # H41 - the CONTRACT the chat panel now formats: `result` is an object
+    # carrying the id and the status as strings (the frontend renders these
+    # as the formal confirmation receipt). It must never become a "[object
+    # Object]" bubble there, so the fields it reads are pinned here.
+    assert isinstance(body["result"]["request_id"], str) and body["result"]["request_id"]
+    assert body["result"]["status"] == EmployeeRequest.Status.DRAFT
     assert EmployeeRequest.objects.filter(requester=user, title="طلب عطلة").count() == 1
     request_row = EmployeeRequest.objects.get(requester=user)
     assert request_row.status == EmployeeRequest.Status.DRAFT

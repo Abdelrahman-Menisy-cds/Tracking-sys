@@ -187,8 +187,19 @@ export async function sendAssistantChat(
   return payload.data;
 }
 
-export async function confirmAssistantAction(token: string, locale?: string): Promise<{ result: string }> {
-  const payload = await apiRequest<{ data: { result: string } }>(`/assistant/actions/${encodeURIComponent(token)}/confirm`, {
+/**
+ * H41 - the confirm response's REAL shape (verified against
+ * accounts/assistant_chat.py `confirm_action` + assistant_tools.py):
+ * {"tool": "create_request" | ..., "result": {"ok": true, "request_id" |
+ * "timesheet_id": "<uuid>", "status": <str>, "submit_result"?}}.
+ * `result` is an OBJECT, never a string - the old `string` annotation is what
+ * let "[object Object]" reach the screen.
+ */
+export async function confirmAssistantAction(
+  token: string,
+  locale?: string,
+): Promise<{ result: unknown; tool: string }> {
+  const payload = await apiRequest<{ data: { result: unknown; tool: string } }>(`/assistant/actions/${encodeURIComponent(token)}/confirm`, {
     method: "POST",
     body: {},
     acceptLanguage: locale,
