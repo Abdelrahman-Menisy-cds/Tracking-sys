@@ -1088,10 +1088,15 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .assistant-face { inline-size: var(--control-sm-h); block-size: var(--control-sm-h); object-fit: cover; border-radius: var(--radius-pill); }
 .assistant-header-text { display: grid; min-inline-size: 0; flex: 1; }
 .assistant-provider-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.assistant-transcript { flex: 1; display: grid; gap: var(--sp-3); align-content: start; padding: var(--sp-4); overflow-y: auto; background: var(--surface-inset); }
+.assistant-transcript { flex: 1; min-block-size: 0; display: flex; flex-direction: column; padding: var(--sp-4); overflow-y: auto; background: var(--surface-inset); }
+/* H40 - the transcript pins to the TAIL: the list hugs the last message, so
+   spare space sits ABOVE the conversation, never between it and the composer.
+   (margin-block-start:auto collapses to 0 once the content overflows, so the
+   scroll range stays fully reachable.) */
+.assistant-transcript-list { display: grid; gap: var(--sp-3); align-content: start; margin-block-start: auto; }
 .assistant-message { max-inline-size: 88%; }
 .assistant-message-user { justify-self: var(--justify-end, end); padding: var(--sp-3) var(--sp-4); border: var(--timeline-width) solid var(--accent-border, var(--card-border)); border-radius: var(--radius-surface); background: var(--accent-soft, var(--surface)); }
-.assistant-message-assistant { justify-self: start; padding: var(--sp-3) var(--sp-4); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--elevation-1); }
+.assistant-message-assistant { justify-self: start; max-inline-size: min(88%, 65ch); /* ds-allow-hardcode: the brief's ~65ch reading measure for long replies */ padding: var(--sp-3) var(--sp-4); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-surface); background: var(--surface); box-shadow: var(--elevation-1); }
 .assistant-message-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* H20 - the markdown renderer's elements: lists sit tight inside the bubble. */
 .assistant-md-para { margin: 0 0 var(--sp-2); }
@@ -1100,8 +1105,34 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .assistant-md-list li { margin-block: var(--sp-1); }
 .assistant-inline-code { font-family: var(--font-mono, monospace); font-size: var(--font-size-xs, 0.85em); padding-inline: 0.3em; border-radius: var(--radius-surface, 4px); background: var(--surface-inset); border: var(--timeline-width) solid var(--card-border); }
 .assistant-typing { color: var(--text-muted); font-style: italic; }
-.assistant-empty { text-align: center; margin-block: var(--sp-6); }
+/* H40 - the ONE waiting state lives here: dots + text in the bubble, and a
+   real إلغاء button beside it. The send button never repeats this state. */
+.assistant-typing-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
+.assistant-typing-row { display: flex; align-items: center; gap: var(--sp-2); color: var(--text-muted); }
+.assistant-typing-dots { display: inline-flex; align-items: center; gap: var(--sp-1); }
+.assistant-typing-dots i { inline-size: calc(var(--dot-size) / 2); block-size: calc(var(--dot-size) / 2); border-radius: var(--radius-pill); background: currentColor; animation: assistant-dot var(--motion-mid) ease-in-out infinite alternate; }
+.assistant-typing-dots i:nth-child(2) { animation-delay: 120ms; } /* ds-allow-hardcode: typing-dot stagger */
+.assistant-typing-dots i:nth-child(3) { animation-delay: 240ms; } /* ds-allow-hardcode: typing-dot stagger */
+@keyframes assistant-dot { from { opacity: 0.35; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .assistant-typing-dots i { animation: none; } }
+/* H40 - the empty chat fills itself: a guide line plus ready-made questions
+   that land in the composer, instead of dead white below a lone sentence. */
+.assistant-empty-state { margin: auto; display: grid; gap: var(--sp-3); justify-items: center; text-align: center; max-inline-size: 100%; padding-block: var(--sp-8); }
+.assistant-empty { margin: 0; }
+.assistant-suggestions-title { margin: 0; color: var(--text-subtle); font-size: var(--font-size-xs); font-weight: 700; }
+.assistant-suggestions { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: center; }
+.assistant-suggestion { display: inline-flex; align-items: center; padding: var(--sp-2) var(--sp-3); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-pill); background: var(--surface); color: var(--text); font-family: inherit; font-size: var(--font-size-sm); text-align: start; cursor: pointer; transition: background-color var(--motion-rest) ease, border-color var(--motion-rest) ease; }
+.assistant-suggestion:hover { background: var(--surface-subtle); border-color: var(--border-control); }
+/* H40 - per-reply affordances: copy always visible, the time only on hover/focus. */
+.assistant-message-meta { display: flex; align-items: center; justify-content: flex-end; gap: var(--sp-2); margin-block-start: var(--sp-1); }
+.assistant-message-time { color: var(--text-subtle); font-size: var(--font-size-xs); opacity: 0; transition: opacity var(--motion-fast) ease; }
+.assistant-message:hover .assistant-message-time, .assistant-message:focus-within .assistant-message-time { opacity: 1; }
+.assistant-copy { display: inline-flex; align-items: center; padding: var(--sp-1) var(--sp-2); border: var(--timeline-width) solid transparent; border-radius: var(--radius-xs); background: none; color: var(--text-muted); font-family: inherit; font-size: var(--font-size-xs); cursor: pointer; }
+.assistant-copy:hover { color: var(--text); background: var(--surface-subtle); }
 .assistant-error { margin: 0; padding: var(--sp-2) var(--sp-3); border: var(--timeline-width) solid var(--danger-border); border-radius: var(--radius-surface); background: var(--danger-soft); color: var(--danger-strong); font-size: var(--font-size-xs); }
+/* H40 - a failed send is an honest card (same danger card as the settings), with retry. */
+.assistant-error-card { display: grid; gap: var(--sp-2); justify-items: start; }
+.assistant-error-card p { margin: 0; font-size: var(--font-size-sm); }
 /* The confirmation card: nothing runs until تأكيد. */
 .assistant-action-card { display: grid; gap: var(--sp-2); justify-items: start; margin-block-start: var(--sp-2); padding: var(--sp-3); border: var(--timeline-width) solid var(--warning-border); border-radius: var(--radius-surface); background: var(--warning-soft); }
 .assistant-action-name { font-family: var(--font-mono, monospace); font-size: var(--font-size-xs); }
@@ -1109,8 +1140,10 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .assistant-action-arg { display: flex; gap: var(--sp-2); }
 .assistant-action-arg dt { color: var(--text-muted); min-inline-size: 40%; }
 .assistant-action-arg dd { margin: 0; }
-.assistant-composer { display: flex; align-items: flex-end; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-block-start: var(--timeline-width) solid var(--card-border); }
+.assistant-composer { display: flex; align-items: flex-end; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-block-start: var(--timeline-width) solid var(--card-border); }
 .assistant-composer-input { flex: 1; resize: none; min-block-size: var(--control-min-h); }
+/* H40 - the Enter/Shift+Enter contract lives under the field, in the UI language. */
+.assistant-composer-hint { margin: 0; padding-block-end: var(--sp-3); text-align: center; }
 
 /* Employee-facing settings widget + HR per-employee widget share these. */
 .assistant-active-toggle { display: flex; align-items: center; gap: var(--sp-2); }

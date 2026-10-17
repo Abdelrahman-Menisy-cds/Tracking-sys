@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp } from "../../app/AppContext";
 import {
@@ -25,6 +25,7 @@ export default function AssistantLauncher() {
   const { t, locale } = useApp();
   const [config, setConfig] = useState<AssistantConfig | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const launcherRef = useRef<HTMLButtonElement>(null);
 
   const reload = useCallback(() => {
     getAssistantConfig(locale)
@@ -50,11 +51,18 @@ export default function AssistantLauncher() {
     setPanelOpen(true);
   };
 
+  /** H40 - closing (button, Esc, or outside click) returns focus to the launcher. */
+  const closePanel = useCallback(() => {
+    setPanelOpen(false);
+    window.setTimeout(() => launcherRef.current?.focus(), 0);
+  }, []);
+
   return (
     <>
       <div className="assistant-launcher-wrap">
         <button
           type="button"
+          ref={launcherRef}
           className={`assistant-launcher${enabled ? "" : " assistant-launcher-muted"}`}
           aria-disabled={enabled ? undefined : "true"}
           aria-expanded={panelOpen}
@@ -73,7 +81,7 @@ export default function AssistantLauncher() {
           </div>
         ) : null}
       </div>
-      {panelOpen && config ? <AssistantPanel config={config} open={panelOpen} onClose={() => setPanelOpen(false)} /> : null}
+      {panelOpen && config ? <AssistantPanel config={config} open={panelOpen} onClose={closePanel} /> : null}
     </>
   );
 }

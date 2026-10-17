@@ -999,6 +999,16 @@ export const dict = {
     assistantEmptyChat: "اسأل مدام عفاف عن أي حاجة في شغلك - هتقرأ من السيستم وتسألك قبل أي تغيير.",
     assistantTyping: "مدام عفاف بتفكر…",
     assistantComposerPlaceholder: "اكتب سؤالك…",
+    // H40 - the composer hint and the empty-state suggestions (the empty chat
+    // fills itself with useful starts instead of dead space).
+    assistantComposerHint: "Enter يرسل - Shift+Enter سطر جديد",
+    assistantSuggestionsTitle: "جرّب تسأل:",
+    assistantSuggestionBalance: "إيه رصيد إجازاتي؟",
+    assistantSuggestionRequests: "إيه آخر تحديث على طلباتي؟",
+    assistantSuggestionSchedule: "إيه جدول شغلي الأسبوع ده؟",
+    assistantSuggestionLeave: "ساعدني أقدّم طلب إجازة.",
+    assistantCopy: "انسخ",
+    assistantCopied: "تم النسخ",
     assistantActionCard: "الإجراء المطلوب تأكيده",
     assistantActionAsk: "حاجة هتتغيّر في السيستم - من غير تأكيدك مفيش حاجة بتحصل.",
     assistantActionDone: "تم تنفيذ الإجراء.",
@@ -2086,6 +2096,16 @@ export const dict = {
     assistantEmptyChat: "Ask مدام عفاف about anything in your work - she reads from the system and asks you before any change.",
     assistantTyping: "مدام عفاف is thinking…",
     assistantComposerPlaceholder: "Type your question…",
+    // H40 - the composer hint and the empty-state suggestions (the empty chat
+    // fills itself with useful starts instead of dead space).
+    assistantComposerHint: "Enter sends - Shift+Enter adds a line",
+    assistantSuggestionsTitle: "Try asking:",
+    assistantSuggestionBalance: "What is my leave balance?",
+    assistantSuggestionRequests: "What is the latest on my requests?",
+    assistantSuggestionSchedule: "What is my work schedule this week?",
+    assistantSuggestionLeave: "Help me file a leave request.",
+    assistantCopy: "Copy",
+    assistantCopied: "Copied",
     assistantActionCard: "Action awaiting your confirmation",
     assistantActionAsk: "Something will change in the system - nothing happens without your confirmation.",
     assistantActionDone: "The action was carried out.",

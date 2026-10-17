@@ -84,6 +84,11 @@ type RequestOptions = {
    * this only forwards what the caller already decided to send.
    */
   headers?: Record<string, string>;
+  /**
+   * H40 - the caller's own abort (a cancelled assistant send). It is chained
+   * onto the timeout controller, so the timeout semantics stay untouched.
+   */
+  signal?: AbortSignal;
 };
 
 /**
@@ -182,7 +187,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   // A cold refresh drives Nager AND two reasoning-LLM calls, measured at ~348s
   // end to end. A short timeout aborts a call that was going to succeed and
   // reports it as unreachable, which is a lie about what happened.
-  const { method = "GET", body, timeoutMs = 600000, acceptLanguage } = options;
+  const { method = "GET", body, timeoutMs = 600000, acceptLanguage, signal } = options;
   const headers: Record<string, string> = { Accept: "application/json", ...options.headers };
   if (acceptLanguage) headers["Accept-Language"] = acceptLanguage;
 
@@ -197,6 +202,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  // A caller abort (cancel) chains onto the same controller, so one signal
+  // drives the fetch no matter who pulled the plug.
+  const abortFromCaller = () => controller.abort();
+  signal?.addEventListener("abort", abortFromCaller);
 
   let response: Response;
   try {
@@ -208,7 +217,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       signal: controller.signal,
     });
   } catch (error) {
-    // A timeout or a refused connection. There is no server answer to report.
+    // A timeout, a caller cancel, or a refused connection. There is no server
+    // answer to report.
     throw new ApiError(
       "unreachable",
       0,
@@ -218,6 +228,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     );
   } finally {
     window.clearTimeout(timer);
+    signal?.removeEventListener("abort", abortFromCaller);
   }
 
   if (response.ok) {

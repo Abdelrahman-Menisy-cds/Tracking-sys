@@ -175,11 +175,14 @@ export async function saveEmployeeAssistant(
 export async function sendAssistantChat(
   messages: AssistantMessage[],
   locale?: string,
+  /** H40 - the panel's cancel button aborts the in-flight send through this. */
+  signal?: AbortSignal,
 ): Promise<AssistantChatReply> {
   const payload = await apiRequest<{ data: AssistantChatReply }>("/assistant/chat", {
     method: "POST",
     body: { messages },
     acceptLanguage: locale,
+    signal,
   });
   return payload.data;
 }
