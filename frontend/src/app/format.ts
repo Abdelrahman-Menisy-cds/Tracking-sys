@@ -152,7 +152,8 @@ export function formatDateRange(fromIso: string, toIso: string | null, locale: "
 }
 
 export function weekInterval(weekStart: string, locale: "ar" | "en"): string {
-  const start = new Date(`${weekStart}T12:00:00Z`);
+  const start = asDate(`${weekStart}T12:00:00Z`);
+  if (!start) return isolated("—");
   const end = new Date(start);
   end.setUTCDate(end.getUTCDate() + 6);
   const formatter = new Intl.DateTimeFormat(localeTag(locale), {
