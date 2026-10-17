@@ -20,12 +20,16 @@ import {
   LogoutIcon,
   MoonIcon,
   ReportIcon,
+  SidebarIcon,
   SunIcon,
   UserIcon,
 } from "../components/icons";
 import { ClockAction } from "../screens/AttendancePage";
 
 const FOCUSABLE = 'a[href], button:not([disabled]), select:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** H45: the desktop rail remembers whether it was collapsed (per browser). */
+const RAIL_COLLAPSED_STORAGE_KEY = "tracking-sys.rail-collapsed";
 
 /** The one route the company gate does not divert: the onboarding step itself. */
 export const COMPANY_ONBOARDING_PATH = "/onboarding/company";
@@ -64,8 +68,12 @@ export default function AppShell() {
     serverAccount,
   } = useApp();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [railCollapsed, setRailCollapsed] = useState(() => {
+    try { return window.localStorage.getItem(RAIL_COLLAPSED_STORAGE_KEY) === "true"; }
+    catch { return false; /* private mode / storage disabled: the rail just stays as-is */ }
+  });
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
-  const [isCompact, setIsCompact] = useState(() => window.matchMedia("(max-width: 1023px)") /* ds-allow-hardcode: the compact-mode breakpoint */.matches);
+  const [isCompact, setIsCompact] = useState(() => window.matchMedia("(max-width: 767px)") /* ds-allow-hardcode: the mobile-overlay breakpoint - below this the sidebar is an overlay drawer, per H45 */.matches);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const profileButtonRef = useRef<HTMLButtonElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -79,6 +87,53 @@ export default function AppShell() {
     setDrawerOpen(false);
     window.setTimeout(() => menuButtonRef.current?.focus(), 0);
   }, []);
+
+  /** H45: persist the desktop rail preference (never auth-related, UI state only). */
+  const setRailCollapsedPersisted = useCallback((collapse: boolean) => {
+    setRailCollapsed(collapse);
+    try { window.localStorage.setItem(RAIL_COLLAPSED_STORAGE_KEY, String(collapse)); }
+    catch { /* storage unavailable: the toggle still works this session */ }
+  }, []);
+
+  const toggleSidebar = useCallback(() => {
+    if (isCompact) {
+      if (drawerOpen) closeDrawer();
+      else {
+        setDrawerOpen(true); /* the compact-focus effect moves focus into the drawer */
+      }
+      return;
+    }
+    if (railCollapsed) {
+      setRailCollapsedPersisted(false);
+      window.setTimeout(() => railRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus(), 0);
+    } else {
+      setRailCollapsedPersisted(true);
+      window.setTimeout(() => menuButtonRef.current?.focus(), 0);
+    }
+  }, [closeDrawer, drawerOpen, isCompact, railCollapsed, setRailCollapsedPersisted]);
+
+  /** H45: `[` toggles the sidebar (GitHub-style); Esc collapses it from inside. */
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.altKey || event.metaKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) return;
+      if (event.key === "[") {
+        event.preventDefault();
+        toggleSidebar();
+        return;
+      }
+      /* Inline rail: Esc only means "leave the sidebar" when focus is in it -
+         the profile menu's and dialogs' own Esc handlers stay untouched. */
+      if (event.key === "Escape" && !isCompact && !railCollapsed && railRef.current?.contains(document.activeElement) && document.activeElement !== railRef.current) {
+        event.preventDefault();
+        setRailCollapsedPersisted(true);
+        window.setTimeout(() => menuButtonRef.current?.focus(), 0);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isCompact, railCollapsed, toggleSidebar, setRailCollapsedPersisted]);
 
   const closeProfileMenu = useCallback((restoreFocus = true) => {
     setProfileMenuOpen(false);
@@ -116,7 +171,7 @@ export default function AppShell() {
   }, [closeProfileMenu, profileMenuOpen]);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(max-width: 1023px)") /* ds-allow-hardcode: the compact-mode breakpoint */;
+    const mediaQuery = window.matchMedia("(max-width: 767px)") /* ds-allow-hardcode: the mobile-overlay breakpoint, same as the state initializer above */;
     const updateCompactMode = () => {
       const nextCompact = mediaQuery.matches;
       setIsCompact(nextCompact);
@@ -219,6 +274,7 @@ export default function AppShell() {
     .filter((item) => item.to === location.pathname || (item.to !== "/" && location.pathname.startsWith(item.to)))
     .sort((left, right) => right.to.length - left.to.length)[0];
   const currentItem = matchedCurrentItem ?? { to: "", label: t("navHome"), icon: HomeIcon };
+  const sidebarOpen = isCompact ? drawerOpen : !railCollapsed;
   const targetLocale: Locale = locale === "en" ? "ar" : "en";
   const targetTheme: Exclude<Appearance, "system"> = resolvedTheme === "light" ? "dark" : "light";
   // The icon names the theme you would get, not the one you are in - the same
@@ -259,7 +315,7 @@ export default function AppShell() {
           stops being the last tab stop. */}
       <TourGuide />
 
-      <div className="app-shell">
+      <div className={`app-shell${!isCompact && railCollapsed ? " rail-collapsed" : ""}`}>
         <nav
           ref={railRef}
           id="app-rail-nav"
@@ -267,7 +323,7 @@ export default function AppShell() {
           aria-label={t("menu")}
           aria-modal={isCompact && drawerOpen ? true : undefined}
           role={isCompact && drawerOpen ? "dialog" : undefined}
-          inert={isCompact && !drawerOpen ? true : undefined}
+          inert={((isCompact && !drawerOpen) || (!isCompact && railCollapsed)) ? true : undefined}
         >
           <BrandLockup />
           {navGroups.map((group) => (
@@ -301,11 +357,12 @@ export default function AppShell() {
               ref={menuButtonRef}
               type="button"
               className="btn btn-secondary menu-toggle"
-              aria-expanded={drawerOpen}
+              aria-expanded={sidebarOpen}
               aria-controls="app-rail-nav"
-              onClick={() => setDrawerOpen((open) => !open)}
+              aria-label={sidebarOpen ? t("menuClose") : t("menuOpen")}
+              onClick={toggleSidebar}
             >
-              <ChevronDownIcon />
+              <SidebarIcon />
               {t("menu")}
             </button>
             <div className="header-page-context">

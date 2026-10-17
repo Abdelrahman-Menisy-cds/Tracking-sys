@@ -842,8 +842,18 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .login-demo-note { margin-block-start: var(--sp-6); margin-block-end: var(--space-0); padding-block-start: var(--sp-4); border-block-start: var(--timeline-width) solid var(--border-subtle); }
 @media (forced-colors: active) { :focus-visible { outline: var(--space-1) solid CanvasText; } .btn, .pill, .nav-link, .work-surface, .table-wrap { border: var(--timeline-width) solid ButtonText; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; scroll-behavior: auto !important; } .skeleton { animation: none; } }
-@media (max-width: 1023px) { .app-rail { position: fixed; inset-block: 0; inset-inline-start: 0; transform: translateX(-100%); z-index: 40; overflow-y: auto; clip-path: inset(0 100% 0 0); visibility: hidden; /* ds-allow-hardcode: closed drawer stays out of paint, hit-testing and geometry, not just off-screen */ transition: transform var(--motion-mid) ease, visibility 0s linear var(--motion-mid); } html[dir="rtl"] .app-rail { transform: translateX(100%); clip-path: inset(0 0 0 100%); } .app-rail.open { transform: translateX(0); clip-path: none; visibility: visible; transition: transform var(--motion-mid) ease, visibility 0s; } .menu-toggle { display: inline-flex !important; } .app-main { padding-inline: var(--sp-6); padding-block-end: var(--launcher-clearance); } .dashboard-grid { grid-template-columns: 1fr; } .drawer-backdrop { position: fixed; inset: 0; z-index: 30; border: var(--radius-none); background: var(--overlay-scrim); } }
-@media (min-width: 1024px) { .menu-toggle { display: none !important; } }
+@media (max-width: 767px) { .app-rail { position: fixed; inset-block: 0; inset-inline-start: 0; transform: translateX(-100%); z-index: 40; overflow-y: auto; clip-path: inset(0 100% 0 0); visibility: hidden; /* ds-allow-hardcode: closed drawer stays out of paint, hit-testing and geometry, not just off-screen */ transition: transform var(--motion-mid) ease, visibility 0s linear var(--motion-mid); } html[dir="rtl"] .app-rail { transform: translateX(100%); clip-path: inset(0 0 0 100%); } .app-rail.open { transform: translateX(0); clip-path: none; visibility: visible; transition: transform var(--motion-mid) ease, visibility 0s; } .drawer-backdrop { position: fixed; inset: 0; z-index: 30; border: var(--radius-none); background: var(--overlay-scrim); } }
+@media (max-width: 1023px) { .app-main { padding-inline: var(--sp-6); padding-block-end: var(--launcher-clearance); } .dashboard-grid { grid-template-columns: 1fr; } }
+/* H45: at 768px and up the sidebar sits INLINE beside the content and the
+   header toggle collapses it. The width (and padding + border, border-box)
+   animate to 0 so the content column reflows smoothly with no dead gap and no
+   resize-jank; overflow-x stays clipped so the animation never provokes a
+   horizontal scrollbar. In the collapsed state visibility flips only AFTER
+   the width transition, so the slide reads as one motion. */
+@media (min-width: 768px) {
+  .app-rail { min-width: 0; overflow-x: hidden; overflow-y: auto; transition: width var(--motion-mid) ease, padding var(--motion-mid) ease, border-width var(--motion-mid) ease, visibility 0s linear 0s; }
+  .app-shell.rail-collapsed .app-rail { width: 0; flex-basis: 0; padding-inline: 0; border-inline-end-width: 0; overflow: hidden; visibility: hidden; transition: width var(--motion-mid) ease, padding var(--motion-mid) ease, border-width var(--motion-mid) ease, visibility 0s linear var(--motion-mid); }
+}
 @media (max-width: 639px) {
   h1 { font-size: var(--font-size-2xl); }
   .app-main { padding: var(--sp-4) var(--sp-4) var(--launcher-clearance); }

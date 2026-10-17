@@ -6,7 +6,7 @@ type IconName =
   | "activity" | "alertTriangle" | "arrowLeft" | "bell" | "calendar" | "check"
   | "chevronDown" | "chevronLeft" | "chevronRight" | "clock" | "close" | "document"
   | "edit" | "filter" | "globe" | "home" | "info" | "logout" | "moon" | "palette" | "play"
-  | "plus" | "report" | "search" | "sun" | "trash" | "user";
+  | "plus" | "report" | "search" | "sidebar" | "sun" | "trash" | "user";
 
 const paths: Record<IconName, ReturnType<typeof Fragment>> = {
   activity: <path d="M3 12h3l2.2-5 3.6 10 2.2-5h3" />,
@@ -32,6 +32,7 @@ const paths: Record<IconName, ReturnType<typeof Fragment>> = {
   play: <path d="M7 5.5v9l7-4.5-7-4.5Z" />,
   plus: <path d="M10 4v12M4 10h12" />,
   report: <><path d="M4 17v-6" /><path d="M10 17V4" /><path d="M16 17v-9" /></>,
+  sidebar: <><path d="M3 5.5A1.5 1.5 0 0 1 4.5 4h11A1.5 1.5 0 0 1 17 5.5v9a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5v-9Z" /><path d="M7.5 4v12" /></>,
   search: <><circle cx="9" cy="9" r="5" /><path d="m13 13 4 4" /></>,
   sun: <><circle cx="10" cy="10" r="3.2" /><path d="M10 2.5v1.3M10 16.2v1.3M17.5 10h-1.3M3.8 10H2.5M15.3 4.7l-.9.9M5.6 14.4l-.9.9M15.3 15.3l-.9-.9M5.6 5.6l-.9-.9" /></>,
   trash: <><path d="M4 6h12M8 3h4l1 3H7l1-3ZM6 6l.7 10h6.6L14 6M8.5 9v4M11.5 9v4" /></>,
@@ -65,6 +66,7 @@ export function PaletteIcon(props: IconProps) { return <SvgIcon name="palette" {
 export function PlayIcon(props: IconProps) { return <SvgIcon name="play" {...props} />; }
 export function PlusIcon(props: IconProps) { return <SvgIcon name="plus" {...props} />; }
 export function ReportIcon(props: IconProps) { return <SvgIcon name="report" {...props} />; }
+export function SidebarIcon(props: IconProps) { return <SvgIcon name="sidebar" {...props} />; }
 export function SearchIcon(props: IconProps) { return <SvgIcon name="search" {...props} />; }
 export function SunIcon(props: IconProps) { return <SvgIcon name="sun" {...props} />; }
 export function TrashIcon(props: IconProps) { return <SvgIcon name="trash" {...props} />; }
