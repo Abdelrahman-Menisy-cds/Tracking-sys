@@ -309,9 +309,11 @@ button { cursor: pointer; }
 .section { margin-block-start: var(--sp-8); }
 .dashboard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-6); align-items: start; }
 .dashboard-grid > * { min-inline-size: 0; }
-/* Settings page: cards share one baseline - equal heights, with each card's
-   last block pushed to its bottom edge so the space reads as deliberate. */
-.settings-grid { align-items: stretch; }
+/* Settings page: each card sizes to its own content. */
+/* Cards size to their own content. stretch + the auto footer margin made every
+   card as tall as its tallest sibling, so opening the 11-item holiday list grew
+   the work-schedule card into a large empty box beside it. */
+.settings-grid { align-items: start; }
 .settings-grid > .work-surface { display: flex; flex-direction: column; }
 .settings-grid > .work-surface > :last-child { margin-block-start: auto; }
 /* Ten-column leave table: give it the width it needs and keep every cell on one
