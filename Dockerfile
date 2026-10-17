@@ -26,10 +26,12 @@ RUN npm ci --no-audit --no-fund
 
 COPY frontend/ ./
 
-# The demo build is the code path Django serves everywhere (config/spa.py):
-# real production bundle (hashed assets); the demo picker is a sign-in screen
-# affordance the owner chose, not a dev leftover.
-RUN npm run build:demo
+# The real build. This was `build:demo`, which sets DEMO_MODE: RequireSession
+# then skips the session gate entirely (main.tsx), so the deployment served the
+# app shell to anonymous visitors, never redirected to /login, and - with the
+# mock layer gone - every screen read "تعذر الاتصال بالخادم". A deployed service
+# signs users in.
+RUN npm run build
 
 # --- Stage 2: the serving image ---------------------------------------------
 FROM python:3.11-slim AS runtime
