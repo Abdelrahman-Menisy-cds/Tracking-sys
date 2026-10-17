@@ -310,6 +310,16 @@ button { cursor: pointer; }
   .attention-strip > div { min-width: 0; }
 }
 .btn-compact { min-height: var(--control-sm-h); padding-inline: var(--sp-3); }
+/* A modern scrollbar: slim, rounded, and quiet until you reach for it. The
+   default one is a hairline with almost no contrast against the surface, so it
+   reads as a rendering artefact rather than a control. The transparent border
+   with background-clip insets the thumb instead of filling the whole track. */
+* { scrollbar-width: thin; scrollbar-color: var(--border-control) transparent; }
+::-webkit-scrollbar { inline-size: 10px; block-size: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-control); border-radius: var(--radius-pill); border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); background-clip: content-box; }
+
 .section { margin-block-start: var(--sp-8); }
 .dashboard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-6); align-items: start; }
 .dashboard-grid > * { min-inline-size: 0; }

@@ -383,11 +383,12 @@ export default function AppShell() {
               title={sidebarOpen ? t("menuClose") : t("menuOpen")}
               onClick={toggleSidebar}
             >
-              {/* A chevron pointing where the rail goes: it opens toward the
-                  rail and closes away from it. RtlChevronIcon resolves that per
+              {/* The chevron points the way the rail will move: collapsed it
+                  points away from the edge (pull it out), open it points back
+                  toward the edge (push it in). RtlChevronIcon resolves that per
                   locale, so the Arabic rail (on the right) and the English one
                   (on the left) both point the right way. */}
-              <RtlChevronIcon locale={locale} direction={sidebarOpen ? "forward" : "back"} />
+              <RtlChevronIcon locale={locale} direction={sidebarOpen ? "back" : "forward"} />
             </button>
             <div className="header-page-context">
               <strong className="header-page-indicator">{currentItem.label}</strong>
