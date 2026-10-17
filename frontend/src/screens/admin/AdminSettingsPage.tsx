@@ -183,7 +183,16 @@ function ScheduleCard({ t, locale }: { t: (key: DictKey) => string; locale: Loca
           ) : null}
         </>
       ) : schedules && !failure ? (
-        <EmptyState message={t("adminScheduleEmpty")} action={addButton} />
+        <EmptyState message={t("adminScheduleEmpty")} />
+      ) : null}
+
+      {/* HR can always add one, not only when the card is empty: a tenant with a
+          schedule in force still needs the way to add the next one (a seasonal
+          schedule, a replacement). The button was inside the empty state, so it
+          disappeared the moment a schedule existed - which is what made the card
+          look like it had no way in. Renders nothing for a non-HR caller. */}
+      {schedules && !failure ? (
+        <div style={{ marginBlockStart: "var(--sp-3)" }}>{addButton}</div>
       ) : null}
 
       {dialogOpen ? (
