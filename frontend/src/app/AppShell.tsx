@@ -323,9 +323,28 @@ export default function AppShell() {
           aria-label={t("menu")}
           aria-modal={isCompact && drawerOpen ? true : undefined}
           role={isCompact && drawerOpen ? "dialog" : undefined}
-          inert={((isCompact && !drawerOpen) || (!isCompact && railCollapsed)) ? true : undefined}
         >
-          <BrandLockup />
+          {/* The head holds the brand and the toggle, and it stays live when the
+              rail is collapsed: the slim rail has to keep its own control
+              reachable, so inert goes on the links, not on the whole nav. */}
+          <div className="rail-head">
+            <BrandLockup />
+            <button
+              type="button"
+              className="btn btn-ghost icon-only menu-toggle rail-toggle"
+              aria-expanded={sidebarOpen}
+              aria-controls="app-rail-nav"
+              aria-label={sidebarOpen ? t("menuClose") : t("menuOpen")}
+              title={sidebarOpen ? t("menuClose") : t("menuOpen")}
+              onClick={toggleSidebar}
+            >
+              <RtlChevronIcon locale={locale} direction={sidebarOpen ? "forward" : "back"} />
+            </button>
+          </div>
+          <div
+            className="rail-links"
+            inert={((isCompact && !drawerOpen) || (!isCompact && railCollapsed)) ? true : undefined}
+          >
           {navGroups.map((group) => (
             <div className="nav-group" key={group.label}>
               <div className="nav-group-title">{group.label}</div>
@@ -349,6 +368,7 @@ export default function AppShell() {
               })}
             </div>
           ))}
+          </div>
         </nav>
         {drawerOpen && isCompact ? <button className="drawer-backdrop" tabIndex={-1} aria-label={t("close")} onClick={closeDrawer} /> : null}
         <div className="app-main" ref={mainRef}>

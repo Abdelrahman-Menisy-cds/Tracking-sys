@@ -280,6 +280,10 @@ button { cursor: pointer; }
 .header-notifications .nav-badge { position: absolute; inset-block-start: -5px; inset-inline-end: -5px; /* ds-allow-hardcode: badge corner offset */ margin: 0; pointer-events: none; }
 .header-actions { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; justify-content: flex-end; }
 .brand-lockup { display: flex; align-items: center; min-width: 0; padding-block-end: var(--sp-6); border-block-end: var(--timeline-width) solid var(--border-subtle); }
+/* The rail's own head: brand plus the collapse toggle. */
+.rail-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); min-width: 0; }
+.rail-head .brand-lockup { border-block-end: 0; padding-block-end: 0; }
+.rail-links { display: flex; flex-direction: column; gap: var(--sp-2); min-width: 0; }
 .brand-logo { display: block; flex: 0 1 auto; width: min(180px, 100%); max-width: 100%; /* ds-allow-hardcode: brand logo measure */ height: auto; }
 .nav-group { display: grid; gap: var(--sp-1); }
 .nav-group-title, .demo-tools-label { color: var(--text-muted); font-size: var(--font-size-xs); font-weight: 700; padding: var(--sp-2) var(--sp-3) var(--sp-1); }
@@ -852,8 +856,16 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
    the width transition, so the slide reads as one motion. */
 @media (min-width: 768px) {
   .app-rail { min-width: 0; overflow-x: hidden; overflow-y: auto; transition: width var(--motion-mid) ease, padding var(--motion-mid) ease, border-width var(--motion-mid) ease, visibility 0s linear 0s; }
-  .app-shell.rail-collapsed .app-rail { width: 0; flex-basis: 0; padding-inline: 0; border-inline-end-width: 0; overflow: hidden; visibility: hidden; transition: width var(--motion-mid) ease, padding var(--motion-mid) ease, border-width var(--motion-mid) ease, visibility 0s linear var(--motion-mid); }
+  /* The collapsed rail keeps a slim strip. At 0 width, with the whole nav hidden
+     and inert, the rail's own toggle was both invisible and unclickable; the
+     links are what collapse, and the head keeps the control reachable. */
+  .app-shell.rail-collapsed .app-rail { width: var(--control-min-h); flex-basis: var(--control-min-h); padding-inline: var(--sp-1); overflow: hidden; transition: width var(--motion-mid) ease, padding var(--motion-mid) ease, border-width var(--motion-mid) ease; }
+  .app-shell.rail-collapsed .rail-links, .app-shell.rail-collapsed .rail-head .brand-lockup { display: none; }
+  .app-shell.rail-collapsed .rail-head { justify-content: center; }
 }
+/* Desktop keeps the toggle in the rail; the header copy is for the compact
+   layout, where the rail is a drawer and its head is off-canvas. */
+@media (min-width: 768px) { .app-header .menu-toggle { display: none; } }
 @media (max-width: 639px) {
   h1 { font-size: var(--font-size-2xl); }
   .app-main { padding: var(--sp-4) var(--sp-4) var(--launcher-clearance); }
