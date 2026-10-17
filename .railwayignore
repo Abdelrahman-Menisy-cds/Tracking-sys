@@ -19,6 +19,17 @@ __pycache__/
 **/__pycache__/
 *.py[cod]
 
+# --- local data that must never leave the machine --------------------------
+# attachments/ is 2.7G of uploaded request files. The deployed service keeps its
+# own on the mounted volume; shipping this one both timed the upload out and
+# would have overwritten the server's data with a dev machine's copy.
+attachments/
+**/attachments/
+*.sqlite3
+*.sqlite3.*
+*.bak-*
+db.sqlite3*
+
 # --- dev caches ------------------------------------------------------------
 .pytest_cache/
 .mypy_cache/
