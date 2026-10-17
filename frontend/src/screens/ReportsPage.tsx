@@ -174,11 +174,17 @@ export default function ReportsPage() {
   );
 
   const employeeOptions = useMemo<{ value: string; label: string }[]>(() => {
+    // Cascading: the employee list answers to the department filter. Picking a
+    // department and then being offered people from other departments is the
+    // inconsistent state this prevents.
+    const department = filters.department;
     if (employeesState.phase === "ready" && employeesState.data) {
-      return employeesState.data.map((employee) => ({
-        value: String(employee.id),
-        label: employee.full_name || employee.email,
-      }));
+      return employeesState.data
+        .filter((employee) => !department || String(employee.department_id) === department)
+        .map((employee) => ({
+          value: String(employee.id),
+          label: employee.full_name || employee.email,
+        }));
     }
     // Fallback: the people already visible in the server-scoped rows.
     const seen = new Map<string, string>();
@@ -189,7 +195,30 @@ export default function ReportsPage() {
       }
     }
     return [...seen.entries()].map(([value, label]) => ({ value, label: label || value }));
-  }, [employeesState, rowsState]);
+  }, [employeesState, rowsState, filters.department]);
+
+  // A dependent filter cannot keep a value its parent excludes: narrowing the
+  // department to HR must drop an employee picked from another department, or
+  // the query would ask for a contradiction and answer with nothing.
+  useEffect(() => {
+    if (!filters.department || !filters.employee) return;
+    if (employeesState.phase !== "ready" || !employeesState.data) return;
+    const stillInScope = employeesState.data.some(
+      (employee) =>
+        String(employee.id) === filters.employee &&
+        String(employee.department_id) === filters.department,
+    );
+    if (!stillInScope) setFilters((current) => ({ ...current, employee: "" }));
+  }, [filters.department, filters.employee, employeesState]);
+
+  // from/to are one range, not two independent fields. An end before the start
+  // is an empty range that looks like a bug; clamp it to a single day instead.
+  // ISO dates compare lexically, so this needs no parsing.
+  useEffect(() => {
+    if (filters.from && filters.to && filters.from > filters.to) {
+      setFilters((current) => ({ ...current, to: current.from }));
+    }
+  }, [filters.from, filters.to]);
 
   const departmentOptions = useMemo<{ value: string; label: string }[]>(() => {
     if (departmentsState.phase !== "ready" || !departmentsState.data) return [];
@@ -382,6 +411,7 @@ function FilterPanel({
             className="input"
             type="date"
             value={filters.from}
+            max={filters.to || undefined}
             onChange={(event) => onChange({ from: event.target.value })}
           />
         </label>
@@ -392,6 +422,7 @@ function FilterPanel({
             className="input"
             type="date"
             value={filters.to}
+            min={filters.from || undefined}
             onChange={(event) => onChange({ to: event.target.value })}
           />
         </label>
