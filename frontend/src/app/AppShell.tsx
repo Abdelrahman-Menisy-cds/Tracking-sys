@@ -241,7 +241,7 @@ export default function AppShell() {
     return (
       <>
         <a href="#main-content" className="skip-link">{t("skipToMain")}</a>
-        <div className="demo-banner" role="note">{t("demoLabel")}</div>
+
         <OnboardingCompanyPage />
       </>
     );
@@ -258,7 +258,7 @@ export default function AppShell() {
           position:fixed, so document order does not move it visually - it only
           stops being the last tab stop. */}
       <TourGuide />
-      <div className="demo-banner" role="note">{t("demoLabel")}</div>
+
       <div className="app-shell">
         <nav
           ref={railRef}

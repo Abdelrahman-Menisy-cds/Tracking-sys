@@ -268,8 +268,8 @@ button { cursor: pointer; }
 .icon { flex: 0 0 auto; width: var(--icon-size); height: var(--icon-size); color: currentColor; }
 .icon-mirror { transform: scaleX(-1); }
 
-.demo-banner { background: var(--accent-soft); color: var(--text); border-block-end: var(--timeline-width) solid var(--border-subtle); padding: var(--sp-2) var(--sp-4); text-align: center; font-size: var(--font-size-sm); font-weight: 600; }
-.app-shell { display: flex; min-height: calc(100vh - 37px); /* ds-allow-hardcode: the demo benchmark bar height */ }
+
+.app-shell { display: flex; min-height: 100vh; }
 .app-rail { width: var(--rail-width); flex: 0 0 var(--rail-width); display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-6) var(--sp-4); background: var(--surface); border-inline-end: var(--timeline-width) solid var(--border-subtle); }
 .app-main { flex: 1; min-width: 0; width: 100%; padding: var(--sp-6) var(--sp-8) var(--sp-12); }
 .app-main > .app-header, .app-main > main { width: min(100%, var(--content-max)); margin-inline: auto; }
