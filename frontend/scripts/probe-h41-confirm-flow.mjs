@@ -365,8 +365,9 @@ const mockCard = await evaluate(`(() => {
 note('mock card', mockCard);
 check('mock card takes its width from the panel (right/left inside)', mockCard.insidePanelX === true, mockCard);
 check('mock card: no horizontal scrollbar under hostile long token', mockCard.horizontalScrollAmount <= 2, mockCard.horizontalScrollAmount);
-check('mock card labels are localized (نوع الطلب / العنوان / التفاصيل / إرسال فوري)', ['نوع الطلب', 'العنوان', 'التفاصيل', 'إرسال فوري'].every((l) => mockCard.labels.includes(l)), mockCard.labels);
-check('boolean arg renders from dict (نعم), not "true"', mockCard.submitValue === 'نعم', mockCard.submitValue);
+// H42: `submit` is never displayed, so the «إرسال فوري» row must be GONE.
+check('mock card labels are localized (نوع الطلب / العنوان / التفاصيل — بلا إرسال فوري)', ['نوع الطلب', 'العنوان', 'التفاصيل'].every((l) => mockCard.labels.includes(l)) && !mockCard.labels.includes('إرسال فوري'), mockCard.labels);
+check('H42: the submit arg line does not exist at all', mockCard.submitValue === null, mockCard.submitValue);
 check('long token wraps inside the panel (overflow-wrap)', mockCard.detailsFits === 'anywhere', mockCard.detailsFits);
 check('H41: markdown table renders as a REAL <table>', mockCard.tableRendered === true, mockCard.tableHeaders);
 check('the table headers are the real cells', mockCard.tableHeaders.includes('البند') && mockCard.tableHeaders.includes('القيمة في السيستم'), mockCard.tableHeaders);

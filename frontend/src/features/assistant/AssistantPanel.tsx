@@ -13,7 +13,14 @@ import {
   type PendingAssistantAction,
 } from "../../app/assistantApi";
 import { renderAssistantMarkdown } from "./assistantMarkdown";
-import { describeConfirmResult, formatArgKey, formatServerValue } from "./displayValues";
+import {
+  describeConfirmResult,
+  describePendingNote,
+  formatArgKey,
+  formatArgValue,
+  toolDisplayName,
+  type ConfirmReceiptContext,
+} from "./displayValues";
 import { CloseIcon } from "../../components/icons";
 
 /**
@@ -222,20 +229,26 @@ export default function AssistantPanel({ config, open, onClose }: AssistantPanel
     setConfirming(true);
     setErrorLine(null);
     try {
-      const result = await confirmAssistantAction(token);
+      // H42 - the locale travels with the confirm so the backend's own
+      // policy messages (SubmissionError) come back in the UI language.
+      const result = await confirmAssistantAction(token, locale);
       failedConfirmRef.current = null;
       // H41 - the confirm body's `result` is an OBJECT (verified against
       // accounts/assistant_chat.py). describeConfirmResult renders it as the
-      // promised formal receipt - headline + رقم + status - never
-      // "[object Object]"; an unrecognized shape falls back to the honest
-      // generic line from dict.
+      // promised formal receipt - headline + title + short ref + status -
+      // never "[object Object]"; an unrecognized shape falls back to the
+      // honest generic line from dict. H42 - the receipt carries the card's
+      // promised العنوان when the pending action had one.
       setEntries((current) =>
         current.map((entry) => {
           if (entry.pending?.token !== token) return entry;
+          const chipArgs = entry.pending.args;
+          const receiptContext: ConfirmReceiptContext =
+            chipArgs && typeof chipArgs.title === "string" ? { title: chipArgs.title } : {};
           const { pending: _pending, ...rest } = entry;
           return {
             ...rest,
-            content: `${rest.content}\n${describeConfirmResult(result.tool, result.result, t)}`,
+            content: `${rest.content}\n${describeConfirmResult(result.tool, result.result, t, receiptContext)}`,
           };
         }),
       );
@@ -343,18 +356,33 @@ export default function AssistantPanel({ config, open, onClose }: AssistantPanel
                   {entry.pending ? (
                     <div className="assistant-action-card" role="group" aria-label={t("assistantActionCard")}>
                       <strong>{t("assistantActionCard")}</strong>
-                      <span className="assistant-action-name"><bdi dir="ltr">{entry.pending.name}</bdi></span>
-                      {entry.pending.args && Object.keys(entry.pending.args).length > 0 ? (
-                        <dl className="assistant-action-args">
-                          {Object.entries(entry.pending.args).map(([key, value]) => (
-                            <div key={key} className="assistant-action-arg">
-                              <dt>{formatArgKey(key, t)}</dt>
-                              <dd><bdi>{formatServerValue(value, t)}</bdi></dd>
-                            </div>
-                          ))}
-                        </dl>
-                      ) : null}
-                      <p className="page-meta">{t("assistantActionAsk")}</p>
+                      {/* H42 - the tool speaks its NAME («إنشاء طلب»), never its
+                          API identifier; unknown tools stay honest and raw. */}
+                      <span className="assistant-action-name"><bdi dir="ltr">{toolDisplayName(entry.pending.name, t)}</bdi></span>
+                      {(() => {
+                        // H42 - `submit` is an implementation detail the user
+                        // did not decide: the card never displays it. Every
+                        // other argument keeps its dict label + readable value.
+                        const cardArgs = entry.pending.args;
+                        const visibleArgs =
+                          cardArgs === null || cardArgs === undefined
+                            ? []
+                            : Object.entries(cardArgs).filter(([key]) => key !== "submit");
+                        if (visibleArgs.length === 0) return null;
+                        return (
+                          <dl className="assistant-action-args">
+                            {visibleArgs.map(([key, value]) => (
+                              <div key={key} className="assistant-action-arg">
+                                <dt>{formatArgKey(key, t)}</dt>
+                                <dd><bdi>{formatArgValue(key, value, t)}</bdi></dd>
+                              </div>
+                            ))}
+                          </dl>
+                        );
+                      })()}
+                      {/* H42 - the note matches the action: a draft says nothing
+                          changes, an immediate submit says the system changes. */}
+                      <p className="page-meta">{describePendingNote(entry.pending.name, entry.pending.args, t)}</p>
                       <button type="button" className="btn btn-primary btn-compact" disabled={confirming} onClick={() => confirm(entry.pending!.token)}>
                         {confirming ? t("saving") : t("confirm")}
                       </button>

@@ -1010,7 +1010,17 @@ export const dict = {
     assistantCopy: "انسخ",
     assistantCopied: "تم النسخ",
     assistantActionCard: "الإجراء المطلوب تأكيده",
-    assistantActionAsk: "حاجة هتتغيّر في السيستم - من غير تأكيدك مفيش حاجة بتحصل.",
+    // H42 - the card names the action in the user's language and its note
+    // matches the ACTION: a draft says nothing changes, an immediate submit
+    // says the system changes. Two honest sentences, never one ambiguous one.
+    assistantToolCreateRequest: "إنشاء طلب",
+    assistantToolDecideRequest: "تحديد حالة طلب",
+    assistantToolDecideTimesheet: "تحديد حالة جدول زمني",
+    assistantToolSubmitTimesheet: "إرسال جدول زمني",
+    assistantToolCreateTask: "إنشاء مهمة",
+    assistantToolClockIn: "تسجيل حضور",
+    assistantActionAskDraft: "مفيش حاجة هتتغير — هيتحفظ كمسودة بس ومش هيتقدّم قبل ما تراجعه.",
+    assistantActionAskSubmit: "هيتغيّر في النظام — مش هيحصل حاجة قبل تأكيدك.",
     assistantActionDone: "تم تنفيذ الإجراء.",
     // H41 - honest rendering of server values: never "[object Object]" raw.
     assistantValueNone: "غير محدد",
@@ -1022,7 +1032,8 @@ export const dict = {
     assistantArgTimesheetId: "الجدول الزمني",
     assistantArgTitle: "العنوان",
     assistantArgDetails: "التفاصيل",
-    assistantArgSubmit: "إرسال فوري",
+    // H42 - the «إرسال فوري» arg line was removed entirely: submit is an
+    // implementation detail and the card's note carries the meaning instead.
     assistantArgAction: "الإجراء",
     assistantArgComment: "التعليق",
     assistantArgVersion: "الإصدار",
@@ -1031,7 +1042,12 @@ export const dict = {
     assistantDoneTimesheetDecided: "تم تحديد حالة الجدول الزمني.",
     assistantDoneTimesheetSubmitted: "تم إرسال الجدول الزمني.",
     assistantDoneId: "الرقم",
+    // H42 - a UUID is machine notation; the receipt shows its tail as a ref
+    // and never an invented number. A submit that did not complete says so
+    // with the real reason sentence.
+    assistantDoneRef: "المرجع",
     assistantDoneStatus: "الحالة",
+    assistantDoneSubmitNotDone: "اتعمل مسودة بس الإرسال ما كمّلش — السبب: %s",
     assistantDoneSubmitBlocked: "لم يكتمل الإرسال: %s",
     assistantErrActionExpired: "انتهت صلاحية التأكيد - اطلب الإجراء من المساعد من جديد.",
     assistantErrActionUsed: "التأكيد دا اتستخدم من قبل - اطلب الإجراء من المساعد من جديد.",
@@ -2130,7 +2146,17 @@ export const dict = {
     assistantCopy: "Copy",
     assistantCopied: "Copied",
     assistantActionCard: "Action awaiting your confirmation",
-    assistantActionAsk: "Something will change in the system - nothing happens without your confirmation.",
+    // H42 - the card names the action in the user's language and its note
+    // matches the ACTION: a draft says nothing changes, an immediate submit
+    // says the system changes. Two honest sentences, never one ambiguous one.
+    assistantToolCreateRequest: "Create request",
+    assistantToolDecideRequest: "Decide request",
+    assistantToolDecideTimesheet: "Decide timesheet",
+    assistantToolSubmitTimesheet: "Submit timesheet",
+    assistantToolCreateTask: "Create task",
+    assistantToolClockIn: "Record attendance",
+    assistantActionAskDraft: "Nothing changes - it is saved as a draft and is not submitted before you review it.",
+    assistantActionAskSubmit: "This changes the system - nothing happens before your confirmation.",
     assistantActionDone: "The action was carried out.",
     // H41 - honest rendering of server values: never "[object Object]" raw.
     assistantValueNone: "Not set",
@@ -2142,7 +2168,8 @@ export const dict = {
     assistantArgTimesheetId: "Timesheet id",
     assistantArgTitle: "Title",
     assistantArgDetails: "Details",
-    assistantArgSubmit: "Submit immediately",
+    // H42 - the «إرسال فوري» arg line was removed entirely: submit is an
+    // implementation detail and the card's note carries the meaning instead.
     assistantArgAction: "Action",
     assistantArgComment: "Comment",
     assistantArgVersion: "Version",
@@ -2151,7 +2178,12 @@ export const dict = {
     assistantDoneTimesheetDecided: "The timesheet state was decided.",
     assistantDoneTimesheetSubmitted: "The timesheet was submitted.",
     assistantDoneId: "ID",
+    // H42 - a UUID is machine notation; the receipt shows its tail as a ref
+    // and never an invented number. A submit that did not complete says so
+    // with the real reason sentence.
+    assistantDoneRef: "Reference",
     assistantDoneStatus: "Status",
+    assistantDoneSubmitNotDone: "Only a draft was saved - the submit did not complete - reason: %s",
     assistantDoneSubmitBlocked: "The submit did not complete: %s",
     assistantErrActionExpired: "The confirmation expired - ask the assistant for the action again.",
     assistantErrActionUsed: "This confirmation was already used - ask the assistant for the action again.",
