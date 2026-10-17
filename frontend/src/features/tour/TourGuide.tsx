@@ -102,7 +102,11 @@ export default function TourGuide() {
   const { pathname } = useLocation();
   const email = serverAccount?.email ?? "unknown";
   const tour = useMemo(() => tourForPath(pathname), [pathname]);
-  const storageKey = tourStorageKey(email, tour.key);
+  // One flag per account, not per page. The tour is the first-run orientation,
+  // and a per-page flag meant every screen it had not been shown on yet started
+  // its own, so it followed the user around the app and came back on every
+  // sign-in.
+  const storageKey = tourStorageKey(email, "account");
 
   const [index, setIndex] = useState<number | null>(null);
   const [box, setBox] = useState<Box | null>(null);
@@ -138,6 +142,15 @@ export default function TourGuide() {
       seen = false;
     }
     if (seen) return;
+    // Marked as seen the moment it opens, not when it is finished. A tour the
+    // user walks away from is still a tour they were shown; leaving it unmarked
+    // is what made it reappear on the next page - and on every sign-in after
+    // that, since a navigation drops the tour before finish() ever runs.
+    try {
+      window.localStorage.setItem(storageKey, new Date().toISOString());
+    } catch {
+      // Storage unavailable: the tour simply offers itself again next session.
+    }
     const timer = window.setTimeout(() => setIndex(0), 700);
     return () => window.clearTimeout(timer);
   }, [storageKey, pathname]);
