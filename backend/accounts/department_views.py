@@ -125,7 +125,12 @@ class DepartmentListView(APIView):
         return super().get_throttles()
 
     def get(self, request):
-        departments = Department.objects.select_related("manager").all()
+        # Scoped to the caller's company. This was .all(), so an HR account read
+        # every tenant's departments (verified: a demo-company HR received
+        # departments belonging to demo-local).
+        departments = Department.objects.select_related("manager").filter(
+            company=request.user.company
+        )
         return Response({"data": DepartmentReadSerializer(departments, many=True).data})
 
     def post(self, request):
@@ -139,7 +144,11 @@ class DepartmentListView(APIView):
         }
         if missing:
             return _validation_response(request, missing)
-        if Department.objects.filter(code=data["code"]).exists():
+        # Per company, not global: a code another tenant already uses must not
+        # block this one, and the global check leaked that it existed.
+        if Department.objects.filter(
+            company=request.user.company, code=data["code"]
+        ).exists():
             return _validation_response(
                 request, {"code": ["A department with this code already exists."]}
             )
@@ -180,7 +189,13 @@ class DepartmentDetailView(APIView):
         return super().get_throttles()
 
     def _resolve(self, department_id):
-        return Department.objects.select_related("manager").filter(pk=department_id).first()
+        # Same scope as the list: without it an HR could read another tenant's
+        # department by guessing its id.
+        return (
+            Department.objects.select_related("manager")
+            .filter(company=self.request.user.company, pk=department_id)
+            .first()
+        )
 
     def get(self, request, department_id):
         department = self._resolve(department_id)
@@ -196,7 +211,9 @@ class DepartmentDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        if "code" in data and Department.objects.exclude(pk=department.pk).filter(code=data["code"]).exists():
+        if "code" in data and Department.objects.exclude(pk=department.pk).filter(
+            company=department.company, code=data["code"]
+        ).exists():
             return _validation_response(
                 request, {"code": ["A department with this code already exists."]}
             )
