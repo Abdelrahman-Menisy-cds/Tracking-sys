@@ -251,6 +251,13 @@ export default function AppShell() {
   return (
     <>
       <a href="#main-content" className="skip-link">{t("skipToMain")}</a>
+      {/* Keyboard path: the tour must sit BEFORE the shell in the DOM. Rendered
+          last, its two controls (skip/next) sat behind ~50 page controls in tab
+          order, so a keyboard user could not reach the tour (verify_keyboard
+          [A unreachable] on every page with the tour open). It is
+          position:fixed, so document order does not move it visually - it only
+          stops being the last tab stop. */}
+      <TourGuide />
       <div className="demo-banner" role="note">{t("demoLabel")}</div>
       <div className="app-shell">
         <nav
@@ -373,7 +380,6 @@ export default function AppShell() {
           <main id="main-content"><Outlet /></main>
         </div>
       </div>
-      <TourGuide />
       {/* H18: the floating مدام عفاف button sits beside the tour, one instance for
           the whole shell - the onboarding gate above returns before this, so it
           never floats over the company onboarding screen. */}

@@ -33,6 +33,9 @@
   --meter-size: 10px;      /* ds-allow-hardcode: progress-track / pulse-dot measure */
   --dialog-max: 560px;     /* ds-allow-hardcode: the dialog measure, named once here */
   --auth-panel-max: 520px; /* ds-allow-hardcode: the login panel measure */
+  --logo-preview-size: 72px;          /* company identity preview (logo-upload + empty state) */
+  --company-widget-logo-size: 64px;   /* settings widget identity logo */
+  --launcher-clearance: calc(64px + var(--sp-4)); /* reserved strip under the floating assistant launcher (64px button + sp-4 inset) */
   --radius-surface: var(--radius-md);
   --radius-dialog: var(--radius-lg);
 
@@ -272,7 +275,7 @@ button { cursor: pointer; }
 .app-main > .app-header, .app-main > main { width: min(100%, var(--content-max)); margin-inline: auto; }
 .app-header { display: flex; /* wraps at ultra-narrow widths instead of colliding */ flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--sp-2) var(--sp-4); min-height: var(--control-min-h); margin-block-end: var(--sp-8); }
 .header-page-context { display: inline-flex; align-items: center; gap: var(--sp-2); min-width: 0; max-width: 100%; }
-.header-page-indicator { display: inline-flex; min-width: 0; align-items: center; color: var(--text); font-size: var(--font-size-lg); line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.header-page-indicator { display: inline-flex; min-width: 0; align-items: center; color: var(--text); font-size: var(--font-size-lg); text-overflow: ellipsis; white-space: nowrap; /* HTML-clip both axes so Noto Sans Arabic's line box (33px over an 18px x1.65 line) is never cut vertically */ overflow-inline: clip; overflow-block: visible; }
 .header-notifications { position: relative; flex: 0 0 auto; }
 .header-notifications .nav-badge { position: absolute; inset-block-start: -5px; inset-inline-end: -5px; /* ds-allow-hardcode: badge corner offset */ margin: 0; pointer-events: none; }
 .header-actions { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; justify-content: flex-end; }
@@ -759,6 +762,10 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 }
 .new-request-page .request-stick-actions .btn-primary { order: -1; min-width: 180px; } /* ds-allow-hardcode: sticky primary measure */
 .new-request-page .request-stick-actions .btn-ghost { margin-inline-start: auto; }
+/* The sticky action bar survives at the viewport bottom edge while pages scroll
+   over it, so on narrow widths its dodgeable content must clear the floating
+   assistant launcher (its inset-inline-end corner) instead of sitting under it. */
+@media (max-width: 1023px) { .new-request-page .request-stick-actions { padding-inline-end: var(--launcher-clearance); } }
 /* §4 validation wiring: aria-invalid lands on the failing control; the inline error node sits
    directly under the failing row and the control points at it. */
 .new-request-page .request-inline-error { display: block; margin-block-start: var(--sp-2); color: var(--danger-strong); font-weight: 700; }
@@ -817,11 +824,11 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .login-demo-note { margin-block-start: var(--sp-6); margin-block-end: var(--space-0); padding-block-start: var(--sp-4); border-block-start: var(--timeline-width) solid var(--border-subtle); }
 @media (forced-colors: active) { :focus-visible { outline: var(--space-1) solid CanvasText; } .btn, .pill, .nav-link, .work-surface, .table-wrap { border: var(--timeline-width) solid ButtonText; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; scroll-behavior: auto !important; } .skeleton { animation: none; } }
-@media (max-width: 1023px) { .app-rail { position: fixed; inset-block: 0; inset-inline-start: 0; transform: translateX(-100%); z-index: 40; overflow-y: auto; clip-path: inset(0 100% 0 0); } html[dir="rtl"] .app-rail { transform: translateX(100%); clip-path: inset(0 0 0 100%); } .app-rail.open { transform: translateX(0); clip-path: none; } .menu-toggle { display: inline-flex !important; } .app-main { padding-inline: var(--sp-6); } .dashboard-grid { grid-template-columns: 1fr; } .drawer-backdrop { position: fixed; inset: 0; z-index: 30; border: var(--radius-none); background: var(--overlay-scrim); } }
+@media (max-width: 1023px) { .app-rail { position: fixed; inset-block: 0; inset-inline-start: 0; transform: translateX(-100%); z-index: 40; overflow-y: auto; clip-path: inset(0 100% 0 0); visibility: hidden; /* ds-allow-hardcode: closed drawer stays out of paint, hit-testing and geometry, not just off-screen */ transition: transform var(--motion-mid) ease, visibility 0s linear var(--motion-mid); } html[dir="rtl"] .app-rail { transform: translateX(100%); clip-path: inset(0 0 0 100%); } .app-rail.open { transform: translateX(0); clip-path: none; visibility: visible; transition: transform var(--motion-mid) ease, visibility 0s; } .menu-toggle { display: inline-flex !important; } .app-main { padding-inline: var(--sp-6); padding-block-end: var(--launcher-clearance); } .dashboard-grid { grid-template-columns: 1fr; } .drawer-backdrop { position: fixed; inset: 0; z-index: 30; border: var(--radius-none); background: var(--overlay-scrim); } }
 @media (min-width: 1024px) { .menu-toggle { display: none !important; } }
 @media (max-width: 639px) {
   h1 { font-size: var(--font-size-2xl); }
-  .app-main { padding: var(--sp-4) var(--sp-4) var(--sp-8); }
+  .app-main { padding: var(--sp-4) var(--sp-4) var(--launcher-clearance); }
   .app-header { margin-block-end: var(--sp-6); }
   .header-page-context { min-width: 0; flex: 1 1 auto; }
   .header-actions { display: flex; flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; }
@@ -1024,11 +1031,11 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .company-form-grid .field { margin-block-end: var(--sp-3); min-inline-size: 0; }
 .company-required-instructions { margin-block-end: var(--sp-2); }
 .company-logo-row { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
-.company-logo-preview { inline-size: 72px; block-size: 72px; object-fit: contain; background: var(--surface-subtle); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-sm); padding: var(--sp-1); }
-.company-logo-none { display: inline-flex; align-items: center; justify-content: center; inline-size: 72px; block-size: 72px; border: var(--timeline-width) dashed var(--border-control); border-radius: var(--radius-sm); color: var(--text-muted); font-size: var(--font-size-xs); text-align: center; }
+.company-logo-preview { inline-size: var(--logo-preview-size); block-size: var(--logo-preview-size); object-fit: contain; background: var(--surface-subtle); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-sm); padding: var(--sp-1); }
+.company-logo-none { display: inline-flex; align-items: center; justify-content: center; inline-size: var(--logo-preview-size); block-size: var(--logo-preview-size); border: var(--timeline-width) dashed var(--border-control); border-radius: var(--radius-sm); color: var(--text-muted); font-size: var(--font-size-xs); text-align: center; }
 /* Settings widget: the identity read-out. */
 .company-widget-identity { display: flex; align-items: center; gap: var(--sp-4); margin-block-end: var(--sp-4); }
-.company-widget-logo { inline-size: 64px; block-size: 64px; object-fit: contain; background: var(--surface-subtle); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-sm); padding: var(--sp-1); }
+.company-widget-logo { inline-size: var(--company-widget-logo-size); block-size: var(--company-widget-logo-size); object-fit: contain; background: var(--surface-subtle); border: var(--timeline-width) solid var(--card-border); border-radius: var(--radius-sm); padding: var(--sp-1); }
 .company-widget-logo-none { display: inline-flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted); font-size: var(--font-size-xs); }
 .company-widget-name { font-size: var(--font-size-lg); }
 .company-widget-facts { margin-block: var(--space-0); }
