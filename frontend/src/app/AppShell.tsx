@@ -20,7 +20,7 @@ import {
   LogoutIcon,
   MoonIcon,
   ReportIcon,
-  SidebarIcon,
+  RtlChevronIcon,
   SunIcon,
   UserIcon,
 } from "../components/icons";
@@ -356,14 +356,18 @@ export default function AppShell() {
             <button
               ref={menuButtonRef}
               type="button"
-              className="btn btn-secondary menu-toggle"
+              className="btn btn-ghost icon-only menu-toggle"
               aria-expanded={sidebarOpen}
               aria-controls="app-rail-nav"
               aria-label={sidebarOpen ? t("menuClose") : t("menuOpen")}
+              title={sidebarOpen ? t("menuClose") : t("menuOpen")}
               onClick={toggleSidebar}
             >
-              <SidebarIcon />
-              {t("menu")}
+              {/* A chevron pointing where the rail goes: it opens toward the
+                  rail and closes away from it. RtlChevronIcon resolves that per
+                  locale, so the Arabic rail (on the right) and the English one
+                  (on the left) both point the right way. */}
+              <RtlChevronIcon locale={locale} direction={sidebarOpen ? "forward" : "back"} />
             </button>
             <div className="header-page-context">
               <strong className="header-page-indicator">{currentItem.label}</strong>
