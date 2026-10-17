@@ -39,11 +39,27 @@ export function cairoDayIso(date: Date): string {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+/** A Date for a formatter, or null when the input is missing/unparseable.
+ *
+ *  Reporting rows legitimately carry an empty date (a sheet that was never
+ *  submitted has no submitted_at), and Intl throws a RangeError on an Invalid
+ *  Date — one empty cell took the whole timesheet report down with
+ *  "RangeError: Invalid time value". Every formatter below resolves through
+ *  here and renders a dash instead of exploding.
+ */
+function asDate(isoDate: string | null | undefined): Date | null {
+  if (!isoDate) return null;
+  const date = new Date(isoDate);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 /** DD/MM/YYYY in the given locale, zero-padded, bidi-isolated. */
 export function formatDate(isoDate: string, locale: "ar" | "en"): string {
+  const date = asDate(isoDate);
+  if (!date) return isolated("—");
   const parts = new Intl.DateTimeFormat(localeTag(locale), {
     year: "numeric", month: "2-digit", day: "2-digit", timeZone: CAIRO_TIME_ZONE,
-  }).formatToParts(new Date(isoDate)).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
+  }).formatToParts(date).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
   return isolated(`${parts.day}/${parts.month}/${parts.year}`);
 }
 
@@ -66,14 +82,17 @@ function timeRun(parts: { hour: string; minute: string; period: string }): strin
 
 /** DD/MM/YYYY · h:mm period - bidi-isolated, no zone token. */
 export function formatDateTime(isoDate: string, locale: "ar" | "en"): string {
-  const date = new Date(isoDate);
+  const date = asDate(isoDate);
+  if (!date) return isolated("—");
   const time = timeParts(date, locale);
   return isolated(`${unwrapped(formatDate(isoDate, locale))}\u00a0·\u00a0${timeRun(time)}`);
 }
 
 /** h:mm period only - bidi-isolated, no zone token. */
 export function formatTime(isoDate: string, locale: "ar" | "en"): string {
-  const time = timeParts(new Date(isoDate), locale);
+  const date = asDate(isoDate);
+  if (!date) return isolated("—");
+  const time = timeParts(date, locale);
   return isolated(timeRun(time));
 }
 
@@ -86,16 +105,20 @@ export function formatWeekdayIndex(weekdayIndex: number, locale: "ar" | "en"): s
 }
 
 export function formatWeekdayOf(isoDate: string, locale: "ar" | "en"): string {
+  const date = asDate(isoDate);
+  if (!date) return isolated("—");
   return new Intl.DateTimeFormat(localeTag(locale), { weekday: "long", timeZone: CAIRO_TIME_ZONE })
-    .format(new Date(isoDate));
+    .format(date);
 }
 
 /** Long date for a single-record detail (profile, holiday); lists, tables and
  *  dense validity rows use numeric formatDate instead. */
 export function formatDateLong(isoDate: string, locale: "ar" | "en"): string {
+  const date = asDate(isoDate);
+  if (!date) return isolated("—");
   const parts = new Intl.DateTimeFormat(localeTag(locale), {
     year: "numeric", month: "long", day: "numeric", timeZone: CAIRO_TIME_ZONE,
-  }).formatToParts(new Date(isoDate)).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
+  }).formatToParts(date).reduce<Record<string, string>>((result, part) => { result[part.type] = part.value; return result; }, {});
   // Each directional run is isolated so the RTL month cannot reorder the year.
   return isolated(`${isolated(parts.day)} ${isolated(parts.month)} ${isolated(parts.year)}`);
 }
