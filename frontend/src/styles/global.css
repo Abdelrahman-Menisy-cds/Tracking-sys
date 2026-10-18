@@ -882,6 +882,12 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 .login-signup-contact { margin-block: var(--sp-2) var(--sp-4); color: var(--text-muted); }
 .login-signup-phone { color: var(--accent); font-weight: 700; text-decoration-thickness: 1px; text-underline-offset: 2px; /* ds-allow-hardcode: optical underline offset */ white-space: nowrap; unicode-bidi: plaintext; }
 .login-signup-phone:focus-visible { outline: var(--space-1) solid var(--focus-ring); outline-offset: var(--space-1); border-radius: var(--radius-sm); }
+/* The contact affordance is the WhatsApp mark, not the digits: the number stays
+   in the aria label so it is still announced and still searchable. */
+.login-signup-whatsapp { display: inline-flex; align-items: center; justify-content: center; inline-size: var(--control-sm-h); block-size: var(--control-sm-h); margin-inline-start: var(--sp-1); border-radius: var(--radius-pill); background: var(--success-soft); color: var(--success-strong); vertical-align: middle; }
+.login-signup-whatsapp svg { inline-size: var(--icon-size-md); block-size: var(--icon-size-md); fill: currentColor; }
+.login-signup-whatsapp:hover { background: var(--success-border); }
+.login-signup-whatsapp:focus-visible { outline: var(--space-1) solid var(--focus-ring); outline-offset: var(--space-1); }
 .login-demo-note { margin-block-start: var(--sp-6); margin-block-end: var(--space-0); padding-block-start: var(--sp-4); border-block-start: var(--timeline-width) solid var(--border-subtle); }
 @media (forced-colors: active) { :focus-visible { outline: var(--space-1) solid CanvasText; } .btn, .pill, .nav-link, .work-surface, .table-wrap { border: var(--timeline-width) solid ButtonText; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; scroll-behavior: auto !important; } .skeleton { animation: none; } }
