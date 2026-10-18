@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { fetchAttendanceToday, recordAttendanceEvent, type AttendanceDay } from "../app/attendanceApi";
 import { t as translate } from "../i18n/dict";
 import { Link } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
@@ -28,17 +29,70 @@ const noAttendanceCopy = (locale: "ar" | "en") => ({
 
 export function ClockAction({ compact = false }: { compact?: boolean }) {
   const { locale } = useApp();
-  /* There is no clock endpoint: nothing may be invented, so the control is
-     visible, keeps its look, but is disabled with the honest reason. */
-  return <span className={compact ? "quick-clock" : undefined}><button type="button" className="btn btn-secondary" disabled title={noAttendanceCopy(locale).waiting} aria-label={translate(locale, "attendanceClockInAria")}><ClockIcon />{translate(locale, "attendanceClockInShort")}</button></span>;
+  const copy = noAttendanceCopy(locale);
+  const [day, setDay] = useState<AttendanceDay | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetchAttendanceToday(locale)
+      .then((next) => { if (alive) setDay(next); })
+      .catch(() => { /* the button stays disabled; the reason is read again on mount */ });
+    return () => { alive = false; };
+  }, [locale]);
+
+  /* One control for both directions: what it does follows the day the server
+     derived, so the button can never offer an action the day refuses. */
+  const kind = day?.can_clock_in ? "clock-in" : day?.can_clock_out ? "clock-out" : null;
+
+  const record = async () => {
+    if (kind === null) return;
+    setBusy(true);
+    try {
+      await recordAttendanceEvent(kind, locale);
+      setDay(await fetchAttendanceToday(locale));
+    } catch {
+      /* Leave the day as it was: a failed write is not a state change. */
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <span className={compact ? "quick-clock" : undefined}><button type="button" className="btn btn-secondary" disabled={kind === null || busy} title={kind === null ? (day?.state === "NO_SCHEDULE" ? copy.emptySchedule : copy.waiting) : undefined} onClick={record} aria-label={translate(locale, "attendanceClockInAria")}><ClockIcon />{translate(locale, kind === "clock-out" ? "attendanceClockOut" : "attendanceClockInShort")}</button></span>;
 }
 
 function TodayPanel() {
   const { locale } = useApp();
   const copy = noAttendanceCopy(locale);
+  const [day, setDay] = useState<AttendanceDay | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetchAttendanceToday(locale)
+      .then((next) => { if (alive) setDay(next); })
+      .catch(() => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+  }, [locale]);
+
+  /* A failed read is not «no schedule»: the two say different things. */
+  if (failed) return <section className="attendance-grid section"><div className="work-surface"><Banner tone="error" role="alert">{copy.banner}</Banner></div></section>;
+  if (day === null) return <section className="attendance-grid section"><div className="work-surface"><EmptyState message={translate(locale, "loading")} /></div></section>;
+
+  const window = day.schedule?.window ?? null;
   return <section className="attendance-grid section">
-    <div className="work-surface"><div className="section-heading"><h2>{translate(locale, "attendanceTodayIntervals")}</h2></div><EmptyState message={copy.emptyIntervals} /></div>
-    <div className="work-surface"><div className="section-heading"><h2>{translate(locale, "attendanceScheduleToday")}</h2></div><EmptyState message={copy.emptySchedule} /></div>
+    <div className="work-surface"><div className="section-heading"><h2>{translate(locale, "attendanceTodayIntervals")}</h2></div>
+      {day.events.length === 0
+        ? <EmptyState message={copy.emptyIntervals} />
+        : <ul className="compact-list">{day.events.map((event) => (
+            <li className="compact-row" key={event.id}><div><strong>{translate(locale, event.kind === "CLOCK_OUT" ? "attendanceClockOut" : "attendanceClockInShort")}</strong><div className="page-meta"><bdi dir="ltr">{event.occurred_at.slice(11, 16)}</bdi></div></div></li>
+          ))}</ul>}
+    </div>
+    <div className="work-surface"><div className="section-heading"><h2>{translate(locale, "attendanceScheduleToday")}</h2></div>
+      {window === null
+        ? <EmptyState message={copy.emptySchedule} />
+        : <><p className="page-meta">{day.schedule?.name}</p><ul className="compact-list"><li className="compact-row"><div><bdi dir="ltr">{String(window.start_time).slice(0, 5)} – {String(window.end_time).slice(0, 5)}</bdi>{window.break_minutes > 0 ? <div className="page-meta">{window.break_minutes} · {translate(locale, "attendanceBreakShort")}</div> : null}</div></li></ul></>}
+    </div>
   </section>;
 }
 
