@@ -16,11 +16,27 @@
 const CAIRO_TIME_ZONE = "Africa/Cairo";
 
 const LRI = "\u2066";
+const RLI = "\u2067";
 const PDI = "\u2069";
 
 /** Wrap a formatted value in bidi isolates - brief H3 rule 4. */
 function isolated(value: string): string {
   return `${LRI}${value}${PDI}`;
+}
+
+/**
+ * Wrap a value so it is READ in the page's own direction.
+ *
+ * A range joined as two dates must be scanned in the order it is written
+ * (earlier -> later). Forcing it into an LTR run (LRI) makes that true for the
+ * English page but NOT for the Arabic one: in an RTL line the LTR run sits to
+ * the LEFT of its label, so an Arabic reader scanning from the label meets the
+ * LAST date first and the range reads backwards ("25 … - 19 …"). Wrapping the
+ * range in an isolate of the page's own direction (RLI for `ar`, LRI for `en`)
+ * keeps the first date the first one encountered, both ways round.
+ */
+function isolatedInPageDirection(value: string, locale: "ar" | "en"): string {
+  return `${locale === "ar" ? RLI : LRI}${value}${PDI}`;
 }
 
 function unwrapped(value: string): string {
@@ -166,7 +182,9 @@ export function weekInterval(weekStart: string, locale: "ar" | "en"): string {
     const values = formatter.formatToParts(date).reduce<Record<string, string>>((result, item) => { result[item.type] = item.value; return result; }, {});
     return `${isolated(values.day)} ${isolated(values.month)} ${isolated(values.year)}`;
   };
-  return isolated(`${part(start)} - ${part(end)}`);
+  // The range is read in the PAGE's direction, so the earlier date is always
+  // the first one encountered - LTR in the English page, RTL in the Arabic one.
+  return isolatedInPageDirection(`${part(start)} - ${part(end)}`, locale);
 }
 
 export function formatMinutes(minutes: number, locale: "ar" | "en"): string {
