@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { useApp, usePageTitle } from "../app/AppContext";
+import { getMyEmployee, type ServerEmployee } from "../app/orgApi";
 import PageHeader from "../components/layout/PageHeader";
 import { Banner, EmptyState } from "../components/ui";
 import { UserIcon } from "../components/icons";
@@ -25,15 +27,26 @@ export default function ProfilePage() {
     ? serverAccount.role === "HR" ? t("roleHr") : serverAccount.role === "MANAGER" ? t("roleManager") : t("roleEmployee")
     : "-";
 
-  const unavailable = locale === "ar"
-    ? "حقول ملف الموظف (المسمى الوظيفي، الإدارة، الرقم الوظيفي، المدير، تاريخ التعيين) تُقرأ من نقطة نهاية الموظفين على الخادم لاحقًا؛ لا توجد بيانات مؤكدة الآن."
-    : "The employee-file fields (job title, department, employee number, manager, join date) will come from the server's employees endpoints; there is no confirmed data yet.";
-
-  const knownFields = serverAccount
-    ? [
-        [t("profileEmail"), serverAccount.email],
-      ] as [string, string][]
-    : [];
+  /* The employee file is the caller's OWN row, which /employees/me serves to
+     every role; the id route is HR-only and was never the right source here. */
+  const [employee, setEmployee] = useState<ServerEmployee | null>(null);
+  const [fileFailed, setFileFailed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    getMyEmployee(locale)
+      .then((row) => { if (alive) { setEmployee(row); setFileFailed(false); } })
+      .catch(() => { if (alive) setFileFailed(true); });
+    return () => { alive = false; };
+  }, [locale]);
+  const fileFields = employee
+    ? ([ 
+        [t("profileEmail"), employee.email],
+        [locale === "ar" ? "المسمى الوظيفي" : "Job title", employee.job_title],
+        [locale === "ar" ? "الإدارة" : "Department", [employee.department_name_ar, employee.department_code].filter(Boolean).join(" · ")],
+        [locale === "ar" ? "الرقم الوظيفي" : "Employee number", employee.employee_number ?? ""],
+        [locale === "ar" ? "المدير" : "Manager", employee.manager_name ?? ""],
+      ] as [string, string][]).filter(([, value]) => value !== "" && value !== null && value !== undefined)
+    : serverAccount ? [[t("profileEmail"), serverAccount.email]] as [string, string][] : [];
 
   return (
     <div className="page reading-page profile-page">
@@ -51,21 +64,21 @@ export default function ProfilePage() {
           <h2 id="profile-details-heading"><bdi>{serverAccount?.full_name ?? "-"}</bdi></h2>
           <span className="muted">{roleLabel}</span>
         </div>
-        {knownFields.length ? (
+        {fileFields.length ? (
           <dl className="profile-details">
-            {knownFields.map(([label, value]) => (
+            {fileFields.map(([label, value]) => (
               <div className="record-field" key={label}>
                 <dt className="record-field-label">{label}</dt>
                 <dd><bdi>{value}</bdi></dd>
               </div>
             ))}
-            <div className="record-field" key={unavailable}>
-              <dt className="record-field-label">{locale === "ar" ? "ملف الموظف" : "Employee file"}</dt>
-              <dd className="muted">{unavailable}</dd>
-            </div>
           </dl>
         ) : (
-          <EmptyState message={unavailable} />
+          fileFailed ? (
+            <Banner tone="error" role="alert">{locale === "ar" ? "تعذّر تحميل ملف الموظف. جرّب تحديث الصفحة." : "Could not load the employee file. Try refreshing."}</Banner>
+          ) : (
+            <EmptyState message={locale === "ar" ? "جارٍ تحميل ملف الموظف…" : "Loading the employee file…"} />
+          )
         )}
       </section>
       {/* H18: the employee links their OWN provider here - no presets, per the owner. */}

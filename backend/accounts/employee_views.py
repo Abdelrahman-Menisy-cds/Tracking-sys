@@ -123,3 +123,18 @@ class EmployeeDetailView(APIView):
         except EmployeeValidationError as exc:
             return _validation_response(request, exc)
         return Response({"data": EmployeeReadSerializer(user).data})
+
+
+class EmployeeMeView(APIView):
+    """GET /api/v1/employees/me - the caller's own employee file, for any role.
+
+    The HR-only list and detail answer «who works here»; this answers «who am
+    I», which every signed-in person is entitled to. It takes no id and resolves
+    through the caller, so it cannot be pointed at somebody else — the scope
+    question does not arise rather than being re-checked.
+    """
+
+    permission_classes = [IsAuthenticated401]
+
+    def get(self, request):
+        return Response({"data": EmployeeReadSerializer(request.user).data})

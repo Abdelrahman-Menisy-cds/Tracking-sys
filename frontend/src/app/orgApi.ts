@@ -65,6 +65,14 @@ export async function listEmployees(locale: string): Promise<ServerEmployee[]> {
 }
 
 /** GET /employees/{id} - one authoritative row (HR only; 404 envelope otherwise). */
+/** GET /employees/me - the caller's OWN employee file, any role.
+ * The id route is HR-only; this one takes no id, so it cannot be aimed at
+ * somebody else. */
+export async function getMyEmployee(locale: string): Promise<ServerEmployee> {
+  const payload = await apiRequest<{ data: ServerEmployee }>("/employees/me", { acceptLanguage: locale });
+  return payload.data;
+}
+
 export async function getEmployee(id: number, locale: string): Promise<ServerEmployee> {
   const payload = await apiRequest<{ data: ServerEmployee }>(`/employees/${id}`, { acceptLanguage: locale });
   return payload.data;

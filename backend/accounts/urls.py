@@ -29,6 +29,9 @@ urlpatterns = [
         name="assistant-action-confirm",
     ),
     path("employees", employee_views.EmployeeListView.as_view(), name="employee-list"),
+    # Before the id route, or <int:target_id> would never see it and "me"
+    # would be read as a bad id.
+    path("employees/me", employee_views.EmployeeMeView.as_view(), name="employee-me"),
     path("employees/<int:target_id>", employee_views.EmployeeDetailView.as_view(), name="employee-detail"),
     path(
         "employees/<int:target_id>/assistant",
