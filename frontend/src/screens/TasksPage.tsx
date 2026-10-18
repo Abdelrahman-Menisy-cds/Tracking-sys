@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useApp, usePageTitle } from "../app/AppContext";
-import { Banner, EmptyState } from "../components/ui";
+import { Banner, Dialog, EmptyState } from "../components/ui";
 import PageHeader from "../components/layout/PageHeader";
 import {
   createTask,
@@ -14,6 +14,12 @@ import {
  * /tasks - the server owns the tasks. «مهامي» is what is assigned to the caller,
  * «مهام أنشأتها» is what they created; both come from one call, and the status
  * moves through the server so two people looking at the same task agree.
+ *
+ * The draft lives in a dialog rather than inline: the list is what the page is
+ * for, and a form parked above it pushed the work down the screen. It reuses the
+ * app's own Dialog, so focus, Escape and the scrim behave like every other
+ * dialog in the product, and the tabs use the app's segmented control so the
+ * active one reads as active.
  */
 export default function TasksPage() {
   const { t, locale } = useApp();
@@ -24,11 +30,19 @@ export default function TasksPage() {
   const [tab, setTab] = useState<"mine" | "created">("mine");
   const [draft, setDraft] = useState({ title: "", details: "" });
   const [busy, setBusy] = useState(false);
+  const [composing, setComposing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const copy = {
     newTask: locale === "ar" ? "مهمة جديدة" : "New task",
+    dialogDescription:
+      locale === "ar"
+        ? "اكتب عنوان المهمة، وتقدر تضيف تفاصيل تساعد اللي هينفذها."
+        : "Give the task a title; details help whoever picks it up.",
     titlePlaceholder: locale === "ar" ? "عنوان المهمة" : "Task title",
     detailsPlaceholder: locale === "ar" ? "تفاصيل (اختياري)" : "Details (optional)",
+    create: locale === "ar" ? "إنشاء المهمة" : "Create task",
+    cancel: locale === "ar" ? "إلغاء" : "Cancel",
     statusOpen: locale === "ar" ? "مفتوحة" : "Open",
     statusInProgress: locale === "ar" ? "قيد التنفيذ" : "In progress",
     statusDone: locale === "ar" ? "مكتملة" : "Done",
@@ -36,6 +50,7 @@ export default function TasksPage() {
       ? "المهام بتُدار على الخادم: الإنشاء والتكليف وتغيير الحالة كلهم محفوظين."
       : "Tasks are managed by the server: creation, assignment and status changes are all persisted.",
     loadFailed: locale === "ar" ? "تعذّر تحميل المهام. جرّب تحديث الصفحة." : "Could not load the tasks. Try refreshing.",
+    createFailed: locale === "ar" ? "تعذّر إنشاء المهمة. جرّب تاني." : "Could not create the task. Try again.",
     due: locale === "ar" ? "الاستحقاق" : "Due",
     titleRequired: locale === "ar" ? "العنوان مطلوب." : "A title is required.",
   };
@@ -61,15 +76,24 @@ export default function TasksPage() {
   const submit = async () => {
     if (draft.title.trim() === "") return;
     setBusy(true);
+    setError(null);
     try {
       await createTask({ title: draft.title.trim(), details: draft.details.trim() }, locale);
       setDraft({ title: "", details: "" });
+      setComposing(false);
       reload();
     } catch {
-      /* Keep the draft so nothing typed is lost. */
+      /* The dialog stays open with the draft: nothing typed is lost. */
+      setError(copy.createFailed);
     } finally {
       setBusy(false);
     }
+  };
+
+  const closeComposer = () => {
+    setComposing(false);
+    setError(null);
+    setDraft({ title: "", details: "" });
   };
 
   if (failed) {
@@ -91,13 +115,7 @@ export default function TasksPage() {
         title={t("tasksTitle")}
         subtitle={t("tasksSubtitle")}
         primaryAction={
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={busy || draft.title.trim() === ""}
-            title={draft.title.trim() === "" ? copy.titleRequired : undefined}
-            onClick={submit}
-          >
+          <button type="button" className="btn btn-primary" onClick={() => setComposing(true)}>
             {copy.newTask}
           </button>
         }
@@ -106,46 +124,20 @@ export default function TasksPage() {
 
       <div className="work-surface">
         <div className="section-heading">
-          <h2>{tab === "mine" ? t("taskListMine") : t("taskListCreated")}</h2>
-          <div className="segmented" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === "mine"}
-              className={tab === "mine" ? "is-active" : undefined}
-              onClick={() => setTab("mine")}
-            >
-              {t("taskListMine")}
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === "created"}
-              className={tab === "created" ? "is-active" : undefined}
-              onClick={() => setTab("created")}
-            >
-              {t("taskListCreated")}
-            </button>
+          <div className="role-segmented" role="tablist" aria-label={t("tasksTitle")}>
+            {(["mine", "created"] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={tab === key}
+                className={`role-segmented-option${tab === key ? " is-selected" : ""}`}
+                onClick={() => setTab(key)}
+              >
+                {key === "mine" ? t("taskListMine") : t("taskListCreated")}
+              </button>
+            ))}
           </div>
-        </div>
-
-        <div className="form-grid">
-          <label className="field">
-            <span>{copy.titlePlaceholder}</span>
-            <input
-              className="input"
-              value={draft.title}
-              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-            />
-          </label>
-          <label className="field">
-            <span>{copy.detailsPlaceholder}</span>
-            <input
-              className="input"
-              value={draft.details}
-              onChange={(event) => setDraft({ ...draft, details: event.target.value })}
-            />
-          </label>
         </div>
 
         {rows === null ? (
@@ -181,6 +173,52 @@ export default function TasksPage() {
           </ul>
         )}
       </div>
+
+      {composing ? (
+        <Dialog
+          title={copy.newTask}
+          description={copy.dialogDescription}
+          onClose={closeComposer}
+          dirty={draft.title.trim() !== "" || draft.details.trim() !== ""}
+          busy={busy}
+        >
+          {error ? <Banner tone="error" role="alert">{error}</Banner> : null}
+          <div className="form-grid">
+            <label className="field">
+              <span>{copy.titlePlaceholder}</span>
+              <input
+                className="input"
+                autoFocus
+                value={draft.title}
+                onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+              />
+            </label>
+            <label className="field">
+              <span>{copy.detailsPlaceholder}</span>
+              <textarea
+                className="input"
+                rows={3}
+                value={draft.details}
+                onChange={(event) => setDraft({ ...draft, details: event.target.value })}
+              />
+            </label>
+          </div>
+          <div className="dialog-actions">
+            <button type="button" className="btn btn-secondary" onClick={closeComposer} disabled={busy}>
+              {copy.cancel}
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={busy || draft.title.trim() === ""}
+              title={draft.title.trim() === "" ? copy.titleRequired : undefined}
+              onClick={submit}
+            >
+              {copy.create}
+            </button>
+          </div>
+        </Dialog>
+      ) : null}
     </div>
   );
 }
