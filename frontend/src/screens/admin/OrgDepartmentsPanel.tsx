@@ -235,9 +235,6 @@ export default function OrgDepartmentsPanel() {
       <div className="section-heading">
         <h2 id="hr-org-heading">{t("adminOrgTitle")}</h2>
         <div className="row-actions">
-          <button className="btn btn-secondary" type="button" onClick={() => setAttempt((n) => n + 1)}>
-            {t("retry")}
-          </button>
           <button className="btn btn-secondary" type="button" onClick={openDepartmentDialog}>
             {t("adminOrgAddDepartment")}
           </button>
