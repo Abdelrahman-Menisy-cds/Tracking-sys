@@ -1,105 +1,352 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar" dir="rtl" data-theme="light">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>هي فوضى؟ — دليل المنتج</title>
+<meta name="description" content="دليل منتج «هي فوضى؟» — نظام طلبات الموظفين وسجل الوقت والحضور: الأقسام، الأدوار، المساعد الذكي، ورأي المساعد في مراجعات الفريق." />
+<!-- The brand mark in the tab. /favicon.svg is the app's scalable mark; the
+     PNGs are the raster fallbacks the app itself links. All three are served
+     from the app's own origin (config/spa.py: `brand/` + the root files), so an
+     absolute path is correct for /guide — which is the way this page ships. -->
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/png" sizes="256x256" href="/brand/favicon.png" />
+<link rel="icon" type="image/png" sizes="64x64" href="/brand/favicon-64.png" />
+<link rel="apple-touch-icon" href="/brand/mark-512.png" />
+<script>
+  // The guide is a standalone page, so it cannot import the app's stylesheet —
+  // it mirrors the tokens below and follows the appearance the reader already
+  // chose IN the app (the same localStorage key the app writes), falling back to
+  // the OS preference. Nothing here writes the app's key. This runs in <head>
+  // so the first paint is already the right theme.
+  (() => {
+    const read = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
+    const named = (value) => value === "light" || value === "dark";
+    const guide = read("tracking-sys.guide-appearance");
+    const app = read("tracking-sys.appearance");
+    const system = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    const choice = named(guide) ? guide : named(app) ? app : "system";
+    document.documentElement.dataset.theme = choice === "system" ? system : choice;
+    document.documentElement.dataset.appearance = choice;
+  })();
+</script>
 <style>
-  :root{
-    --bg:#F7F7F9; --surface:#FFFFFF; --text:#18181B; --muted:#52525B;
-    --border:#E4E4E7; --accent:#C2185B; --accent-soft:#FCE7F1;
-    --ok:#15803D; --warn:#B45309; --sp:16px; --radius:14px;
-    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
-    --sans:"Segoe UI",system-ui,-apple-system,"Noto Sans Arabic",Tahoma,sans-serif;
+  /* ==========================================================================
+     TOKENS — mirrored from frontend/src/styles/global.css (the app's one source
+     of truth: colour, radii, spacing, type, elevation). Same names, same values,
+     so this page reads as one product with the app instead of a parallel look.
+     ========================================================================== */
+  :root {
+    color-scheme: dark;
+
+    --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+    --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px;
+    --space-12: 48px;
+    --sp-1: var(--space-1); --sp-2: var(--space-2); --sp-3: var(--space-3);
+    --sp-4: var(--space-4); --sp-5: var(--space-5); --sp-6: var(--space-6);
+    --sp-8: var(--space-8);
+
+    --radius-xs: 4px; --radius-sm: 8px; --radius-md: 12px;
+    --radius-pill: 999px; --radius-surface: var(--radius-md);
+
+    --font-ar: "Noto Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+    --font-size-xs: 12px; --font-size-sm: 14px; --font-size-md: 16px;
+    --font-size-lg: 18px; --font-size-xl: 22px; --font-size-2xl: 26px;
+    --font-size-3xl: 32px; --font-size-4xl: 40px;
+    --line-height-tight: 1.25; --line-height-heading: 1.35; --line-height-ar: 1.65;
+
+    --elevation-1: 0 1px 2px rgb(0 0 0 / .18), 0 8px 24px rgb(0 0 0 / .16);
+    --motion-rest: 160ms;
+
+    --page-bg: #1A1A1F;
+    --surface: #232329;
+    --surface-raised: #26262D;
+    --surface-subtle: #2A2A30;
+    --surface-inset: #15151A;
+    --card-border: rgba(255, 255, 255, .08);
+    --border-subtle: var(--card-border);
+
+    --text: #F4F4F5; --text-strong: #FFFFFF; --text-muted: #A1A1AA;
+
+    --accent: #F06060; --accent-strong: #F28888;
+    --accent-soft: rgb(240 96 96 / .14); --accent-border: rgb(240 96 96 / .38);
+    --on-accent: #172129;
+
+    --success: #3FCE96;
+    --success-soft: rgb(52 211 153 / .14); --success-border: rgb(52 211 153 / .38);
+    --warning: #F2B84B;
+    --warning-soft: rgb(251 191 36 / .15); --warning-border: rgb(251 191 36 / .38);
+    --danger: #F28A50;
+    --danger-soft: rgb(251 146 60 / .15); --danger-border: rgb(251 146 60 / .38);
+    --neutral: #A1A1AA; --neutral-soft: rgb(161 161 170 / .15); --neutral-border: rgb(161 161 170 / .38);
+
+    --focus-ring: rgb(240 96 96 / .45);
+    --selection-bg: var(--accent); --selection-text: var(--on-accent);
+    --scrollbar-track: var(--surface-inset); --scrollbar-thumb: var(--surface-subtle);
+
+    --content-max: 1280px; --rail-width: 268px;
   }
-  @media (prefers-color-scheme:dark){
-    :root{ --bg:#0E0E10; --surface:#18181B; --text:#FAFAFA; --muted:#A1A1AA;
-           --border:#27272A; --accent:#F472B6; --accent-soft:#3B0A22; }
+  :root[data-theme="light"] {
+    color-scheme: light;
+
+    --page-bg: #F4F4F5; --surface: #FFFFFF; --surface-raised: #FFFFFF;
+    --surface-subtle: #ECECEE; --surface-inset: #E8E8EA;
+    --card-border: rgb(24 24 27 / .10);
+
+    --text: #18181B; --text-strong: #09090B; --text-muted: #606060;
+
+    --accent: #C80000; --accent-strong: #A30000;
+    --accent-soft: rgb(200 0 0 / .10); --accent-border: rgb(200 0 0 / .34);
+    --on-accent: #FFFFFF;
+
+    --success: #047857;
+    --success-soft: rgb(4 120 87 / .12); --success-border: rgb(4 120 87 / .34);
+    --warning: #A16207;
+    --warning-soft: rgb(161 98 7 / .13); --warning-border: rgb(161 98 7 / .38);
+    --danger: #BF4A0A;
+    --danger-soft: rgb(191 74 10 / .12); --danger-border: rgb(191 74 10 / .34);
+    --neutral: #606060; --neutral-soft: rgb(96 96 96 / .13); --neutral-border: rgb(96 96 96 / .34);
+
+    --focus-ring: rgb(200 0 0 / .40);
+    --elevation-1: 0 1px 2px rgb(15 23 42 / .06), 0 8px 24px rgb(15 23 42 / .08);
+    --scrollbar-thumb: color-mix(in srgb, var(--neutral) 55%, var(--surface));
   }
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
-       line-height:1.85;font-size:17px}
-  .wrap{display:grid;grid-template-columns:280px 1fr;gap:0;max-width:1280px;margin:0 auto;
-        background:var(--surface);min-height:100vh;box-shadow:0 0 40px rgba(0,0,0,.06)}
-  nav{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
-      padding:28px 20px;border-inline-start:1px solid var(--border);background:var(--surface)}
-  nav .brand{font-weight:800;font-size:19px;color:var(--accent);margin-bottom:4px}
-  nav .tag{font-size:13px;color:var(--muted);margin-bottom:22px}
-  nav a{display:block;padding:7px 10px;color:var(--muted);text-decoration:none;
-        border-radius:9px;font-size:15px;margin-bottom:2px}
-  nav a:hover{background:var(--accent-soft);color:var(--accent)}
-  nav .sub{padding-inline-start:22px;font-size:14px}
-  main{padding:44px 52px 90px;min-width:0}
-  h1{font-size:36px;line-height:1.3;margin:0 0 10px}
-  h2{font-size:26px;margin:52px 0 14px;padding-bottom:10px;border-bottom:2px solid var(--border)}
-  h3{font-size:20px;margin:32px 0 10px;color:var(--accent)}
-  h4{font-size:17px;margin:22px 0 8px}
-  p,li{color:var(--text)}
-  .lead{font-size:19px;color:var(--muted);margin-bottom:8px}
-  .tagline{display:inline-block;background:var(--accent-soft);color:var(--accent);
-           padding:6px 14px;border-radius:999px;font-weight:700;font-size:15px;margin-bottom:24px}
-  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:15.5px}
-  th,td{text-align:right;padding:11px 14px;border-bottom:1px solid var(--border)}
-  th{background:var(--bg);font-weight:700}
-  code{font-family:var(--mono);background:var(--bg);padding:2px 7px;border-radius:6px;font-size:14.5px}
-  pre{background:var(--bg);padding:16px 18px;border-radius:var(--radius);overflow-x:auto;
-      border:1px solid var(--border);font-size:14.5px;line-height:1.7}
-  pre code{background:none;padding:0}
-  blockquote{margin:18px 0;padding:14px 18px;background:var(--accent-soft);
-             border-inline-start:4px solid var(--accent);border-radius:10px;color:var(--text)}
-  blockquote p{margin:0}
-  .card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);
-        padding:20px 22px;margin:18px 0}
-  .ai{border:2px solid var(--accent);background:var(--surface)}
-  .ai h3{color:var(--accent)}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:18px 0}
-  .grid .card{margin:0}
-  .pill{display:inline-block;background:var(--accent-soft);color:var(--accent);
-        border-radius:999px;padding:2px 11px;font-size:13px;font-weight:700;margin-inline-start:6px}
-  .ok{color:var(--ok);font-weight:700}
-  .warn{color:var(--warn);font-weight:700}
-  hr{border:0;border-top:1px solid var(--border);margin:44px 0}
-  footer{padding:30px 0 10px;color:var(--muted);font-size:14px;border-top:1px solid var(--border);margin-top:50px}
-  @media (max-width:900px){
-    .wrap{grid-template-columns:1fr}
-    nav{position:static;height:auto;border-inline-start:0;border-bottom:1px solid var(--border)}
-    main{padding:26px 20px 70px}
-    h1{font-size:28px} h2{font-size:22px}
+
+  /* ================================ base ================================ */
+  * { box-sizing: border-box; }
+  html { scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); scrollbar-width: thin; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--text);
+    font-family: var(--font-ar);
+    font-size: var(--font-size-md);
+    line-height: var(--line-height-ar);
+    -webkit-tap-highlight-color: transparent;
+  }
+  ::selection { background: var(--selection-bg); color: var(--selection-text); }
+  :focus-visible { outline: var(--space-1) solid var(--focus-ring); outline-offset: var(--space-1); }
+  a { color: var(--accent-strong); text-underline-offset: 3px; }
+  a:hover { color: var(--accent); }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    padding: 1px 6px; border-radius: var(--radius-xs);
+    font-size: .92em; direction: ltr; display: inline-block;
+  }
+  bdi { unicode-bidi: isolate; }
+
+  /* =============================== layout =============================== */
+  .wrap {
+    display: grid;
+    grid-template-columns: var(--rail-width) minmax(0, 1fr);
+    max-width: var(--content-max);
+    margin: 0 auto;
+    background: var(--surface);
+    border-inline: 1px solid var(--border-subtle);
+    min-height: 100vh;
+    box-shadow: var(--elevation-1);
+  }
+  .rail {
+    position: sticky; inset-block-start: 0; align-self: start;
+    max-height: 100vh; overflow-y: auto;
+    padding: var(--sp-6) var(--sp-5) var(--sp-8);
+    border-inline-start: 1px solid var(--border-subtle);
+    background: var(--surface);
+  }
+  .rail-brand { display: flex; flex-direction: column; gap: var(--sp-2); padding-block-end: var(--sp-4); border-block-end: 1px solid var(--border-subtle); }
+  .rail-brand img { display: block; width: min(180px, 100%); height: auto; }
+  .rail-brand .kicker { font-size: var(--font-size-sm); color: var(--text-muted); }
+  /* The app ships a logo per theme (BrandLockup picks logo-<theme>.png); the
+     guide does the same instead of recolouring one file with a filter. The
+     `.rail-brand img` rule above is more specific than a bare class, so the
+     hide/show rules carry the same `.rail-brand img` prefix. */
+  .rail-brand img.logo-light { display: none; }
+  :root[data-theme="light"] .rail-brand img.logo-light { display: block; }
+  :root[data-theme="light"] .rail-brand img.logo-dark { display: none; }
+
+  .rail-nav { display: flex; flex-direction: column; gap: 2px; padding-block: var(--sp-4); }
+  .rail-nav a {
+    display: block; padding: 7px var(--sp-3); border-radius: var(--radius-sm);
+    color: var(--text-muted); text-decoration: none; font-size: var(--font-size-sm);
+    transition: background-color var(--motion-rest) ease, color var(--motion-rest) ease;
+  }
+  .rail-nav a:hover { background: var(--accent-soft); color: var(--accent); }
+  .rail-nav a.sub { padding-inline-start: var(--sp-6); }
+  .rail-nav a.group { color: var(--text); font-weight: 700; margin-block-start: var(--sp-2); }
+
+  .rail-tools { display: flex; flex-direction: column; gap: var(--sp-2); padding-block: var(--sp-4); border-block-end: 1px solid var(--border-subtle); }
+  .segmented { display: inline-flex; background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-pill); padding: 3px; }
+  .segmented button {
+    font: inherit; font-size: var(--font-size-xs); font-weight: 700;
+    border: 0; background: none; color: var(--text-muted);
+    padding: 5px var(--sp-3); border-radius: var(--radius-pill); cursor: pointer;
+    transition: background-color var(--motion-rest) ease, color var(--motion-rest) ease;
+  }
+  .segmented button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+
+  main { padding: var(--space-12) var(--space-12) 90px; min-width: 0; }
+  main > * { max-width: 900px; }
+
+  /* ============================== typography ============================== */
+  h1 { font-size: var(--font-size-4xl); line-height: var(--line-height-tight); margin: 0 0 var(--sp-3); color: var(--text-strong); }
+  h2 {
+    font-size: var(--font-size-2xl); line-height: var(--line-height-heading);
+    margin: var(--space-12) 0 var(--sp-4); color: var(--text-strong);
+    padding-block-end: var(--sp-3); border-block-end: 1px solid var(--border-subtle);
+  }
+  h3 { font-size: var(--font-size-xl); margin: var(--space-8) 0 var(--sp-3); color: var(--text-strong); }
+  h4 { font-size: var(--font-size-lg); margin: var(--space-6) 0 var(--sp-2); color: var(--text-strong); }
+  p { margin: 0 0 var(--sp-4); }
+  p, li { color: var(--text); }
+  .lede { font-size: var(--font-size-lg); color: var(--text-muted); }
+  .tagline {
+    display: inline-block; background: var(--accent-soft); color: var(--accent);
+    border: 1px solid var(--accent-border); padding: 5px var(--sp-4);
+    border-radius: var(--radius-pill); font-weight: 700; font-size: var(--font-size-sm);
+    margin-block-end: var(--sp-6);
+  }
+  .muted { color: var(--text-muted); }
+
+  /* =============================== blocks =============================== */
+  .card {
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-surface);
+    padding: var(--sp-5) var(--sp-6);
+    margin-block: var(--sp-5);
+  }
+  .card > :last-child { margin-block-end: 0; }
+  .card.raised { background: var(--surface-raised); box-shadow: var(--elevation-1); }
+  .card.accent { background: var(--surface-raised); border-color: var(--accent-border); }
+  .card.accent h3, .card.accent h4 { color: var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: var(--sp-4); margin-block: var(--sp-5); }
+  .grid > .card { margin: 0; }
+
+  ul, ol { margin: 0 0 var(--sp-4); padding-inline-start: var(--sp-6); }
+  li { margin-block-end: var(--sp-2); }
+  li > ul, li > ol { margin-block: var(--sp-2); }
+
+  blockquote {
+    margin: var(--sp-5) 0; padding: var(--sp-4) var(--sp-5);
+    background: var(--accent-soft); border-inline-start: 3px solid var(--accent);
+    border-radius: var(--radius-sm); color: var(--text);
+  }
+  blockquote p { margin: 0; }
+  blockquote.honest { background: var(--warning-soft); border-inline-start-color: var(--warning); }
+
+  pre {
+    background: var(--surface-inset); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-surface); padding: var(--sp-4) var(--sp-5);
+    overflow-x: auto; font-size: var(--font-size-sm); line-height: 1.7; margin-block: var(--sp-5);
+  }
+  pre code { background: none; border: 0; padding: 0; display: block; }
+
+  .pill {
+    display: inline-block; border-radius: var(--radius-pill); padding: 2px 11px;
+    font-size: var(--font-size-xs); font-weight: 700; margin-inline-start: var(--sp-2);
+    border: 1px solid transparent; vertical-align: middle;
+  }
+  .pill.accent { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); }
+  .pill.success { background: var(--success-soft); border-color: var(--success-border); color: var(--success); }
+  .pill.warning { background: var(--warning-soft); border-color: var(--warning-border); color: var(--warning); }
+  .pill.danger { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger); }
+  .pill.neutral { background: var(--neutral-soft); border-color: var(--neutral-border); color: var(--text-muted); }
+
+  .table-wrap { overflow-x: auto; margin-block: var(--sp-5); border: 1px solid var(--border-subtle); border-radius: var(--radius-surface); }
+  table { width: 100%; border-collapse: collapse; font-size: var(--font-size-sm); background: var(--surface-raised); }
+  caption { caption-side: top; text-align: start; padding: var(--sp-3) var(--sp-4); color: var(--text-muted); font-size: var(--font-size-xs); }
+  th, td { text-align: start; padding: 11px var(--sp-4); border-block-end: 1px solid var(--border-subtle); vertical-align: top; }
+  thead th { background: var(--surface-inset); font-weight: 700; color: var(--text-strong); white-space: nowrap; }
+  tbody tr:last-child td { border-block-end: 0; }
+
+  .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: var(--sp-3); margin-block: var(--sp-5); }
+  .strip .item { background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: var(--sp-3) var(--sp-4); }
+  .strip .value { display: block; font-size: var(--font-size-xl); font-weight: 800; color: var(--text-strong); }
+  .strip .label { display: block; font-size: var(--font-size-xs); color: var(--text-muted); }
+
+  hr { border: 0; border-block-start: 1px solid var(--border-subtle); margin: var(--space-10) 0; }
+  footer { margin-block-start: var(--space-12); padding-block-start: var(--sp-6); border-block-start: 1px solid var(--border-subtle); color: var(--text-muted); font-size: var(--font-size-sm); }
+
+  /* ============================== narrow ============================== */
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: minmax(0, 1fr); border-inline: 0; }
+    .rail {
+      position: static; max-height: none;
+      border-inline-start: 0; border-block-end: 1px solid var(--border-subtle);
+      padding: var(--sp-5) var(--sp-5) var(--sp-4);
+    }
+    .rail-brand { align-items: flex-start; }
+    .rail-nav { flex-direction: row; flex-wrap: wrap; gap: var(--sp-1); }
+    .rail-nav a { border: 1px solid var(--border-subtle); }
+    .rail-nav a.sub { padding-inline-start: var(--sp-3); }
+    main { padding: var(--space-6) var(--sp-5) 70px; }
+    h1 { font-size: var(--font-size-3xl); }
+    h2 { font-size: var(--font-size-xl); }
+    h3 { font-size: var(--font-size-lg); }
+  }
+  @media print {
+    .rail, .rail-tools { display: none; }
+    .wrap { display: block; border: 0; box-shadow: none; }
+    main { padding: 0; }
   }
 </style>
 </head>
 <body>
 <div class="wrap">
 
-<nav>
-  <div class="brand">هي فوضى؟</div>
-  <div class="tag">دليل المنتج</div>
-  <a href="#what">١ · إيه ده؟</a>
-  <a href="#glance">٢ · لمحة سريعة</a>
-  <a href="#roles">٣ · الأدوار التلاتة</a>
-  <a href="#modules">٤ · دليل الأقسام</a>
-  <a class="sub" href="#m-auth">تسجيل الدخول</a>
-  <a class="sub" href="#m-requests">طلباتي</a>
-  <a class="sub" href="#m-timesheets">سجلات وقتي</a>
-  <a class="sub" href="#m-reviews">مراجعات الفريق</a>
-  <a class="sub" href="#m-hr">لوحة الموارد البشرية</a>
-  <a class="sub" href="#m-reports">التقارير</a>
-  <a class="sub" href="#m-attendance">الحضور</a>
-  <a class="sub" href="#m-notifications">الإشعارات</a>
-  <a href="#ai" style="color:var(--accent);font-weight:700">٥ · الذكاء الاصطناعي ★</a>
-  <a href="#security">٦ · الأمان والعزل</a>
-  <a href="#stack">٧ · التقنيات</a>
-  <a href="#try">٨ · جرّب بنفسك</a>
-  <a href="#faq">٩ · أسئلة شائعة</a>
+<nav class="rail" aria-label="أقسام الدليل">
+  <div class="rail-brand">
+    <img class="logo-light" src="/brand/logo-light.png" alt="هي فوضى؟ — من الفوضى إلى النظام" />
+    <img class="logo-dark" src="/brand/logo-dark.png" alt="" aria-hidden="true" />
+    <span class="kicker">دليل المنتج</span>
+  </div>
+
+  <div class="rail-tools">
+    <div class="segmented" role="group" aria-label="مظهر الصفحة">
+      <button type="button" data-appearance="system" aria-pressed="true">حسب النظام</button>
+      <button type="button" data-appearance="light" aria-pressed="false">فاتح</button>
+      <button type="button" data-appearance="dark" aria-pressed="false">غامق</button>
+    </div>
+    <span class="kicker muted">نفس هوية التطبيق ونفس المظهر اللي اخترته جواه.</span>
+  </div>
+
+  <div class="rail-nav">
+    <a href="#what">١ · إيه ده؟</a>
+    <a href="#glance">٢ · لمحة سريعة</a>
+    <a href="#roles">٣ · الأدوار التلاتة</a>
+    <a class="group" href="#modules">٤ · دليل الأقسام</a>
+    <a class="sub" href="#m-auth">تسجيل الدخول والإنشاء</a>
+    <a class="sub" href="#m-requests">طلباتي</a>
+    <a class="sub" href="#m-timesheets">سجلات وقتي</a>
+    <a class="sub" href="#m-tasks">المهام</a>
+    <a class="sub" href="#m-reviews">مراجعات الفريق</a>
+    <a class="sub" href="#m-hr">لوحة الموارد البشرية</a>
+    <a class="sub" href="#m-announcements">الإعلانات الداخلية</a>
+    <a class="sub" href="#m-reports">التقارير</a>
+    <a class="sub" href="#m-attendance">الحضور والانصراف</a>
+    <a class="sub" href="#m-notifications">الإشعارات والتنقّل</a>
+    <a class="group" href="#ai">٥ · الذكاء الاصطناعي <span class="pill accent">★</span></a>
+    <a class="sub" href="#a-afaf">المساعد «مدام عفاف»</a>
+    <a class="sub" href="#a-holidays">تحديد أيام العطل</a>
+    <a class="sub" href="#a-advice">رأي المساعد في المراجعات</a>
+    <a href="#security">٦ · الأمان والعزل</a>
+    <a href="#stack">٧ · التقنيات</a>
+    <a href="#try">٨ · جرّب بنفسك</a>
+    <a href="#faq">٩ · أسئلة شائعة</a>
+  </div>
 </nav>
 
 <main>
   <h1>هي فوضى؟</h1>
-  <div class="tagline">خلي السيستم يتصرف.</div>
-  <p class="lead">
-    نظام واحد يجمع <strong>طلبات الموظفين</strong> و<strong>سجل الوقت والحضور</strong>،
-    بثلاثة أدوار (موظف · مدير · موارد بشرية)، ومساعد ذكي جواه
-    <strong>يسألك قبل أي تغيير</strong>.
+  <div class="tagline">من الفوضى إلى النظام</div>
+  <p class="lede">
+    نظام واحد يجمع <strong>طلبات الموظفين</strong> و<strong>سجل الوقت والحضور</strong>
+    و<strong>المهام</strong>، بثلاثة أدوار (موظف · مدير · موارد بشرية)، ومساعد ذكي
+    جواه <strong>يسألك قبل أي تغيير</strong> — وفي شاشة المراجعة يوصلك
+    <strong>«رأي المساعد»</strong> محسوبًا بقواعد على الخادم.
   </p>
 
   <h2 id="what">١ · إيه ده؟</h2>
@@ -108,22 +355,31 @@
   <p><strong>«هي فوضى؟»</strong> بيحل ده بإنه يحط كل ده في مكان واحد:</p>
   <ul>
     <li><strong>الطلب</strong> بيتقدّم من النظام، وحالته معروفة لحظة بلحظة
-        (مسودة · بانتظار المدير · بانتظار HR · معتمد · مرفوض · معاد للتعديل).</li>
-    <li><strong>الوقت</strong> بيتسجّل يوميًا وبيتجمّع في سجل أسبوعي للمراجعة.</li>
+        (مسودة · بانتظار المدير · بانتظار HR · معتمد · مرفوض · معاد للتعديل · ملغى).</li>
+    <li><strong>الوقت</strong> بيتسجّل على أسبوع (الاثنين→الأحد) وبيتجمّع في سجل
+        أسبوعي للمراجعة، و<strong>الحضور</strong> بيتسجّل ببصمة دخول/خروج من
+        جدول الدوام الساري.</li>
+    <li><strong>الشغل اليومي</strong> كمان له مكان: <strong>مهام</strong> بتنشأ
+        وبتتسند وبتمشي من مفتوحة لـ«قيد التنفيذ» لـ«مكتملة» على الخادم.</li>
     <li><strong>الصلاحيات</strong> محددة على السيرفر: الموظف يشوف بتاعه، المدير
         فريقه، والموارد البشرية الشركة كلها.</li>
   </ul>
   <p><strong>لمين؟</strong> أي شركة عندها موظفين ومديرين وقسم موارد بشرية.</p>
 
   <h2 id="glance">٢ · لمحة سريعة</h2>
-  <table>
-    <tr><th>السؤال</th><th>الإجابة</th></tr>
-    <tr><td>بيشتغل على إيه؟</td><td>متصفح — ديسكتوب · تابلت · موبايل</td></tr>
-    <tr><td>اللغة؟</td><td>عربي (RTL) وإنجليزي (LTR) — تبديل لحظي</td></tr>
-    <tr><td>الوضع الليلي؟</td><td>فاتح · غامق · أو حسب النظام</td></tr>
-    <tr><td>الأدوار؟</td><td>موظف · مدير · موارد بشرية</td></tr>
-    <tr><td>العزل؟</td><td>كل شركة معزولة تمامًا عن التانية</td></tr>
-  </table>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>السؤال</th><th>الإجابة</th></tr></thead>
+      <tbody>
+        <tr><td>بيشتغل على إيه؟</td><td>متصفح — ديسكتوب · تابلت · موبايل</td></tr>
+        <tr><td>اللغة؟</td><td>عربي (RTL) وإنجليزي (LTR) — تبديل لحظي</td></tr>
+        <tr><td>المظهر؟</td><td>فاتح · غامق · أو حسب النظام</td></tr>
+        <tr><td>الأدوار؟</td><td>موظف · مدير · موارد بشرية</td></tr>
+        <tr><td>الذكاء الاصطناعي؟</td><td>مساعد بيسأل قبل أي تغيير + رأي محسوب بقواعد على الخادم في المراجعات</td></tr>
+        <tr><td>العزل؟</td><td>كل شركة معزولة تمامًا عن التانية</td></tr>
+      </tbody>
+    </table>
+  </div>
 
   <h2 id="roles">٣ · الأدوار التلاتة</h2>
   <div class="grid">
@@ -131,9 +387,10 @@
       <h4>موظف</h4>
       <ul>
         <li>ملفه الشخصي وبياناته</li>
-        <li>ينشئ طلبات (إجازة · إذن · سلفة · شهادة) ويحفظها مسودة</li>
-        <li>يسجّل وقته يوميًا ويقدّم السجل الأسبوعي</li>
-        <li>يتابع الحالة وسجل النشاط</li>
+        <li>ينشئ طلبات (إجازة · إذن · سلفة · شهادة خبرة) ويحفظها مسودة</li>
+        <li>يسجّل وقته أسبوعيًا ويقدّم السجل</li>
+        <li>يقرأ مهامه ويحرّك حالتها</li>
+        <li>يبصم دخول/خروج ويتابع سجل حضوره</li>
       </ul>
     </div>
     <div class="card">
@@ -142,16 +399,19 @@
         <li>يشوف <strong>الموظفين اللي بيتبعوه بس</strong></li>
         <li>يراجع طلبات فريقه: موافقة · رفض · إعادة للتعديل</li>
         <li>يراجع سجلات الوقت ويرجّع اللي محتاج تصحيح</li>
-        <li>داشبورد الفريق</li>
+        <li>وعنده عمود <strong>«رأي المساعد»</strong> جانب كل طلب</li>
+        <li>يدشبورد الفريق + تقارير فريقه</li>
       </ul>
     </div>
     <div class="card">
       <h4>موارد بشرية</h4>
       <ul>
-        <li>إدارة الموظفين وخطوط الإبلاغ والأدوار</li>
+        <li>إدارة الموظفين والأقسام وخطوط الإبلاغ والأدوار</li>
         <li>إشراف على كل الطلبات والسجلات</li>
-        <li>التقارير وتصدير CSV</li>
+        <li><strong>نظرة عامة</strong> بلقطة اليوم لكل المؤسسة</li>
+        <li><strong>استحقاقات الإجازات</strong> لكل موظف وتعديل الرصيد</li>
         <li>إعدادات المؤسسة: أنواع الطلبات · جدول الدوام · الأعياد</li>
+        <li><strong>الإعلانات الداخلية</strong> + سجل إرسالها</li>
       </ul>
     </div>
   </div>
@@ -164,74 +424,157 @@
   <ul>
     <li><strong>دخول</strong> بإيميل وباسورد مع جلسة آمنة (حماية CSRF).</li>
     <li><strong>إنشاء شركة جديدة</strong>: خطوتين — بيانات الشركة + كود التفعيل
-        أولًا، وبعدها حساب الموارد البشرية (أول حساب). الشركة بتتعمل في قاعدة
-        البيانات بعد التأكد إن كل حاجة تمام.</li>
+        أولًا، وبعدها حساب الموارد البشرية (أول حساب). الشركة + بروفايلها +
+        حساب الموارد البشرية بيتكتبوا في <strong>معاملة واحدة</strong>: لو أي
+        حاجة اترفضت، مفيش صف واحد بيتكتب.</li>
     <li><strong>أول زيارة</strong> بتفتح بالوضع الفاتح، وبعدها بيفضل اختيارك.</li>
   </ul>
 
   <h3 id="m-requests">٤.٢ طلباتي</h3>
   <ul>
-    <li><strong>إنشاء طلب</strong>: النوع + عنوان + تفاصيل + إمكانية إرفاق مستندات.</li>
-    <li><strong>مسودة</strong> → مراجعة → <strong>إرسال</strong> → بتتحوّل للمدير
-        (أو HR حسب نوع الطلب).</li>
-    <li><strong>متابعة الحالة</strong> وسجل النشاط (مين عمل إيه وامتى).</li>
+    <li><strong>«طلب جديد»</strong> بيسأل: <strong>نوع الطلب</strong> من قايمة
+        أنواع شركتك الحقيقية (اللي معرّفها الخادم، وجنب كل نوع إذا كان
+        <em>يشمل مراجعة الموارد البشرية</em> أو لأ)، و<strong>المدة</strong>
+        (من/إلى)، و<strong>السبب</strong>، وإمكانية <strong>إرفاق مستندات</strong>.</li>
+    <li><strong>الفترة بتتخزّن جوه عنوان الطلب</strong> بصيغة تاريخ واضحة
+        (<code>YYYY-MM-DD</code>) — الخادم ملهوش أعمدة تواريخ منفصلة، وده نفس
+        الشكل اللي قارئ الفترة على الخادم بيرجّعه منه. علشان كده عنوان طلب
+        الإجازة بيبان مثلاً: <code>إجازة اعتيادية - 2026-10-18</code>.</li>
+    <li><strong>المرفقات</strong> بتترفع على الطلب بعد ما المسودة تتكوّن، والخادم
+        بيفحص كل ملف، والإرسال مش بيعدّي قبل ما الفحص يرجع <strong>سليم</strong>.</li>
+    <li><strong>مسودة</strong> → مراجعة → <strong>إرسال</strong> → الطلب
+        بيتحوّل للمدير أو للموارد البشرية حسب نوعه.</li>
+    <li><strong>الخطوة التالية</strong> مكتوبة في سجل الطلب (مراجعة المدير ·
+        مراجعة الموارد البشرية · «أنت — صحح ثم أرسل» · لا يوجد إجراء مطلوب).</li>
+    <li><strong>«متابعة المسودة» / «متابعة التصحيح»</strong> بتفتح
+        <strong>نفس الطلب</strong> في نموذج التعديل: تعدّل ثم تعيد الإرسال —
+        مفيش طلب جديد بيتكوّن، والنوع بيفضل ثابت على الطلب القائم.</li>
     <li><strong>إلغاء</strong> في الحالات المسموح بيها.</li>
   </ul>
 
   <h3 id="m-timesheets">٤.٣ سجلات وقتي</h3>
   <ul>
-    <li><strong>إدخال يومي</strong>: التاريخ + من/إلى أو الساعات + وصف الشغل.</li>
-    <li><strong>مسودة</strong> للسجل الأسبوعي → <strong>إرسال للمراجعة</strong>.</li>
-    <li><strong>بعد الإرسال</strong> السجل بيبقى <em>للقراءة فقط</em> — إلا لو
-        اترجع للتعديل أو فتحه دور مصرّح له.</li>
-    <li><strong>الأسبوع الحالي</strong>: نسبة الإنجاز · المتبقي · مقابل الهدف.</li>
+    <li>جدول أسابيع: الأسبوع (الاثنين→الأحد · توقيت المؤسسة: القاهرة) ·
+        الحالة · إجمالي الساعات · آخر تحديث.</li>
+    <li>فتح الأسبوع بيوريك يوم بيوم: <strong>المدة بالدقائق · الراحة غير
+        المدفوعة · وصف الشغل</strong>، وكل تعديل بيتبعت للخادم فورًا مع
+        <strong>إصدار السجل</strong> (لو الإصدار اتغيّر، الشاشة بتقولك أعد
+        التحميل بدل ما تخبّي الفشل).</li>
+    <li><strong>الإرسال</strong> للمراجعة بيحوّل السجل <em>للقراءة فقط</em> —
+        لحد ما يترجع للتعديل أو يفتحه دور مصرّح له.</li>
+    <li>الإجمالي والراحة ظاهرين في شريط ملخّص تحت الجدول.</li>
   </ul>
 
-  <h3 id="m-reviews">٤.٤ مراجعات الفريق</h3>
+  <h3 id="m-tasks">٤.٤ المهام</h3>
   <ul>
-    <li>طلبات وسجلات <strong>بانتظار قرارك</strong>: موافقة · رفض · إعادة للتعديل
-        (مع سبب).</li>
-    <li><strong>شريط الانتباه</strong> بيوريك اللي محتاج تصرّف فورًا.</li>
+    <li>تابين من نداء واحد على الخادم: <strong>«مهامي»</strong> (اللي مسندة
+        لك) و<strong>«مهام أنشأتها»</strong>.</li>
+    <li><strong>«مهمة جديدة»</strong> بتفتح في نافذة: العنوان · التفاصيل ·
+        <strong>المكلَّف</strong> (من قايمة اللي الخادم بيسمحلك تسندلهم، أو
+        «بدون تكليف») · واختيار مرفقات.</li>
+    <li>الحالة بتتحرّك على الخادم: <strong>مفتوحة → قيد التنفيذ → مكتملة</strong>،
+        فاللي بيشوف المهمة بيشوف نفس الحالة.</li>
+  </ul>
+  <blockquote class="honest"><p><strong>بصراحة:</strong> اختيار المرفقات في نافذة
+    المهمة بيجمّع الملفات ويوريك عددها، لكن <strong>رفعها مش موصّل من الشاشة
+    بعد</strong> — النافذة بتقول ده بدل ما تتظاهر إن الملف اترفع.</p></blockquote>
+
+  <h3 id="m-reviews">٤.٥ مراجعات الفريق</h3>
+  <ul>
+    <li>تابين: <strong>الطلبات</strong> و<strong>سجلات الوقت</strong>، والقايمة
+        بتوصل من الخادم مقيّدة على نطاقك: كل صف بيقول إذا كان ليك عليه إجراء
+        مراجعة أو لأ.</li>
+    <li>أعمدة الطلبات: العنوان والنوع · الموظف · الحالة · تاريخ الإنشاء ·
+        <strong>المرحلة التالية</strong> · <strong>«رأي المساعد»</strong> ·
+        <strong>القرار</strong>.</li>
+    <li><strong>القرار</strong>: موافقة · إعادة للتعديل · رفض — والسبب مطلوب
+        للإرجاع والرفض، والقرار بيتنفّذ بمفتاح Idempotency فمش بيتكرّر لو
+        الشبكة قطعت.</li>
+    <li>فتح الطلب بيوريك السبب والمرفقات و<strong>سجل الأحداث</strong> (مين عمل
+        إيه وامتى) وكارت <strong>«رأي المساعد»</strong> بالوقائع والشرح.</li>
+    <li>«رأي المساعد» <strong>استشاري فقط ومش بيمنع القرار</strong> — العمود
+        اللي جنبه هو اللي بيقرر.</li>
   </ul>
 
-  <h3 id="m-hr">٤.٥ لوحة الموارد البشرية</h3>
+  <h3 id="m-hr">٤.٦ لوحة الموارد البشرية</h3>
   <ul>
-    <li><strong>الموظفين</strong>: إضافة · تعديل · تفعيل/إيقاف · تحديد المدير والقسم.</li>
-    <li><strong>الأقسام</strong>: إنشاء وإدارة.</li>
+    <li><strong>نظرة عامة — لقطة اليوم</strong>: اسم جدول الدوام الساري، وعدد
+        الموظفين في كل حالة (حاضر · غائب · يوم راحة · ناقص · لا يوجد جدول)،
+        وصف لكل موظف: أول دخول · آخر خروج · ساعات العمل · الحالة. ولو مفيش جدول
+        دوام معتمد، الصفحة بتقول ده بصراحة بدل ما ترسم جدول فاضي يتقرأ إن
+        محدش جه.</li>
+    <li><strong>إعدادات الموظفين</strong>: إضافة · تعديل · تفعيل/إيقاف · تحديد
+        المدير والقسم، وصلاحيات إضافية لموظف بعينه (مدير ميشوفش حد برّه قسمه
+        إلا لو الـHR وسّعها له كتابةً).</li>
+    <li><strong>الأقسام</strong>: إنشاء وإدارة، وعدد الأعضاء في كل قسم.</li>
     <li><strong>جدول دوام المؤسسة</strong>: زرار «إضافة جدول دوام» — الاسم ·
         تاريخ السريان · الأيام السبعة (يوم عمل؟ · من/إلى · استراحة) — والجدول
         الساري بيظهر بأيامه.</li>
-    <li><strong>الأعياد الرسمية</strong>: عرض وإضافة.</li>
+    <li><strong>استحقاقات الإجازات</strong>: جدول لكل موظف ولكل نوع إجازة —
+        <strong>الاستحقاق · رصيد مُرحّل · مستخدم · المتبقي</strong>، مع فلتر
+        «كل الموظفين» وزرار <strong>«تعديل رصيد»</strong> لكل صف. (عمود
+        «مستخدم» بيعدّ الطلبات المعتمدة من النوع ده في السنة، مش مجموع الأيام،
+        علشان كده بيظهر حتى قبل تعريف الاستحقاق.)</li>
+    <li><strong>الأعياد الرسمية</strong>: عرض وإضافة، مع زرار يقترح أيام العطل
+        بالذكاء الاصطناعي (تحت في قسم الذكاء الاصطناعي).</li>
   </ul>
 
-  <h3 id="m-reports">٤.٦ التقارير</h3>
+  <h3 id="m-announcements">٤.٧ الإعلانات الداخلية</h3>
+  <ul>
+    <li><strong>إنشاء إعلان</strong> بحالة مسودة: العنوان · النص · الجمهور
+        (كل الشركة أو ناس مختارين).</li>
+    <li><strong>نشر</strong> بخطوة تأكيد، وبعدها الإعلان بيتسلّم للناس المستهدفة.</li>
+    <li><strong>سجل الإرسال</strong> بيوريك اللي الخادم عمله فعلاً لكل مستلم —
+        والقناة الوحيدة هي داخل التطبيق، فمفيش كلام عن بريد أو إشعار خارجي.</li>
+  </ul>
+
+  <h3 id="m-reports">٤.٨ التقارير</h3>
   <ul>
     <li>أربعة تبويبات من السيرفر مباشرة: <strong>الطلبات · السجلات الزمنية ·
         الحضور · الأشخاص</strong>.</li>
     <li><strong>فلاتر مترابطة</strong>: اختيار القسم بيقصّر قايمة الموظفين على
-        القسم ده بس، ومن/إلى مربوطين (مش ممكن تعكسهم).</li>
-    <li><strong>تصدير CSV</strong> لأي تقرير.</li>
+        القسم ده بس، ومن/إلى مربوطين (مش ممكن تعكسهم)، وقايمة الحالات بتتغيّر
+        مع التبويب.</li>
+    <li><strong>تصدير CSV</strong> لأي تقرير، والتصدير نفسه مسجّل في سجل التدقيق.</li>
     <li>المدير بيشوف فريقه، والـHR بيشوف الشركة كلها.</li>
   </ul>
 
-  <h3 id="m-attendance">٤.٧ الحضور والانصراف</h3>
+  <h3 id="m-attendance">٤.٩ الحضور والانصراف</h3>
   <ul>
-    <li><strong>تسجيل دخول/خروج</strong> بضغطة، وسجل بيوم بيوم.</li>
-    <li><strong>حالة اليوم</strong> بتتحسب من الإدخالات: حاضر · ناقص · غياب محتمل.</li>
+    <li><strong>زرار واحد</strong> بيبصم دخول أو خروج — واللي بيحدّده هو اليوم
+        اللي الخادم حسبه من <strong>جدول الدوام النشط</strong> والبصمات
+        المسجّلة، فمستحيل الزرار يعرض إجراء واليوم رافضه.</li>
+    <li><strong>فترات اليوم</strong> (كل بصمة بوقتها) + <strong>الجدول الساري
+        اليوم</strong> (اسمه ووقت من/إلى والراحة).</li>
+    <li><strong>الأيام الأخيرة</strong> و<strong>السجل الكامل</strong>: أول دخول ·
+        آخر خروج · ساعات العمل · الراحة · الحالة، بفلاتر (من/إلى/الحالة) وشريط
+        فلاتر مطبّقة تقدر تشيله بضغطة.</li>
+    <li>الحالات الخمسة: <strong>حاضر · غائب · يوم راحة · ناقص · لا يوجد جدول</strong>
+        — و«غائب محتمل» يعني يوم عمل مجدول مفيهوش بصمات، و«ناقص» يعني دخول
+        مفتوح من غير خروج.</li>
+    <li>وللـHR: نفس اليوم بيتقرأ كـ<strong>لقطة للمؤسسة</strong> في «نظرة عامة».</li>
   </ul>
+  <blockquote class="honest"><p><strong>بصراحة:</strong> «طلب تصحيح» للحضور لسه
+    مفيش له نقطة نهاية على الخادم، فالفورم بتاعه ظاهر <strong>معطّل</strong> —
+    الشاشة بتقول ده بدل ما تسيبك تملأ حاجة مش هتتحفظ.</p></blockquote>
 
-  <h3 id="m-notifications">٤.٨ الإشعارات والتنقّل</h3>
+  <h3 id="m-notifications">٤.١٠ الإشعارات والتنقّل</h3>
   <ul>
-    <li>إشعارات عند الإرسال · الموافقة · الرفض · الإرجاع للتعديل — مع مقروء/غير مقروء.</li>
+    <li>إشعارات من الخادم عند الإرسال · الموافقة · الرفض · الإرجاع للتعديل،
+        مع <strong>مقروء/غير مقروء</strong> ووسم الإشعار كمقروء بيتسجّل على
+        الخادم.</li>
     <li><strong>القائمة الجانبية</strong> بتفتح وتقفل بزر سهم، والحالة بتتفتكر.</li>
-    <li>الوضع الفاتح/الغامق + تبديل اللغة + تصميم متجاوب من الموبايل للديسكتوب.</li>
+    <li>الوضع الفاتح/الغامق/حسب النظام + تبديل اللغة + تصميم متجاوب من الموبايل
+        للديسكتوب.</li>
   </ul>
 
   <h2 id="ai">٥ · الذكاء الاصطناعي في النظام</h2>
-  <p>النظام فيه ذكاء اصطناعي حقيقي بيشتغل جواه — مش واجهة ديكور.</p>
+  <p>النظام فيه ذكاء اصطناعي حقيقي بيشتغل جواه — مش واجهة ديكور. ومبدأه واحد:
+     <strong>القراءة مفتوحة للصلاحيات، والكتابة محتاجة تأكيد، والحكم الجوهري
+     محسوب على الخادم مش متألّف.</strong></p>
 
-  <div class="card ai">
-    <h3>٥.١ المساعد «مدام عفاف»</h3>
+  <div class="card accent">
+    <h3 id="a-afaf">٥.١ المساعد «مدام عفاف»</h3>
     <p><strong>إيه هو؟</strong> مساعد ذكي جوه التطبيق، بتكلّمه بالعربي عن شغلك:</p>
     <blockquote>
       <p>«إيه رصيد إجازاتي؟» · «إيه آخر تحديث على طلباتي؟» ·
@@ -266,88 +609,208 @@
     <h4>٤) إيصال رسمي بالنتيجة</h4>
     <p>بعد التنفيذ بتظهر نتيجة مفهومة: <strong>رقم الطلب · حالته · والرسالة</strong> —
        مش كود تقني ولا <code>[object Object]</code>.</p>
-
-    <p><strong>ليه ده مهم؟</strong> لأن أخطر حاجة في أي مساعد ذكي إنه يعمل حاجة من
-       غير ما تسأله. النظام هنا بيمنع ده بالتصميم:
-       <strong>القراءة مفتوحة للصلاحيات، والكتابة محتاجة تأكيد.</strong></p>
   </div>
 
-  <div class="card ai">
-    <h3>٥.٢ «ذكاء اصطناعي: تحديد أيام العطل»</h3>
+  <div class="card accent">
+    <h3 id="a-holidays">٥.٢ «ذكاء اصطناعي: تحديد أيام العطل»</h3>
     <p>في <strong>إعدادات المؤسسة</strong> → كارت <strong>الأعياد الرسمية</strong> →
        زرار بيستخدم الذكاء الاصطناعي <strong>يقترح أيام العطل الرسمية للسنة</strong>،
        والمستخدم <strong>يراجع ويعتمد</strong> — بنفس مبدأ «مفيش تغيير من غير تأكيد».</p>
   </div>
 
-  <div class="card ai">
-    <h3>٥.٣ الذكاء الاصطناعي في تطوير النظام نفسه</h3>
-    <p>النظام اتبنى بمساعدة <strong>وكلاء ذكاء اصطناعي متخصصين</strong> — وده جزء
-       من التقييم:</p>
+  <div class="card accent">
+    <h3 id="a-advice">٥.٣ «رأي المساعد» في «مراجعات الفريق»</h3>
+    <p><strong>إيه هو؟</strong> كل طلب مستني قرار بيوصل معاه <strong>رأي</strong>:
+       حكم مختصر + شرح عربي. الحكم ظاهر كـ<strong>عمود «رأي المساعد»</strong>
+       في جدول مراجعات الفريق، وبيظهر تاني كـ<strong>كارت في صفحة الطلب</strong>
+       نفسه مع وقائعه.</p>
+
+    <h4>★ الحكم بيتحسب بقواعد على الخادم — مش تخمين</h4>
+    <p>أربع قواعد بتشتغل على بيانات موجودة فعلاً، وكل قاعدة بترجّع
+       <strong>واقعة بالأرقام + سبب مكتوب</strong>:</p>
+    <ol>
+      <li><strong>الرصيد</strong>: هل رصيد الإجازات المتبقي يكفي المدة المطلوبة؟
+          الرصيد بييجي من موديول <strong>استحقاقات الإجازات</strong>
+          (المتبقي = الاستحقاق + المُرحّل − المستخدم) ومش بيتحسب من جديد هنا.
+          ولو النوع مش نوع إجازة، القاعدة بتقول إنها ما تنطبقش.</li>
+      <li><strong>التعارض</strong>: هل فيه <strong>طلب معتمد تاني لنفس
+          الموظف</strong> بيتقاطع مع نفس الفترة؟ ده تعارض حقيقي بيميل للرفض.</li>
+      <li><strong>تغطية القسم</strong>: كام زميل في <strong>نفس القسم</strong>
+          عنده إجازة معتمدة بتغطي نفس الفترة؟ دي <strong>تحذير</strong> — بتنبه
+          لتأثير على التغطية، وعمرها ما بترفض لوحدها.</li>
+      <li><strong>مرحلة الموارد البشرية</strong>: هل نوع الطلب ده نفسه بيحتاج
+          اعتماد HR، وهل الطلب في المرحلة دي دلوقتي؟ (واقعة، مش رأي.)</li>
+    </ol>
+    <p>والحكم النهائي بيتجمّع من الوقائع بشكل ثابت: أي واقعة بتدعم الرفض →
+       <span class="pill danger">يوصى بالرفض</span>؛ وإلا أي تحذير →
+       <span class="pill warning">يحتاج انتباه</span>؛ وإلا أي تأييد →
+       <span class="pill success">يوصى بالاعتماد</span>؛ وإلا →
+       <span class="pill neutral">لا يوجد رأي</span>.</p>
+
+    <h4>الشرح العربي: من المساعد، ومقيّد بالوقائع</h4>
+    <p>الشرح بتكتبه <strong>«مدام عفاف»</strong> في جملتين على الأكثر، وبيتبعت
+       لها <strong>الوقائع المحسوبة نفسها</strong> مع تعليمات صريحة: ممنوع تضيف
+       رقم أو واقعة مش موجودة، وممنوع تصدر قرار نيابة عن المراجع.</p>
+
+    <h4>★ ولو المساعد مش متاح؟ الحكم يفضل موجود</h4>
+    <p>لو المساعد مش متظبّط على الحساب أو متوقف أو وقع في خطأ، فالرد لسه
+       بيوصلك كامل: <strong>الحكم المحسوب بقواعد + وقائعه بالأرقام</strong>،
+       والشرح بيتعلّم <strong>«غير متاح»</strong>. النظام <strong>عمره ما
+       بيألّف جملة</strong> مكانها. (على حساب الـHR في النسخة التجريبية المساعد
+       متظبّط، فبتشوف الشرح الحقيقي مكتوب.)</p>
+
+    <h4>الأداء والأمان في التصميم</h4>
     <ul>
-      <li><strong>كل وكيل بمهمة محددة</strong>: واحد للواجهة، واحد للباك إند، واحد
-          للنشر — وكل واحد بياخد <strong>بريف مكتوب</strong> فيه المطلوب + القيود
-          + <strong>متطلبات تحقق إلزامية</strong>.</li>
-      <li><strong>★ مفيش قبول أعمى</strong>: كل نتيجة اتفحصت بنفسي — قياسات في
-          المتصفح، اختبارات على الـAPI، ومقارنة اللي اتقال باللي ظهر فعلاً.</li>
-      <li><strong>★ أخطاء حقيقية اتصلّحت</strong> (الشفافية جزء من الشغل):
-        <ul>
-          <li>بطاقة تأكيد كانت بتعرض <code>[object Object]</code> → اتصلّحت.</li>
-          <li>بطاقة كانت بتتقطع أفقيًا → اتصلّحت.</li>
-          <li>الإرسال كان بيفشل ويطلّع للمستخدم
-              <code>validation_error: request_type</code> → اتصلّحت الرسالة
-              والسبب الجذري.</li>
-          <li><strong>تسريب بين الشركات</strong>: نقطة الأقسام كانت بترجّع أقسام
-              كل الشركات لأي HR → اتقفلت في ٤ مواضع + اتضافت اختبارات عزل.</li>
-          <li>الجولة الإرشادية كانت بتظهر كل مرة → بقت مرة واحدة لكل حساب.</li>
-        </ul>
-      </li>
+      <li>الجدول بيجيب آراء الصفحة كلها في <strong>نداء واحد مجمّع</strong> —
+          مش نداء لكل صف.</li>
+      <li>الرأي <strong>قراءة مقيّدة بنطاقك</strong>: مش بتظهر لك إلا على صفوف
+          ليك عليها مراجعة، ونفس نطاق المراجعة اللي بيفتح الطلب.</li>
+      <li><strong>★ استشاري فقط</strong>: العمود مش بيقفل زرار القرار ولا يمنعه
+          — القرار ليك، والرأي معلومة مساعدة.</li>
     </ul>
+
+    <h4>والفترة بتتجاب منين؟</h4>
+    <p>الخادم بيقرا فترة الطلب من نصه (تواريخ بصيغة <code>YYYY-MM-DD</code>،
+       والأرقام العربية مقبولة كمان). ولو الطلب مذكورش أي تواريخ، النظام
+       <strong>بيقول بصراحة إن الفترة مجهولة</strong> وإن قاعدتي التعارض
+       والتغطية ما اتنفّذوش — بدل ما يفترض مدة من عنده.</p>
+
+    <blockquote>
+      <p><strong>مثال حقيقي من النسخة التجريبية:</strong> طلب
+      «إجازة اعتيادية - 2026-10-18» طلع رأيه
+      <span class="pill warning">يحتاج انتباه</span> — لأن مفيش رصيد مُعرّف
+      لنوع «إجازة اعتيادية» في ٢٠٢٦ فكفاية الرصيد مش قابلة للتحقق، مع إن مفيش
+      إجازة معتمدة متقاطعة للموظف ولا لزملاء القسم، والطلب في مرحلة الموارد
+      البشرية لأن النوع بيحتاج اعتمادها. والشرح العربي اللي وصل معاه كان:
+      «…لا يمكن التحقق من كفاية رصيده لعدم وجود رصيد مُعرّف لهذا النوع لعام
+      ٢٠٢٦…».</p>
+    </blockquote>
   </div>
 
   <h2 id="security">٦ · الأمان والعزل</h2>
   <ul>
-    <li><strong>الصلاحيات على السيرفر</strong>: دور · ملكية السجل · نطاق الفريق —
-        مش إخفاء أزرار.</li>
-    <li><strong>العزل بين الشركات</strong>: كل استعلام مربوط بالشركة. محاولة قراءة
-        سجل شركة تانية بترجّع <strong>404</strong> (مش 403) عشان ما تتسرّبش حتى
-        معلومة وجوده.</li>
+    <li><strong>الصلاحيات على السيرفر</strong>: دور · ملكية السجل · نطاق
+        الفريق — مش إخفاء أزرار.</li>
+    <li><strong>العزل بين الشركات</strong>: كل استعلام مربوط بالشركة. محاولة
+        قراءة سجل شركة تانية بترجّع <strong>404</strong> (مش 403) عشان ما
+        تتسرّبش حتى معلومة وجوده. وكود التفعيل المخصص لشركة بيدخّلك عليها،
+        والكود العام بيعمل <strong>شركة جديدة مستقلة</strong> — فمفيش شركتين
+        بيتشاركوا نفس المستأجر.</li>
     <li><strong>حماية الكتابة</strong>: CSRF على كل عملية تغيير + توكن موقّع
-        لعمليات المساعد.</li>
-    <li><strong>الأسرار برّه الكود</strong>: متغيرات البيئة على السيرفر، والملفات
-        المحلية مستثناة من الرفع.</li>
+        لعمليات المساعد + مفتاح Idempotency للقرارات.</li>
+    <li><strong>الأسرار برّه الكود</strong>: متغيرات البيئة على السيرفر،
+        ومفاتيح المساعد مخزّنة مشفّرة، والملفات المحلية مستثناة من الرفع.</li>
     <li><strong>التحقق من المدخلات</strong>: كل حقل بيتفحص، والأخطاء بترجع
         <strong>بحقول واضحة</strong> جنب الحقل الغلط.</li>
+    <li><strong>المرفقات</strong>: بتترفع على الخادم وبتتفحص، وملف لسه مش
+        سليم بيمنع الإرسال.</li>
   </ul>
 
   <h2 id="stack">٧ · التقنيات</h2>
-  <table>
-    <tr><th>الطبقة</th><th>التقنية</th></tr>
-    <tr><td>الباك إند</td><td>Django + Django REST Framework</td></tr>
-    <tr><td>قاعدة البيانات</td><td>PostgreSQL (والنسخة المحلية SQLite للتطوير)</td></tr>
-    <tr><td>الفرونت</td><td>React + TypeScript + Vite</td></tr>
-    <tr><td>النشر</td><td>Railway (Docker) — والـmigrations بتتنفّذ عند التشغيل</td></tr>
-    <tr><td>التستات</td><td>١٣٨ ملف اختبار (مصادقة · أدوار · ملكية · طلبات ·
-        سجلات · فلاتر · عزل)</td></tr>
-    <tr><td>التوثيق</td><td><code>specs/</code> (الدستور + مصفوفة الصلاحيات + آلات
-        الحالة) + <code>docs/</code></td></tr>
-  </table>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>الطبقة</th><th>التقنية</th></tr></thead>
+      <tbody>
+        <tr><td>الباك إند</td><td>Django + Django REST Framework</td></tr>
+        <tr><td>قاعدة البيانات</td><td>PostgreSQL (والنسخة المحلية للتطوير SQLite) — والنسخة المنشورة على Railway بتستخدم SQLite على قرص دائم</td></tr>
+        <tr><td>الفرونت</td><td>React + TypeScript + Vite</td></tr>
+        <tr><td>النشر</td><td>Railway (Docker) — صورة واحدة بتخدم الـAPI والواجهة من نفس الأصل، والـmigrations بتتنفّذ عند التشغيل</td></tr>
+        <tr><td>التستات</td><td>١٢٤ ملف اختبار (مصادقة · أدوار · ملكية · طلبات · سجلات · حضور · مهام · إعلانات · فلاتر · عزل)</td></tr>
+        <tr><td>التوثيق</td><td><code>specs/</code> (الدستور + مصفوفة الصلاحيات + آلات الحالة) + <code>docs/</code></td></tr>
+      </tbody>
+    </table>
+  </div>
 
   <h2 id="try">٨ · جرّب بنفسك</h2>
-  <p><strong>الرابط:</strong>
-     <code>https://heya-fawda-production.up.railway.app</code></p>
-  <table>
-    <tr><th>الدور</th><th>الإيميل</th><th>الباسورد</th></tr>
-    <tr><td><strong>موارد بشرية</strong></td><td><code>hr@demo.local</code></td><td><code>demo1234</code></td></tr>
-    <tr><td><strong>مدير</strong></td><td><code>manager@demo.local</code></td><td><code>demo1234</code></td></tr>
-    <tr><td><strong>موظف</strong></td><td><code>emp1@demo.local</code></td><td><code>demo1234</code></td></tr>
-  </table>
+  <p><strong>الرابط:</strong> <code>https://heya-fawda-production.up.railway.app</code></p>
+
+  <div class="card raised">
+    <h4>الطريقة الأولى — اعمل شركتك بنفسك من الصفر <span class="pill accent">الأفضل للتقييم</span></h4>
+    <p>من <strong>«إنشاء شركة جديدة»</strong> في شاشة الدخول، وبخطوتين (بيانات
+       الشركة + كود التفعيل، وبعدها حساب الموارد البشرية)، اكتب كود التفعيل:</p>
+    <p><code>Menisy2002</code></p>
+    <p>ده <strong>كود العرض التجريبي</strong> المفعّل على النسخة المنشورة،
+       وبيفتح لك <strong>شركة جديدة مستقلة</strong> — وأنت أول حساب فيها،
+       يعني <strong>موارد بشرية</strong>.</p>
+    <p><strong>الشركة الجديدة بتبدأ فاضية فعلاً</strong>: مفيش موظفين، ولا أقسام،
+       ولا أنواع طلبات، ولا جدول دوام، ولا طلبات. يعني بتشوف المنتج بيتبني من
+       الصفر بإيدك: تعرّف أنواع الطلبات، تضيف أقسام وموظفين، تعمل جدول الدوام،
+       وبعدها الطلبات والسجلات بتتحرك على الخادم. ومحدش غيرك يشوف شركتك.</p>
+  </div>
+
+  <div class="card raised">
+    <h4>الطريقة الثانية — قاعدة بيانات تجريبية جاهزة ومليانة داتا</h4>
+    <p>لو مش عايز تبدأ من الصفر، فيه <strong>شركة تجريبية معمولة بالفعل</strong>
+       على نفس الرابط، وكل الحسابات دي شغّالة عليها والباسورد واحد:
+       <code>demo1234</code>.</p>
+    <div class="table-wrap">
+      <table>
+        <caption>حسابات النسخة التجريبية — كلها متحققة على النسخة المنشورة</caption>
+        <thead><tr><th>الإيميل</th><th>الدور على الخادم</th><th>الاسم</th></tr></thead>
+        <tbody>
+          <tr><td><code>hr@demo.local</code></td><td><strong>موارد بشرية</strong></td><td>منى شريف</td></tr>
+          <tr><td><code>manager@demo.local</code></td><td><strong>مدير</strong></td><td>هالة عبد الرحمن</td></tr>
+          <tr><td><code>emp1@demo.local</code></td><td>موظف</td><td>كريم مصطفى</td></tr>
+          <tr><td><code>emp2@demo.local</code></td><td>موظف</td><td>أحمد سعيد</td></tr>
+          <tr><td><code>emp3@demo.local</code></td><td>مدير (وعنده قايمة مراجعة)</td><td>نور الدين</td></tr>
+          <tr><td><code>emp4@demo.local</code></td><td>مدير (وعنده قايمة مراجعة)</td><td>سلمى فؤاد</td></tr>
+          <tr><td><code>emp5@demo.local</code></td><td>مدير (وعنده قايمة مراجعة)</td><td>طارق منصور</td></tr>
+          <tr><td><code>emp6@demo.local</code></td><td>مدير (وعنده قايمة مراجعة)</td><td>سارة حمدي</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">ملاحظة صريحة: دي كل الحسابات الموجودة على النسخة التجريبية
+       دلوقتي (٨ حسابات). أي إيميل تاني على <code>@demo.local</code> بيرجع
+       «بيانات دخول غير صحيحة» — فمفيش حسابات مخفية ولا باسوردات تانية.</p>
+
+    <h4>اللي هتلاقيه فعلاً في قاعدة الداتا التجريبية</h4>
+    <div class="strip">
+      <div class="item"><span class="value">٤٤</span><span class="label">طلب في كل الحالات</span></div>
+      <div class="item"><span class="value">٣٠</span><span class="label">سجل وقت أسبوعي</span></div>
+      <div class="item"><span class="value">١١</span><span class="label">مهمة على الخادم</span></div>
+      <div class="item"><span class="value">٧</span><span class="label">أقسام</span></div>
+    </div>
+    <ul>
+      <li><strong>الأقسام (٧)</strong>: الموارد البشرية · التقنية · المبيعات ·
+          المالية · التسويق · العمليات · الدعم الفني — و٣ منها فيها أعضاء فعلاً،
+          والباقي فاضي علشان تجرّب الإسناد بنفسك.</li>
+      <li><strong>أنواع الطلبات (٤)</strong>: إجازة اعتيادية · إذن · سلفة ·
+          شهادة خبرة — وكلها بتشمل مراجعة الموارد البشرية.</li>
+      <li><strong>الطلبات (٤٤)</strong>: ١٣ بانتظار المدير · ٢٥ بانتظار الموارد
+          البشرية · ٤ معتمدة · ٢ مرفوضة. يعني قوايم المراجعة مليانة في الدورين،
+          و«رأي المساعد» بيظهر على الصفوف اللي ليك عليها قرار.</li>
+      <li><strong>سجلات الوقت (٣٠ أسبوع)</strong>: ٢٤ مسودة · ٢ مُرسل للمراجعة ·
+          ٢ معاد للتعديل · ٢ معتمد — فتقدر تجرّب التعديل والإرسال والمراجعة.</li>
+      <li><strong>المهام (١١)</strong>: مفتوحة · قيد التنفيذ · مكتملة، وبعضها
+          مسند لموظفين فعلاً (حساب <code>emp1</code> عنده ٤ مهام مسندة).</li>
+      <li><strong>جدول دوام واحد</strong> اسمه «اساسي» ساري من ٢٠٢٦-١٠-١٨:
+          خمسة أيام عمل من ٩:٠٠ لـ١٧:٠٠ براحة ٦٠ دقيقة.</li>
+      <li><strong>الحضور</strong>: بصمات حقيقية النهاردة (لقطة الـHR بتقول
+          ٧ حاضرين)، وسجل ٣٠ يوم بحالات: حاضر · غائب · يوم راحة.</li>
+      <li><strong>استحقاقات الإجازات</strong>: ٨ صفوف لنوع واحد، لكن
+          <strong>الاستحقاق نفسه لسه غير مُعرّف</strong> — علشان كده عمود
+          «المتبقي» فاضي، وده بالظبط سبب إن «رأي المساعد» بيقول
+          <span class="pill warning">يحتاج انتباه</span> بدل «يوصى بالاعتماد».
+          عدّل الرصيد من «استحقاقات الإجازات» وشوف الرأي بيتغيّر.</li>
+      <li><strong>الإعلانات الداخلية</strong>: مفيش إعلان منشور في النسخة
+          التجريبية — الموديول موجود وشغّال، فتقدر تنشئ إعلان وتنشره من حساب
+          الـHR وتشوف سجل الإرسال بنفسك.</li>
+    </ul>
+  </div>
+
   <p><strong>جرّب ده بالترتيب:</strong></p>
   <ol>
-    <li>ادخل كـ<strong>موظف</strong> → اعمل طلب إجازة → اتبعه من «طلباتي».</li>
-    <li>سجّل وقتك النهاردة → قدّم السجل.</li>
-    <li>اطلع وادخل كـ<strong>مدير</strong> → «مراجعات الفريق» → اقبل أو رجّع.</li>
-    <li>اطلع وادخل كـ<strong>HR</strong> → «لوحة الموارد البشرية» → «التقارير» →
-        جرّب الفلاتر (اختار قسم، شوف قايمة الموظفين بتتقصر) → صدّر CSV.</li>
+    <li>ادخل كـ<strong>موظف</strong> (<code>emp1@demo.local</code>) →
+        اعمل طلب إجازة → اتبعه من «طلباتي».</li>
+    <li>سجّل وقتك الأسبوع ده → قدّم السجل، وشوف مهامك المسندة.</li>
+    <li>ابصم دخول من <strong>«الحضور»</strong> → وشوف فترات اليوم والجدول الساري.</li>
+    <li>اطلع وادخل كـ<strong>مدير</strong> (<code>manager@demo.local</code>) →
+        «مراجعات الفريق» → بص على عمود <strong>«رأي المساعد»</strong> الأول →
+        افتح طلب → شوف الوقائع والشرح → بعدها اقبل أو رجّع بسبب.</li>
+    <li>اطلع وادخل كـ<strong>HR</strong> (<code>hr@demo.local</code>) →
+        «نظرة عامة» (لقطة اليوم) → «استحقاقات الإجازات» (عدّل رصيد إجازة
+        اعتيادية) → «مراجعات الفريق» تاني وشوف الرأي اتغيّر → «التقارير» →
+        جرّب الفلاتر وصدّر CSV.</li>
     <li>افتح <strong>المساعد</strong> → اسأله «إيه رصيد إجازاتي؟» → بعدها
         «اعملي طلب إجازة يوم ٢٥ الجاي» → <strong>شوف بطاقة التأكيد</strong> → وافق.</li>
   </ol>
@@ -355,20 +818,78 @@
   <h2 id="faq">٩ · أسئلة شائعة</h2>
   <h4>هل المساعد الذكي يقدر يعمل حاجة من غير إذني؟</h4>
   <p>لأ. أي عملية كتابة بتعرض بطاقة تأكيد الأول، ومفيش تنفيذ من غير موافقة صريحة.</p>
+
+  <h4>هل «رأي المساعد» بيمنعني من القرار؟</h4>
+  <p>لأ. الرأي استشاري فقط: الحكم بيتحسب بقواعد على الخادم وبيوصلك مع وقائعه،
+     والشرح من المساعد — والزرار بتاعك هو اللي بيقرر.</p>
+
+  <h4>وإيه اللي يحصل لو المساعد مش متظبّط؟</h4>
+  <p>الحكم ووقائعه لسه بيوصلوك (محسوبين على الخادم)، والشرح بيتعلّم «غير متاح»
+     — النظام ما بيألّفش جملة مكانها.</p>
+
   <h4>هل المدير يشوف كل الشركة؟</h4>
-  <p>لأ. بيشوف الموظفين اللي بيتبعوه مباشرة بس، وده مطبّق على السيرفر.</p>
+  <p>لأ. بيشوف الموظفين اللي بيتبعوه مباشرة بس، وده مطبّق على السيرفر — إلا لو
+     الـHR وسّع له صلاحية موظف بعينه.</p>
+
   <h4>هل شركة تقدر تشوف بيانات شركة تانية؟</h4>
   <p>لأ. كل استعلام مربوط بالشركة، وقراءة سجل شركة تانية بترجّع 404.</p>
+
   <h4>إيه اللي يحصل لو رجّعت السجل للتعديل؟</h4>
-  <p>بيرجع للموظف مع السبب، ويقدر يعدّل ويقدّمه تاني.</p>
+  <p>بيرجع للموظف مع السبب، ويفتحه من «متابعة التصحيح» اللي بيعدّل
+     <strong>نفس الطلب</strong> ثم يعيد إرساله — مش طلب جديد.</p>
+
+  <h4>أقدر أبدأ بشركة فاضية من الصفر؟</h4>
+  <p>أيوه — بكود التفعيل <code>Menisy2002</code> بتعمل شركة جديدة مستقلة،
+     وتبدأ فيها كموارد بشرية وتبني كل حاجة بنفسك.</p>
+
   <h4>أقدر أستخدم النظام على الموبايل؟</h4>
-  <p>أيوه — التصميم متجاوب، والقائمة الجانبية بتتحول لدرج على الشاشات الصغيرة.</p>
+  <p>أيوه — التصميم متجاوب، والقائمة الجانبية بتتحول لدرج على الشاشات الصغيرة،
+     والجداول بتتزحلق أفقيًا بدل ما تتقطع.</p>
 
   <footer>
-    هي فوضى؟ — دليل المنتج · <span class="ok">النسخة الكاملة في
-    <code>docs/USER-GUIDE.md</code></span>
+    هي فوضى؟ — دليل المنتج · الصفحة دي بتتقدّم من المستودع
+    (<code>docs/user-guide.html</code>) على المسار <code>/guide</code> —
+    والمرجع التفصيلي للصلاحيات وآلات الحالة في <code>specs/</code>.
   </footer>
 </main>
 </div>
+
+<script>
+  // The appearance control: mirrors the app's own three-way choice, stored under
+  // the guide's own key so reading the guide never changes the app's setting.
+  (() => {
+    const buttons = [...document.querySelectorAll("[data-appearance]")];
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const read = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
+    const named = (value) => value === "light" || value === "dark";
+
+    const apply = (choice) => {
+      const system = media.matches ? "dark" : "light";
+      document.documentElement.dataset.theme = choice === "system" ? system : choice;
+      document.documentElement.dataset.appearance = choice;
+      buttons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.appearance === choice)));
+    };
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const choice = button.dataset.appearance;
+        try {
+          if (choice === "system") localStorage.removeItem("tracking-sys.guide-appearance");
+          else localStorage.setItem("tracking-sys.guide-appearance", choice);
+        } catch { /* private mode: the choice simply does not persist */ }
+        apply(choice);
+      });
+    });
+
+    // A system change re-resolves only while the reader is on «حسب النظام».
+    media.addEventListener("change", () => { if (document.documentElement.dataset.appearance === "system") apply("system"); });
+
+    // Same resolution the <head> made: the reader's guide choice wins, else the
+    // appearance they picked in the app, else the OS.
+    const guide = read("tracking-sys.guide-appearance");
+    const app = read("tracking-sys.appearance");
+    apply(named(guide) ? guide : named(app) ? app : "system");
+  })();
+</script>
 </body>
 </html>
