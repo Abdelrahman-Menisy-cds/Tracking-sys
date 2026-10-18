@@ -39,8 +39,13 @@ class DraftCreateSerializer(serializers.Serializer):
     details = serializers.CharField(required=False, allow_blank=True, max_length=10_000, trim_whitespace=False)
 
     def validate_request_type_id(self, value):
+        # Company-scoped (H30 §2.6): a type another tenant defined is answered
+        # exactly like an unknown id, so no create path can anchor a request to
+        # a foreign type — and GET /request-types is then the whole truth about
+        # what can be created (accounts.assistant_tools already scopes this way).
+        company = getattr(getattr(self.context.get("request"), "user", None), "company", None)
         try:
-            request_type = RequestType.objects.get(pk=value)
+            request_type = RequestType.objects.get(pk=value, company=company)
         except RequestType.DoesNotExist:
             raise serializers.ValidationError("Unknown request type.")
         if not request_type.is_active:

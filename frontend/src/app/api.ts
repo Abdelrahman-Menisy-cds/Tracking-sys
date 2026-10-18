@@ -191,7 +191,12 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const headers: Record<string, string> = { Accept: "application/json", ...options.headers };
   if (acceptLanguage) headers["Accept-Language"] = acceptLanguage;
 
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  // A FormData body (attachment upload) must NOT be JSON-encoded and must NOT
+  // carry a Content-Type: the browser sets multipart/form-data with its own
+  // boundary, and an explicit header here strips the boundary and the upload
+  // arrives unparseable. One HTTP layer still, just the two body encodings.
+  const isMultipart = typeof FormData !== "undefined" && body instanceof FormData;
+  if (body !== undefined && !isMultipart) headers["Content-Type"] = "application/json";
   // Every unsafe method needs the token, not just POST: Django enforces CSRF on
   // PATCH and DELETE too, and a missing header there looks exactly like a
   // permission problem.
@@ -213,7 +218,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       method,
       headers,
       credentials: "include",
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isMultipart ? (body as FormData) : JSON.stringify(body),
       signal: controller.signal,
     });
   } catch (error) {

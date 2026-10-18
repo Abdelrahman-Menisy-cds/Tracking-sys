@@ -10,10 +10,21 @@ import type {
   DecisionAction,
   PagedPayload,
   ServerMyRequest,
+  ServerRequestType,
   ServerReviewAdvice,
   ServerReviewRequest,
   ServerReviewRequestRow,
 } from "./serverTypes";
+
+/**
+ * The caller's company's ACTIVE request types (GET /request-types) — the
+ * source of the «طلب جديد» type picker. Read-only; the server scopes it to the
+ * caller's company, so the client adds no filter of its own.
+ */
+export function listRequestTypes(locale: string): Promise<ServerRequestType[]> {
+  return apiRequest<{ data: ServerRequestType[] }>("/request-types", { acceptLanguage: locale })
+    .then((payload) => payload.data ?? []);
+}
 
 /** The requester's own request list (EmployeeRequestSerializer rows). */
 export function listMyRequests(locale: string, page = 1): Promise<PagedPayload<ServerMyRequest>> {
@@ -65,6 +76,43 @@ export function submitMyRequest(id: string, version: number, locale: string): Pr
   return apiRequest<{ data: ServerMyRequest }>(`/requests/${id}/submit`, {
     method: "POST",
     body: { version },
+    headers: { "Idempotency-Key": newIdempotencyKey() },
+    acceptLanguage: locale,
+  }).then((payload) => payload.data);
+}
+
+/**
+ * PATCH /requests/{id} - the draft's permitted fields only ({title, details}).
+ * Used when the form's values changed after the draft was first saved; the
+ * server refuses every other field, so nothing else is ever sent.
+ */
+export function updateMyRequestDraft(
+  id: string,
+  input: { title: string; details: string },
+  locale: string,
+): Promise<ServerMyRequest> {
+  return apiRequest<{ data: ServerMyRequest }>(`/requests/${id}`, {
+    method: "PATCH",
+    body: { title: input.title, details: input.details },
+    acceptLanguage: locale,
+  }).then((payload) => payload.data);
+}
+
+/**
+ * POST /requests/{id}/attachments - multipart upload (the server reads the
+ * `file` part) with the Idempotency-Key the endpoint requires. The bytes go up
+ * as FormData; the shared client leaves the multipart boundary to the browser.
+ */
+export function uploadRequestAttachment(
+  id: string,
+  file: File,
+  locale: string,
+): Promise<ServerAttachmentRow> {
+  const form = new FormData();
+  form.append("file", file);
+  return apiRequest<{ data: ServerAttachmentRow }>(`/requests/${id}/attachments`, {
+    method: "POST",
+    body: form,
     headers: { "Idempotency-Key": newIdempotencyKey() },
     acceptLanguage: locale,
   }).then((payload) => payload.data);

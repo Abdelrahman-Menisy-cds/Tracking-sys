@@ -14,6 +14,7 @@ from reqs import serializers as rs
 from reqs import attachment_views  # re-exported for reqs.urls (Story 2.2)
 from reqs.models import (
     EmployeeRequest,
+    RequestType,
     SubmissionIdempotencyRecord,
 )
 from reqs.services import create_draft, edit_draft
@@ -48,6 +49,28 @@ def _get_own_request(user, pk):
         raise Http404
 
 
+class RequestTypeListView(APIView):
+    """GET /api/v1/request-types — the «طلب جديد» picker's real source.
+
+    The draft contract requires a ``request_type_id`` and nothing listed the
+    organisation's types, which is why the new-request screen was a shell.
+    This is a read-only, unthrottled, company-scoped list of the caller's
+    ACTIVE types — exactly the rows the create endpoint accepts (it refuses an
+    unknown, inactive, or another company's id), so the picker can never offer
+    a type the create call would reject. A type another company defined is
+    never listed: the queryset is filtered by the caller's own company, never
+    by anything a client sends.
+    """
+
+    throttle_classes = []  # GET: no mutation, no throttle (review-queue convention)
+
+    def get(self, request):
+        types = RequestType.objects.filter(
+            company=request.user.company, is_active=True
+        )
+        return Response({"data": rs.RequestTypeSerializer(types, many=True).data})
+
+
 class RequestListView(APIView):
     throttle_classes = [MutationRateThrottle]
 
@@ -66,7 +89,7 @@ class RequestListView(APIView):
         return paginator.get_paginated_response(rs.EmployeeRequestSerializer(page, many=True).data)
 
     def post(self, request):
-        serializer = rs.DraftCreateSerializer(data=request.data)
+        serializer = rs.DraftCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         draft = create_draft(
             requester=request.user,

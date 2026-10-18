@@ -6,6 +6,10 @@ from reqs import views
 app_name = "reqs"
 
 urlpatterns = [
+    # The type picker's read source. Declared before the `requests/...` routes
+    # (it is a sibling path, not a sub-path, so order is cosmetic — kept first
+    # because the create form reads it before it posts anything).
+    path("request-types", views.RequestTypeListView.as_view(), name="request-type-list"),
     path("requests", views.RequestListView.as_view(), name="request-list"),
     path("requests/<uuid:pk>", views.RequestDetailView.as_view(), name="request-detail"),
     path("requests/<uuid:pk>/submit", views.RequestSubmitView.as_view(), name="request-submit"),

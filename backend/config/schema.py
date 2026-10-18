@@ -720,6 +720,20 @@ class EmployeeDetailSchema(EmployeeSchema):
     }
 
 
+class RequestTypeListSchema(_ViewSchema):
+    responses = {
+        # RequestTypeListView.get: {"data": [RequestType]} — the caller's
+        # company's active types only (the rows the create endpoint accepts).
+        "get": {
+            **_json_response(
+                "200",
+                "The caller's company's ACTIVE request types.",
+                _data_envelope({"type": "array", "items": _object_ref("RequestType")}),
+            ),
+        },
+    }
+
+
 class RequestListSchema(_ViewSchema):
     request_bodies = {"post": _body(_object_ref("DraftCreateRequest"))}
     responses = {
@@ -1331,6 +1345,7 @@ def _wire_schemas():
     _attach_schema(assistant_views.AssistantSubscriptionPollView, AssistantSubscriptionPollSchema)
     _attach_schema(assistant_views.AssistantSubscriptionModelsView, AssistantSubscriptionModelsSchema)
 
+    _attach_schema(reqs_views.RequestTypeListView, RequestTypeListSchema)
     _attach_schema(reqs_views.RequestListView, RequestListSchema)
     _attach_schema(reqs_views.RequestDetailView, RequestDetailSchema)
     _attach_schema(reqs_views.RequestSubmitView, RequestSubmitSchema)

@@ -1,13 +1,24 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
 import { useServerData } from "../app/useServerData";
 import { formatDateTime } from "../app/format";
-import { listMyRequests } from "../app/requestsApi";
-import type { RequestStatusType, ServerMyRequest } from "../app/serverTypes";
+import { ApiError } from "../app/api";
+import {
+  createRequestDraft,
+  listMyRequestAttachments,
+  listMyRequests,
+  listRequestTypes,
+  submitMyRequest,
+  updateMyRequestDraft,
+  uploadRequestAttachment,
+  type ServerAttachmentRow,
+} from "../app/requestsApi";
+import type { RequestStatusType, ServerMyRequest, ServerRequestType } from "../app/serverTypes";
 import { Banner, EmptyState, ErrorState, RequestStatusPill, SkeletonRows } from "../components/ui";
 import OperationalTable, { type OperationalColumn } from "../components/data/OperationalTable";
 import PageHeader from "../components/layout/PageHeader";
-import { FilterIcon, PlusIcon } from "../components/icons";
+import { AlertTriangleIcon, FilterIcon, PlusIcon } from "../components/icons";
 
 function nextStage(request: ServerMyRequest, locale: "ar" | "en") {
   const ar = locale === "ar";
@@ -52,50 +63,326 @@ export default function MyRequestsPage() {
 }
 
 /**
- * The new-request form. HONEST STATE (Brief H33): the contract's draft
- * endpoint needs a request_type_id, and the backend exposes NO endpoint that
- * lists the organisation's request types (the tool exists only inside the
- * assistant chat). Nothing is invented client-side: the type picker renders
- * its honest empty state, every field stays disabled, and the page says
- * exactly what is missing and what still works.
+ * The new-request form — REAL since Brief H33b.
+ *
+ * The server's draft contract takes only {request_type_id, title, details}:
+ * dates, reason-as-a-field and the status are all server-managed and a request
+ * carrying them is refused 422. So this form sends exactly those three fields
+ * and nothing else:
+ *
+ * - the type picker is fed by GET /request-types (the caller's company's
+ *   ACTIVE types — the same rows the create endpoint accepts);
+ * - the period is REAL because it travels inside the title as ISO dates
+ *   (YYYY-MM-DD), which is the format the server's own period reader
+ *   (review.advice.parse_request_period) reads back for the reviewer's advice;
+ *   there is no separate start/end column on the server, and no clock column
+ *   either, so a same-day hour window belongs in the reason text — the copy
+ *   says so instead of offering a time input nothing would store;
+ * - the reason is the accepted `details` field;
+ * - attachments are uploaded to POST /requests/{id}/attachments once the draft
+ *   exists (the endpoint is draft-scoped), and the submit waits for their
+ *   malware scan to come back CLEAN because the server refuses a submission
+ *   with a quarantined file.
+ *
+ * A failed read shows the server's own sentence and a retry; a failed
+ * mutation shows the server's own sentence and keeps every entered value.
  */
+type TypesState =
+  | { phase: "loading" }
+  | { phase: "ready"; rows: ServerRequestType[] }
+  | { phase: "error"; message: string | null };
+
+/** The title the server will store: type name + the period as ISO dates. */
+function buildRequestTitle(typeName: string, fromDate: string, toDate: string, locale: "ar" | "en"): string {
+  if (!fromDate) return "";
+  if (!toDate || toDate === fromDate) return `${typeName} - ${fromDate}`;
+  return `${typeName} - ${fromDate} ${locale === "ar" ? "إلى" : "to"} ${toDate}`;
+}
+
+function scanLabel(scanStatus: string, locale: "ar" | "en"): string {
+  // The server emits the model's uppercase choices (PENDING/CLEAN/FAILED/REJECTED).
+  if (scanStatus === "CLEAN") return locale === "ar" ? "فحص سليم" : "Scan clean";
+  if (scanStatus === "PENDING") return locale === "ar" ? "بانتظار الفحص" : "Awaiting scan";
+  return locale === "ar" ? "محجوز؛ الملف غير متاح" : "Quarantined; file unavailable";
+}
+
 export function NewRequestPage() {
-  const { t, locale } = useApp(); const navigate = useNavigate();
+  const { t, locale } = useApp();
+  const navigate = useNavigate();
   usePageTitle(t("newRequest"));
-  const blocked = locale === "ar"
-    ? "هذه الصفحة بانتظار الربط: نقطة |request-types| غير متاحة من الخادم بعد، فلا يمكن اختيار نوع طلب حقيقي أو إنشاء المسودة. البدل المتاح الآن: اطلب من مدام عفاف (المساعد) إنشاء الطلب نيابةً عنك."
-    : "This screen is waiting on its wiring: no request-types endpoint exists server-side yet, so a real type cannot be picked and no draft can be created. For now, ask مدام عفاف (the assistant) to raise the request on your behalf.";
-  const noTypes = locale === "ar"
-    ? "قائمة أنواع الطلبات تصل من الخادم لاحقًا؛ لا يوجد نوع حقيقي للاختيار الآن."
-    : "The request-types list arrives from the server later; there is no real type to pick yet.";
-  const waitingTitle = locale === "ar" ? "بانتظار قائمة أنواع الطلبات من الخادم" : "Waiting on the server's request-types list";
-  const dateField = (id: string, label: string, min?: string) => <label className="field"><span className="field-label">{label}</span><input id={id} className="input" type="date" dir="ltr" lang={locale} disabled title={waitingTitle} min={min || undefined} onChange={() => undefined} /></label>;
-  const timeField = (id: string, label: string) => <label className="field"><span className="field-label">{label}</span><input id={id} className="input" type="time" dir="ltr" disabled title={waitingTitle} onChange={() => undefined} /></label>;
-  const typeField = <div className="field type-field"><span className="field-label" id="request-type-label">{t("requestType")}</span><EmptyState message={noTypes} /></div>;
-  const periodField = <fieldset className="quiet-inset field request-inset" disabled><legend className="field-label">{t("requestPeriod")}</legend>
-    <div className="request-period-row">
-      {dateField("request-period", t("requestPeriodFrom"))}
-      {dateField("request-period-end", t("requestPeriodTo"))}
-      {timeField("request-clock", t("requestPeriodFromTime"))}
-      {timeField("request-clock-end", t("requestPeriodToTime"))}
+
+  const [types, setTypes] = useState<TypesState>({ phase: "loading" });
+  const [typesAttempt, setTypesAttempt] = useState(0);
+  const [typeId, setTypeId] = useState<number | null>(null);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [reason, setReason] = useState("");
+  const [draft, setDraft] = useState<ServerMyRequest | null>(null);
+  const [attachments, setAttachments] = useState<ServerAttachmentRow[]>([]);
+  const [busy, setBusy] = useState<"save" | "submit" | "upload" | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ kind: "draft" | "submitted"; status: RequestStatusType; id: string } | null>(null);
+  const [errors, setErrors] = useState<{ type?: string; from?: string; to?: string }>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    setTypes({ phase: "loading" });
+    listRequestTypes(locale)
+      .then((rows) => { if (!cancelled) setTypes({ phase: "ready", rows }); })
+      .catch((error: unknown) => {
+        if (!cancelled) setTypes({ phase: "error", message: error instanceof ApiError ? error.message : null });
+      });
+    return () => { cancelled = true; };
+  }, [locale, typesAttempt]);
+
+  // A quarantined (not yet CLEAN) attachment blocks the submit server-side, so
+  // the page re-reads the list while a scan is outstanding instead of leaving a
+  // stale "awaiting scan" that the operator cannot clear.
+  const scanPending = attachments.some((attachment) => attachment.scan_status !== "CLEAN");
+  useEffect(() => {
+    if (!draft || !scanPending) return;
+    const timer = window.setInterval(() => {
+      void listMyRequestAttachments(draft.id, locale).then(setAttachments).catch(() => undefined);
+    }, 1500);
+    return () => window.clearInterval(timer);
+  }, [draft, scanPending, locale]);
+
+  const selectedType = types.phase === "ready" ? types.rows.find((row) => row.id === typeId) ?? null : null;
+  const title = selectedType ? buildRequestTitle(selectedType.name, fromDate, toDate, locale) : "";
+  const submitted = notice?.kind === "submitted";
+  const editable = !submitted && (draft === null || draft.status === "DRAFT" || draft.status === "RETURNED");
+
+  const validate = () => {
+    const next: { type?: string; from?: string; to?: string } = {};
+    if (typeId === null) next.type = t("requestTypeRequired");
+    if (!fromDate) next.from = t("requestPeriodFromRequired");
+    else if (toDate && toDate < fromDate) next.to = t("requestPeriodReversed");
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
+  const messageFor = (error: unknown) =>
+    error instanceof ApiError && error.message ? error.message : t("requestRetryFailure");
+
+  /** The draft the form's current values describe: created, or patched if changed. */
+  const ensureDraft = async (): Promise<ServerMyRequest> => {
+    if (!draft) {
+      const created = await createRequestDraft({ requestTypeId: typeId as number, title, details: reason }, locale);
+      setDraft(created);
+      return created;
+    }
+    if (draft.title === title && draft.details === reason) return draft;
+    const updated = await updateMyRequestDraft(draft.id, { title, details: reason }, locale);
+    setDraft(updated);
+    return updated;
+  };
+
+  const onSaveDraft = async () => {
+    if (!validate()) return;
+    setBusy("save");
+    setFailure(null);
+    try {
+      const saved = await ensureDraft();
+      setNotice({ kind: "draft", status: saved.status, id: saved.id });
+    } catch (error: unknown) {
+      setFailure(messageFor(error));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onSubmit = async () => {
+    if (!validate()) return;
+    if (scanPending) {
+      setFailure(t("requestSubmitHeldByScan"));
+      return;
+    }
+    setBusy("submit");
+    setFailure(null);
+    try {
+      const saved = await ensureDraft();
+      const result = await submitMyRequest(saved.id, saved.version, locale);
+      setDraft(result);
+      setNotice({ kind: "submitted", status: result.status, id: result.id });
+    } catch (error: unknown) {
+      setFailure(messageFor(error));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onPickFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !draft) return;
+    setBusy("upload");
+    setFailure(null);
+    try {
+      await uploadRequestAttachment(draft.id, file, locale);
+      setAttachments(await listMyRequestAttachments(draft.id, locale));
+    } catch (error: unknown) {
+      setFailure(messageFor(error));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const dateField = (
+    id: string,
+    label: string,
+    value: string,
+    invalid: boolean,
+    onChange: (next: string) => void,
+    min?: string,
+  ) => (
+    <label className="field" htmlFor={id}>
+      <span className="field-label">{label}</span>
+      <input
+        id={id}
+        className="input"
+        type="date"
+        dir="ltr"
+        lang={locale}
+        value={value}
+        min={min || undefined}
+        disabled={!editable}
+        aria-invalid={invalid || undefined}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
+
+  return (
+    <div className="page reading-page new-request-page">
+      <PageHeader
+        title={t("newRequest")}
+        subtitle={t("newRequestSubtitle")}
+        breadcrumb={<Link to="/requests">{t("myRequestsTitle")}</Link>}
+        primaryAction={<span className="page-meta new-request-steps" aria-hidden="true">{t("newRequestSteps")}</span>}
+      />
+      {failure && <Banner tone="error" role="alert">{failure}</Banner>}
+      {notice && (
+        <Banner tone={submitted ? "success" : "info"} role="status">
+          {submitted ? t("requestSubmitted") : t("draftSaved")}{" "}
+          <RequestStatusPill status={notice.status} />{" "}
+          <Link to={`/requests/${notice.id}`}>{t("requestViewRecord")}</Link>
+        </Banner>
+      )}
+      <form className="work-surface form-stack" noValidate onSubmit={(event) => event.preventDefault()}>
+        <fieldset className="field request-type-field">
+          <legend className="field-label">{t("requestType")}</legend>
+          {types.phase === "loading" && <SkeletonRows rows={2} />}
+          {types.phase === "error" && (
+            <div className="error-region" role="alert">
+              <AlertTriangleIcon className="state-icon" />
+              <p>{types.message ?? t("requestTypesUnavailable")}</p>
+              <button type="button" className="btn btn-secondary" onClick={() => setTypesAttempt((attempt) => attempt + 1)}>{t("retry")}</button>
+            </div>
+          )}
+          {types.phase === "ready" && (types.rows.length === 0
+            ? <EmptyState message={t("requestTypeEmpty")} />
+            : <div className="role-segmented">
+                {types.rows.map((row) => (
+                  <button
+                    key={row.id}
+                    type="button"
+                    className={`role-segmented-option${typeId === row.id ? " is-selected" : ""}`}
+                    aria-pressed={typeId === row.id}
+                    disabled={!editable || draft !== null}
+                    onClick={() => { setTypeId(row.id); setErrors((current) => ({ ...current, type: undefined })); }}
+                  >
+                    {row.name}
+                    <span className="role-segmented-hint">{row.requires_hr_approval ? t("requestTypeHrRequired") : t("requestTypeHrNotRequired")}</span>
+                  </button>
+                ))}
+              </div>)}
+          {draft !== null && !submitted && <span className="field-hint">{t("requestTypeLockedAfterDraft")}</span>}
+          {errors.type && <span className="field-error" role="alert">{errors.type}</span>}
+        </fieldset>
+
+        <fieldset className="quiet-inset field request-inset">
+          <legend className="field-label">{t("requestPeriod")}</legend>
+          <div className="request-period-row">
+            {dateField("request-period", t("requestPeriodFrom"), fromDate, Boolean(errors.from), (next) => { setFromDate(next); setErrors((current) => ({ ...current, from: undefined, to: undefined })); })}
+            {dateField("request-period-end", t("requestPeriodToOptional"), toDate, Boolean(errors.to), (next) => { setToDate(next); setErrors((current) => ({ ...current, to: undefined })); }, fromDate)}
+          </div>
+          <p className="field-hint" id="request-period-hint">{t("requestPeriodRealHint")}</p>
+          {errors.from && <span className="request-inline-error" role="alert">{errors.from}</span>}
+          {errors.to && <span className="request-inline-error" role="alert">{errors.to}</span>}
+          {title && (
+            <div className="request-receipt" aria-live="polite">
+              <p className="request-receipt-line"><span className="field-hint">{t("requestTitlePreview").replace("%s", "")}</span><bdi>{title}</bdi></p>
+            </div>
+          )}
+        </fieldset>
+
+        <label className="field">
+          <span className="field-label">{t("requestReasonOptional")}</span>
+          <textarea
+            id="request-reason-text"
+            className="textarea"
+            name="details"
+            rows={3}
+            maxLength={500}
+            value={reason}
+            disabled={!editable}
+            placeholder={t("requestReasonPlaceholder")}
+            aria-describedby="request-reason-hint"
+            onChange={(event) => setReason(event.target.value)}
+          />
+          <span className="field-hint" id="request-reason-hint">{t("requestReasonHintReal")}</span>
+          {reason.length >= 450 && <span className="reason-count is-warned">{t("requestReasonCountNear").replace("%s", String(reason.length))}</span>}
+        </label>
+
+        <div className="field request-attachments-field">
+          <span className="field-label">{t("attachments")}</span>
+          {draft === null ? (
+            <p className="field-hint">{t("requestAttachmentsNeedDraft")}</p>
+          ) : (
+            <>
+              {attachments.length === 0
+                ? <p className="field-hint">{t("noAttachments")}</p>
+                : <ul className="attachment-list">{attachments.map((attachment) => (
+                    <li className="attachment-row" key={attachment.id}>
+                      <bdi dir="ltr">{attachment.original_filename}</bdi>
+                      <span className="muted">{attachment.content_type} · {Math.round(attachment.size_bytes / 1024)} KB · {scanLabel(attachment.scan_status, locale)}</span>
+                    </li>
+                  ))}</ul>}
+              {scanPending && <span className="field-hint" role="status">{t("requestAttachmentScanPending")}</span>}
+              {editable && (
+                <label className="file-placeholder is-actionable">
+                  <input
+                    type="file"
+                    className="file-input-hidden"
+                    accept=".pdf,.png,.jpg,.jpeg,.docx"
+                    disabled={busy !== null}
+                    aria-label={t("requestAttachmentChoose")}
+                    onChange={onPickFile}
+                  />
+                  {busy === "upload" ? t("requestAttachmentUploading") : t("requestAttachmentChoose")}
+                </label>
+              )}
+              <p className="field-hint">{t("attachmentsNote")}</p>
+            </>
+          )}
+        </div>
+
+        <div className="form-actions request-stick-actions">
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={busy !== null || !editable || scanPending}
+            title={scanPending ? t("requestSubmitHeldByScan") : undefined}
+            onClick={onSubmit}
+          >
+            {busy === "submit" ? <><span className="spinner" aria-hidden="true" />{t("saving")}</> : t("submitRequest")}
+          </button>
+          <button className="btn btn-secondary" type="button" disabled={busy !== null || !editable} onClick={onSaveDraft}>
+            {busy === "save" ? <><span className="spinner" aria-hidden="true" />{t("saving")}</> : t("saveDraft")}
+          </button>
+          <button className="btn btn-ghost" type="button" onClick={() => navigate("/requests")}>{t("back")}</button>
+        </div>
+      </form>
     </div>
-  </fieldset>;
-  const reasonId = "request-reason-text";
-  return <div className="page reading-page new-request-page"><PageHeader title={t("newRequest")} subtitle={t("newRequestSubtitle")} breadcrumb={<Link to="/requests">{t("myRequestsTitle")}</Link>} primaryAction={<span className="page-meta new-request-steps" aria-hidden="true">{t("newRequestSteps")}</span>} />
-    <Banner tone="warning" role="alert" >{blocked}</Banner>
-    <form className="work-surface" noValidate onSubmit={(event) => event.preventDefault()}>
-      {typeField}
-      {periodField}
-      <label className="field"><span className="field-label">{t("requestReasonOptional")}</span><textarea id={reasonId} className="textarea" name="details" rows={3} maxLength={500} disabled title={waitingTitle} placeholder={t("requestReasonPlaceholder")} onChange={() => undefined} aria-describedby="reason-hint" /><span className="field-hint" id="reason-hint">{t("requestReasonHint")}</span></label>
-      <label className="field request-attachments-field"><span className="field-label">{t("attachments")}</span>
-        <span className="file-placeholder">{t("attachmentsDemo")}</span>
-        <input type="file" disabled aria-hidden="true" aria-label={t("attachmentsDemo")} className="file-input-hidden" tabIndex={-1} />
-      </label>
-      <div className="form-actions request-stick-actions">
-        <button className="btn btn-primary" type="button" disabled title={waitingTitle}>{t("submitRequest")}</button>
-        <button className="btn btn-secondary" type="button" disabled title={waitingTitle}>{t("saveDraft")}</button>
-        <button className="btn btn-ghost" type="button" onClick={() => navigate("/requests")}>{t("back")}</button>
-      </div>
-    </form>
-  </div>;
+  );
 }

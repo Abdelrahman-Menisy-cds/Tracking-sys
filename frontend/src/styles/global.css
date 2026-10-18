@@ -781,7 +781,7 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
 /* Design §2.2: the four Arabic type names wrap instead of truncating; each option carries its
    own muted path line under the label. Selection keeps the primitive's solid-accent rule. */
 .new-request-page .role-segmented { flex-wrap: wrap; row-gap: var(--sp-2); }
-.new-request-page .role-segmented-option { flex: 1 1 min(100%, 10rem); min-inline-size: 0; align-items: flex-start; gap: 2px; /* ds-allow-hardcode: hairline receipt gap */ min-block-size: var(--control-min-h); padding-block: var(--sp-2); }
+.new-request-page .role-segmented-option { flex: 1 1 min(100%, 10rem); min-inline-size: 0; display: flex; flex-wrap: wrap; align-items: flex-start; gap: 2px; /* ds-allow-hardcode: hairline receipt gap */ min-block-size: var(--control-min-h); padding-block: var(--sp-2); }
 .new-request-page .role-segmented-hint { display: block; flex-basis: 100%; color: var(--text-muted); font-size: var(--font-size-xs); font-weight: 500; }
 /* Review fix (H13d): inside the selected option the hint sat at ~1.03:1 - muted ink on the accent
    surface. It takes the on-accent ink instead; the 12px/500-vs-16px/700 step keeps the hierarchy. */
@@ -834,6 +834,12 @@ tbody tr:last-child td, tbody tr:last-child th { border-block-end: var(--radius-
   color: var(--text-muted); font-size: var(--font-size-sm); background: var(--surface);
   cursor: default;
 }
+/* H33b: the same placeholder is now the real upload trigger once the draft
+   exists (a <label> around the visually hidden file input), so it takes the
+   pointer affordance and a visible keyboard focus ring again. */
+.new-request-page .file-placeholder.is-actionable { cursor: pointer; }
+.new-request-page .file-placeholder.is-actionable:hover { border-color: var(--accent); color: var(--text); }
+.new-request-page .file-placeholder.is-actionable:focus-within { outline: var(--space-1) solid var(--focus-ring); outline-offset: var(--space-1); }
 .new-request-page .file-input-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* §4 the reason: soft cap 500, a quiet counter that appears only near the cap. */
 .new-request-page .reason-count { color: var(--text-muted); font-size: var(--font-size-xs); font-variant-numeric: var(--period-numeric); }
