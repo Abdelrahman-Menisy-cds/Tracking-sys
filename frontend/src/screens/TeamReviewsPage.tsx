@@ -266,7 +266,7 @@ export default function TeamReviewsPage() {
             : null}
           {activeState.phase === "ready" && records.length > 0 && tab === "requests" ? (
             <OperationalTable
-              caption={locale === "ar" ? `${pendingRequests.length} طلبات بانتظار قرار ضمن نطاقك` : `${pendingRequests.length} requests awaiting your decision within your server scope`}
+              caption={locale === "ar" ? `عدد الطلبات: ${pendingRequests.length} — بانتظار قرار ضمن نطاقك` : `${pendingRequests.length} requests awaiting your decision within your server scope`}
               columns={requestColumns}
               records={pendingRequests}
             />
@@ -275,7 +275,7 @@ export default function TeamReviewsPage() {
             <>
               <p className="muted">{locale === "ar" ? "الأسابيع من الاثنين إلى الأحد · المنطقة الزمنية للمؤسسة: Africa/Cairo" : "Weeks run Monday-Sunday · organization timezone: Africa/Cairo"}</p>
               <OperationalTable
-                caption={locale === "ar" ? `${pendingTimesheets.length} سجلات وقت بانتظار قرار ضمن نطاقك` : `${pendingTimesheets.length} timesheets awaiting your decision within your server scope`}
+                caption={locale === "ar" ? `عدد السجلات: ${pendingTimesheets.length} — بانتظار قرار ضمن نطاقك` : `${pendingTimesheets.length} timesheets awaiting your decision within your server scope`}
                 columns={timesheetColumns}
                 records={pendingTimesheets}
               />
