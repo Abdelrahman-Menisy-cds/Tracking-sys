@@ -19,9 +19,9 @@ import PageHeader from "../components/layout/PageHeader";
 
 const noAttendanceCopy = (locale: "ar" | "en") => ({
   banner: locale === "ar"
-    ? "سجل الحضور غير متاح بعد: لا توجد نقطة نهاية للحضور على الخادم حتى الآن، فلا توجد بيانات مؤكدة ولا بصمة تُسجَّل. الهيكل والنص الأصليان باقيان، وتُستكمل البيانات عند توفر النقطة."
-    : "The attendance record is not available yet: the server exposes no attendance endpoint, so there is no confirmed data and no punch to record. The shell and copy remain; the data completes once the endpoint exists.",
-  waiting: locale === "ar" ? "بانتظار نقطة نهاية الحضور على الخادم" : "Waiting for the attendance endpoint on the server",
+    ? "الحضور بيتسجّل على الخادم: بصمة الدخول والخروج بتحصل من الزرار، واليوم بيتحسب من جدول الدوام النشط."
+    : "Attendance is recorded on the server: the button punches in and out, and the day is derived from the active work schedule.",
+  waiting: locale === "ar" ? "مفيش إجراء حضور متاح دلوقتي" : "No attendance action is available right now",
   emptyIntervals: locale === "ar" ? "لا توجد فواصل حضور مؤكدة من الخادم بعد." : "No confirmed attendance intervals from the server yet.",
   emptySchedule: locale === "ar" ? "لا يوجد جدول مؤكد من الخادم بعد." : "No confirmed schedule from the server yet.",
   emptyCorrections: locale === "ar" ? "لا توجد طلبات تصحيح مؤكدة من الخادم بعد." : "No confirmed correction requests from the server yet.",
