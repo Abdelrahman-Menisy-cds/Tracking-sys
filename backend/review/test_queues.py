@@ -375,26 +375,24 @@ class TimesheetReviewDetailTests(ReviewBase):
         res = self._client_for(self.manager).get(url)
         self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_hr_read_can_decide_false_for_unrelated_sheet(self):
+    def test_hr_can_decide_any_submitted_sheet_in_their_company(self):
         sheet_other = self._sheet(self.employee2, week_start=date(2026, 8, 17))
         url = reverse("review:timesheet-detail", kwargs={"pk": sheet_other.pk})
         res = self._client_for(self.hr).get(url)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        # QA finding 1 (Story 4.1): HR organization read scope is visibility
-        # only — there is no explicit HR decision capability in the model,
-        # so HR reads must never serialize can_decide=true, including on a
-        # SUBMITTED sheet. The command endpoint's own authorization is
-        # untouched (Story 3.3 snapshot).
-        self.assertEqual(res.data["data"]["permissions"]["can_decide"], False)
+        # HR reviews the SUBMITTED stage of the whole company's sheets:
+        # timesheets.review_services._resolve_scope grants HR there and the
+        # decision endpoint accepts it, so the read flag must agree.
+        self.assertEqual(res.data["data"]["permissions"]["can_decide"], True)
 
-    def test_hr_queue_read_shows_can_decide_false_for_submitted_sheet(self):
-        # QA finding 1 (Story 4.1): same rule on the queue rows, not just the
-        # detail view.
+    def test_hr_queue_row_for_submitted_sheet_is_decidable(self):
+        # Same rule on the queue rows, not just the detail view: the queue
+        # offers its decision from this flag alone.
         res = self._client_for(self.hr).get(self.ts_queue_url)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         rows = {row["id"]: row for row in res.data["data"]}
         self.assertIn(str(self.sheet.pk), rows)
-        self.assertEqual(rows[str(self.sheet.pk)]["permissions"]["can_decide"], False)
+        self.assertEqual(rows[str(self.sheet.pk)]["permissions"]["can_decide"], True)
 
     def test_hr_read_can_decide_false_for_non_submitted_sheet(self):
         approved = self._sheet(self.employee2, week_start=date(2026, 8, 17), status=Timesheet.Status.APPROVED)

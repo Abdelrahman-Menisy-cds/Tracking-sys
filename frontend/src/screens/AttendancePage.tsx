@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { fetchAttendanceToday, recordAttendanceEvent, type AttendanceDay } from "../app/attendanceApi";
+import {
+  fetchAttendanceHistory,
+  fetchAttendanceToday,
+  recordAttendanceEvent,
+  type AttendanceDay,
+  type AttendanceHistoryDay,
+} from "../app/attendanceApi";
+import { ApiError } from "../app/api";
 import { t as translate } from "../i18n/dict";
 import { Link } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
@@ -8,13 +15,11 @@ import { ClockIcon, CloseIcon } from "../components/icons";
 import PageHeader from "../components/layout/PageHeader";
 
 /**
- * Brief H33 - the attendance record has NO server endpoint yet (punches,
- * derived days, exceptions, schedule resolution all lived only in the deleted
- * mock layer). The frontend may not invent rows, so the three attendance
- * routes keep their shells, headings and copy and render the honest
- * unavailable state; every write affordance stays visible but disabled with a
- * title explaining why, and ClockAction (which AppShell also renders)
- * degrades to the same disabled control.
+ * Brief H33 made the attendance record honest about having no server endpoint;
+ * H41 is that endpoint. The day is derived on the server (active work schedule
+ * + recorded events), so the history table and the recent-days list now render
+ * real rows, and the only empty states left are the ones that are true: no
+ * punches today, no schedule in force, or no rows matching the chosen filters.
  */
 
 const noAttendanceCopy = (locale: "ar" | "en") => ({
@@ -22,10 +27,40 @@ const noAttendanceCopy = (locale: "ar" | "en") => ({
     ? "الحضور بيتسجّل على الخادم: بصمة الدخول والخروج بتحصل من الزرار، واليوم بيتحسب من جدول الدوام النشط."
     : "Attendance is recorded on the server: the button punches in and out, and the day is derived from the active work schedule.",
   waiting: locale === "ar" ? "مفيش إجراء حضور متاح دلوقتي" : "No attendance action is available right now",
-  emptyIntervals: locale === "ar" ? "لا توجد فواصل حضور مؤكدة من الخادم بعد." : "No confirmed attendance intervals from the server yet.",
+  emptyIntervals: locale === "ar" ? "لا توجد بصمات حضور مسجّلة في هذا اليوم." : "No attendance punches recorded for this day.",
   emptySchedule: locale === "ar" ? "لا يوجد جدول مؤكد من الخادم بعد." : "No confirmed schedule from the server yet.",
   emptyCorrections: locale === "ar" ? "لا توجد طلبات تصحيح مؤكدة من الخادم بعد." : "No confirmed correction requests from the server yet.",
+  emptyHistory: locale === "ar" ? "لا توجد أيام مطابقة للفلاتر المختارة." : "No days match the selected filters.",
+  failed: locale === "ar" ? "تعذّر تحميل سجل الحضور من الخادم. أعد المحاولة." : "Could not load the attendance history from the server. Retry.",
+  invalidRange: locale === "ar" ? "تحقّق من نطاق التاريخ: «من» يجب ألا تكون بعد «إلى»." : "Check the date range: “From” must not be after “To”.",
 });
+
+/** The five states a derived day may carry, as the server names them. */
+const historyStateLabels = (locale: "ar" | "en"): Record<string, string> => ({
+  PRESENT: translate(locale, "attendanceStatusPresent"),
+  ABSENT: translate(locale, "attendanceStatusAbsent"),
+  REST_DAY: translate(locale, "attendanceStatusRestDay"),
+  INCOMPLETE: translate(locale, "attendanceStatusIncomplete"),
+  NO_SCHEDULE: translate(locale, "attendanceStatusNoSchedule"),
+});
+
+/** HH:MM from the server's ISO timestamp, or an honest dash when there is none. */
+function clockTime(iso: string | null): string {
+  return iso ? iso.slice(11, 16) : "—";
+}
+
+function formatWorked(minutes: number | null, locale: "ar" | "en"): string {
+  if (minutes === null) return "—";
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  const suffixH = translate(locale, "attendanceHoursSuffix");
+  const suffixM = translate(locale, "attendanceMinutesSuffix");
+  return hours > 0 ? `${hours}${suffixH} ${rest}${suffixM}` : `${rest}${suffixM}`;
+}
+
+function formatBreak(minutes: number | null, locale: "ar" | "en"): string {
+  return minutes === null ? "—" : `${minutes} ${translate(locale, "attendanceBreakShort")}`;
+}
 
 export function ClockAction({ compact = false }: { compact?: boolean }) {
   const { locale } = useApp();
@@ -96,26 +131,10 @@ function TodayPanel() {
   </section>;
 }
 
-export default function AttendancePage() {
-  const { t, locale } = useApp(); usePageTitle(t("attendanceTitle"));
-  const copy = noAttendanceCopy(locale);
-  return <main className="page">
-    <PageHeader title={t("attendanceTitle")} subtitle={translate(locale, "attendanceDemoBoundary")} primaryAction={<Link className="btn btn-secondary" to="/attendance/history">{t("attendanceHistoryTitle")}</Link>} />
-    <Banner tone="warning" role="alert">{copy.banner}</Banner>
-    <TodayPanel />
-    <section className="work-surface section">
-      <div className="section-heading"><h2>{translate(locale, "attendanceRecentDays")}</h2><Link to="/attendance/history">{translate(locale, "attendanceViewFullHistory")}</Link></div>
-      <EmptyState message={copy.emptyIntervals} />
-    </section>
-  </main>;
-}
-
-/**
- * History and corrections keep their filter shells and append-only copy so
- * the design is genuinely unchanged; with no server rows the honest cell in
- * the table body is the state that renders, whatever filter is picked.
- */
-function attendanceTableShell(locale: "ar" | "en") {
+/** The derived days, as the server returns them: one table, shared by the
+ *  recent-days card and the full history screen. */
+function AttendanceTable({ locale, rows, emptyMessage }: { locale: "ar" | "en"; rows: AttendanceHistoryDay[]; emptyMessage: string }) {
+  const labels = historyStateLabels(locale);
   return <div className="table-wrap">
     <table aria-label={translate(locale, "attendanceTable")}>
       <thead>
@@ -130,14 +149,55 @@ function attendanceTableShell(locale: "ar" | "en") {
         </tr>
       </thead>
       <tbody>
-        <tr><td colSpan={7}><EmptyState message={noAttendanceCopy(locale).emptyIntervals} /></td></tr>
+        {rows.length === 0
+          ? <tr><td colSpan={7}><EmptyState message={emptyMessage} /></td></tr>
+          : rows.map((row) => (
+            <tr key={row.date}>
+              <td><bdi dir="ltr">{locale === "ar" ? formatArabicDigits(row.date) : row.date}</bdi></td>
+              <td><bdi dir="ltr">{clockTime(row.first_clock_in)}</bdi></td>
+              <td><bdi dir="ltr">{clockTime(row.last_clock_out)}</bdi></td>
+              <td>{formatWorked(row.worked_minutes, locale)}</td>
+              <td>{formatBreak(row.break_minutes, locale)}</td>
+              <td>{labels[row.state] ?? row.state}</td>
+              <td><Link to="/attendance/corrections">{translate(locale, "attendanceRequestCorrection")}</Link></td>
+            </tr>
+          ))}
       </tbody>
     </table>
   </div>;
 }
 
-function AttendanceTable({ locale }: { locale: "ar" | "en" }) {
-  return attendanceTableShell(locale);
+/** The last few derived days, read from the same history endpoint. */
+function RecentDaysPanel() {
+  const { locale } = useApp();
+  const copy = noAttendanceCopy(locale);
+  const [rows, setRows] = useState<AttendanceHistoryDay[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetchAttendanceHistory({}, locale)
+      .then(({ rows: next }) => { if (alive) setRows(next.slice(0, 7)); })
+      .catch(() => { if (alive) setRows([]); });
+    return () => { alive = false; };
+  }, [locale]);
+
+  return <section className="work-surface section">
+    <div className="section-heading"><h2>{translate(locale, "attendanceRecentDays")}</h2><Link to="/attendance/history">{translate(locale, "attendanceViewFullHistory")}</Link></div>
+    {rows === null
+      ? <EmptyState message={translate(locale, "loading")} />
+      : <AttendanceTable locale={locale} rows={rows} emptyMessage={copy.emptyIntervals} />}
+  </section>;
+}
+
+export default function AttendancePage() {
+  const { t, locale } = useApp(); usePageTitle(t("attendanceTitle"));
+  const copy = noAttendanceCopy(locale);
+  return <main className="page">
+    <PageHeader title={t("attendanceTitle")} subtitle={translate(locale, "attendanceDemoBoundary")} primaryAction={<Link className="btn btn-secondary" to="/attendance/history">{t("attendanceHistoryTitle")}</Link>} />
+    <Banner tone="warning" role="alert">{copy.banner}</Banner>
+    <TodayPanel />
+    <RecentDaysPanel />
+  </main>;
 }
 
 function formatArabicDigits(value: string): string {
@@ -148,19 +208,35 @@ function formatArabicDigits(value: string): string {
 
 export function AttendanceHistoryPage() {
   const { locale } = useApp();
+  const copy = noAttendanceCopy(locale);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [filter, setFilter] = useState("ALL");
-  /* The range/status decisions wait for real server rows; the shell keeps its
-     value so the operator's chosen filter survives the endpoint arriving. */
-  const filterLabels: Record<string, string> = {
-    PRESENT: translate(locale, "attendanceStatusPresent"),
-    INCOMPLETE: translate(locale, "attendanceStatusIncomplete"),
-    ABSENT_CANDIDATE: translate(locale, "attendanceStatusAbsentCandidate"),
-    LATE: translate(locale, "attendanceExceptionLate"),
-    EARLY_LEAVE: translate(locale, "attendanceExceptionEarlyLeave"),
-    MISSING_CLOCK_OUT: translate(locale, "attendanceExceptionMissingClockOut"),
-  };
+  const [rows, setRows] = useState<AttendanceHistoryDay[] | null>(null);
+  const [count, setCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  /* The range/status filter is the query: every change re-derives on the
+     server, so the table can never disagree with the filters above it. */
+  useEffect(() => {
+    let alive = true;
+    setRows(null);
+    setError(null);
+    fetchAttendanceHistory({ from, to, status: filter }, locale)
+      .then(({ rows: next, meta }) => {
+        if (!alive) return;
+        setRows(next);
+        setCount(meta.count);
+      })
+      .catch((failure) => {
+        if (!alive) return;
+        setRows([]);
+        setError(failure instanceof ApiError && failure.status === 422 ? copy.invalidRange : copy.failed);
+      });
+    return () => { alive = false; };
+  }, [from, to, filter, locale, copy.invalidRange, copy.failed]);
+
+  const filterLabels: Record<string, string> = historyStateLabels(locale);
   const activeFilters = [
     from ? { key: "from", label: `${translate(locale, "attendanceFrom")} ${locale === "ar" ? formatArabicDigits(from) : from}` } : null,
     to ? { key: "to", label: `${translate(locale, "attendanceTo")} ${locale === "ar" ? formatArabicDigits(to) : to}` } : null,
@@ -171,10 +247,10 @@ export function AttendanceHistoryPage() {
   return (
     <main className="page">
       <PageHeader title={translate(locale, "attendanceHistoryTitle")} subtitle={translate(locale, "attendanceHistorySubtitle")} />
-      <Banner tone="warning" role="alert">{noAttendanceCopy(locale).banner}</Banner>
       <Banner tone="info">
         <strong>{translate(locale, "attendanceWhatStatesMean")}</strong> {translate(locale, "attendanceStatesHelp")}
       </Banner>
+      {error ? <Banner tone="error" role="alert">{error}</Banner> : null}
       <section className="section">
         <section className="filter-panel" aria-labelledby="attendance-history-filters-heading">
           <div className="filter-panel-heading">
@@ -195,11 +271,10 @@ export function AttendanceHistoryPage() {
               <select className="select" value={filter} onChange={(e) => setFilter(e.target.value)}>
                 <option value="ALL">{translate(locale, "attendanceAll")}</option>
                 <option value="PRESENT">{translate(locale, "attendanceStatusPresent")}</option>
+                <option value="ABSENT">{translate(locale, "attendanceStatusAbsent")}</option>
                 <option value="INCOMPLETE">{translate(locale, "attendanceStatusIncomplete")}</option>
-                <option value="ABSENT_CANDIDATE">{translate(locale, "attendanceStatusAbsentCandidate")}</option>
-                <option value="LATE">{translate(locale, "attendanceExceptionLate")}</option>
-                <option value="EARLY_LEAVE">{translate(locale, "attendanceExceptionEarlyLeave")}</option>
-                <option value="MISSING_CLOCK_OUT">{translate(locale, "attendanceExceptionMissingClockOut")}</option>
+                <option value="REST_DAY">{translate(locale, "attendanceStatusRestDay")}</option>
+                <option value="NO_SCHEDULE">{translate(locale, "attendanceStatusNoSchedule")}</option>
               </select>
             </label>
           </div>
@@ -224,9 +299,15 @@ export function AttendanceHistoryPage() {
           ) : null}
         </section>
         <div className="filter-count-line">
-          <p className="table-caption" aria-live="polite">{translate(locale, "taskFiltersShowing").replace("%s", "0").replace("%s", "0")}</p>
+          <p className="table-caption" aria-live="polite">
+            {translate(locale, "taskFiltersShowing")
+              .replace("%s", locale === "ar" ? formatArabicDigits(String(rows?.length ?? 0)) : String(rows?.length ?? 0))
+              .replace("%s", locale === "ar" ? formatArabicDigits(String(count)) : String(count))}
+          </p>
         </div>
-        <AttendanceTable locale={locale} />
+        {rows === null
+          ? <EmptyState message={translate(locale, "loading")} />
+          : <AttendanceTable locale={locale} rows={rows} emptyMessage={copy.emptyHistory} />}
       </section>
     </main>
   );

@@ -9,6 +9,7 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 from django.db.models import F
 from django.utils import timezone
+from uuid import uuid4
 
 
 class UserManager(BaseUserManager):
@@ -750,3 +751,223 @@ class Task(models.Model):
 
     def __str__(self) -> str:
         return f"{self.title} ({self.status})"
+
+
+class TaskAttachment(models.Model):
+    """A file on a task — the same kind of object as a request attachment.
+
+    It reuses the request store wholesale (one opaque-key layout, one
+    PDF/PNG/JPG/DOCX policy, one malware-scan pipeline; see
+    ``accounts.task_attachment_services``) so the product never grows a second
+    attachment scheme. What differs is only the audience: a task file is
+    readable by the task's owner and its assignee, and by nobody else.
+    """
+
+    class ScanStatus(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        CLEAN = "CLEAN", "Clean"
+        FAILED = "FAILED", "Failed"
+        REJECTED = "REJECTED", "Rejected"
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    task = models.ForeignKey(
+        Task,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+    # H30 §2.6 step 5 + §6: tenant anchor mirrored from the parent task — a
+    # corrupted bulk query can never join task files across companies.
+    company = models.ForeignKey("Company", on_delete=models.PROTECT)
+    uploaded_by = models.ForeignKey(
+        "User",
+        on_delete=models.PROTECT,
+        related_name="uploaded_task_attachments",
+    )
+    # Opaque random key: MEDIA_ROOT/attachments/<uuid>/<uuid>.bin — the SAME
+    # layout the request attachments use, never filename-derived.
+    storage_key = models.CharField(max_length=255, unique=True)
+    original_filename = models.CharField(max_length=255)
+    declared_content_type = models.CharField(max_length=128)
+    detected_content_type = models.CharField(max_length=128)
+    size_bytes = models.PositiveBigIntegerField()
+    content_sha256 = models.CharField(max_length=64)
+    scan_status = models.CharField(
+        max_length=16,
+        choices=ScanStatus.choices,
+        default=ScanStatus.PENDING,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ("created_at", "id")
+        verbose_name = "task attachment"
+        verbose_name_plural = "task attachments"
+
+    def __str__(self) -> str:
+        return f"{self.original_filename} ({self.scan_status})"
+
+
+class Announcement(models.Model):
+    """An internal announcement HR authors and publishes to a chosen audience.
+
+    The «الإعلانات الداخلية» screen had nothing behind it — no model, no feed,
+    no send path — and it refused to simulate a delivery. This is the server
+    half of that screen.
+
+    AUDIENCE RULE (why it is what it is):
+
+    * ``ALL`` resolves to every ACTIVE user of the author's company at the
+      moment of publishing; ``SELECTED`` resolves to the named users, and every
+      named user must be an ACTIVE member of the SAME company or the write is
+      refused (422). The company boundary is not decoration: an announcement is
+      tenant data like every other row, and a recipient list is exactly the
+      place an id from another tenant could otherwise leak.
+    * The audience is SNAPSHOTTED at publish time — the delivery row records
+      the resolved ``recipient_count`` — and never recomputed for the log. The
+      log has to say what the server actually did, and a read-time recomputation
+      would let «sent to 40 people» drift as people join or leave afterwards.
+    * The FEED is computed from the stored rule, so somebody added to the
+      company later still sees an ``ALL`` announcement published before them
+      (it is a company-wide notice), while a ``SELECTED`` announcement stays
+      with the people it named. Only PUBLISHED announcements are visible to a
+      non-HR reader; a DRAFT is HR's alone.
+
+    ``author`` is PROTECTed — the record of who wrote a notice outlives the
+    account. ``version`` is the optimistic-concurrency token publish checks.
+    """
+
+    class Audience(models.TextChoices):
+        ALL = "ALL", "All employees"
+        SELECTED = "SELECTED", "Selected employees"
+
+    class State(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        PUBLISHED = "PUBLISHED", "Published"
+
+    company = models.ForeignKey("Company", on_delete=models.PROTECT, related_name="announcements")
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="announcements_authored",
+    )
+    title = models.CharField(max_length=200)
+    body = models.TextField()
+    audience = models.CharField(max_length=16, choices=Audience.choices, default=Audience.ALL)
+    recipients = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="announcements_received",
+    )
+    state = models.CharField(max_length=16, choices=State.choices, default=State.DRAFT, db_index=True)
+    published_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    version = models.IntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        verbose_name = "announcement"
+        verbose_name_plural = "announcements"
+        indexes = [models.Index(fields=["company", "state"], name="announce_company_state")]
+
+    def __str__(self) -> str:
+        return f"{self.title} ({self.state})"
+
+    @classmethod
+    def feed_for(cls, user):
+        """The announcements ``user`` may read: HR everything, others addressed.
+
+        Non-HR callers see only PUBLISHED rows whose rule covers them — ``ALL``
+        or a ``SELECTED`` list that names them — scoped to their own company.
+        A manager is a reader here, not an author.
+        """
+        from django.db.models import Q
+
+        scoped = cls.objects.filter(company=user.company)
+        if user.role == User.Role.HR:
+            return scoped
+        return (
+            scoped.filter(state=cls.State.PUBLISHED)
+            .filter(Q(audience=cls.Audience.ALL) | Q(recipients=user))
+            .distinct()
+        )
+
+
+class AnnouncementDelivery(models.Model):
+    """The send log: ONE append-only row per publish — what the server actually did.
+
+    This row is the honest answer to «what was sent, to which audience, when».
+    ``channel`` is a closed list with exactly ONE member today, and that is the
+    point: the product has no email/push transport, so publishing puts the
+    announcement into the in-app feed (the announcements list itself) and the
+    log says precisely that. There is deliberately no "email" or "push" choice
+    to fake — a channel that does not exist cannot be recorded as if it did.
+
+    ``audience`` is the SNAPSHOT of the rule at publish time and
+    ``recipient_count`` the number of people it resolved to; both are frozen so
+    the log never drifts from what happened. ``sent_by`` and ``request_id`` make
+    the row auditable the same way AuditEvent is.
+    """
+
+    class Channel(models.TextChoices):
+        IN_APP_FEED = "in_app_feed", "In-app feed"
+
+    company = models.ForeignKey("Company", on_delete=models.PROTECT, related_name="announcement_deliveries")
+    announcement = models.ForeignKey(
+        Announcement,
+        on_delete=models.PROTECT,
+        related_name="deliveries",
+    )
+    audience = models.CharField(max_length=16, choices=Announcement.Audience.choices)
+    recipient_count = models.PositiveIntegerField(default=0)
+    channel = models.CharField(max_length=32, choices=Channel.choices, default=Channel.IN_APP_FEED)
+    sent_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="announcement_deliveries_sent",
+    )
+    sent_at = models.DateTimeField(default=timezone.now, db_index=True)
+    request_id = models.CharField(max_length=128, blank=True, default="")
+
+    class Meta:
+        ordering = ["-sent_at", "-id"]
+        verbose_name = "announcement delivery"
+        verbose_name_plural = "announcement deliveries"
+
+    def __str__(self) -> str:
+        return f"delivery#{self.pk} -> {self.recipient_count} ({self.channel})"
+
+
+class AnnouncementIdempotencyRecord(models.Model):
+    """Stored idempotency for announcement mutations (create + publish).
+
+    Same key + same payload replays the original response without a second
+    draft or a second delivery; a differing payload with the same key -> 409.
+    Scoped per (key_hash, user), exactly like DecisionIdempotencyRecord, so a
+    key guessed by another user is simply unknown to them and one author's
+    stored snapshot never leaks to someone else.
+    """
+
+    key_hash = models.CharField(max_length=64, db_index=True)
+    payload_hash = models.CharField(max_length=64)
+    response_snapshot = models.JSONField()
+    company = models.ForeignKey("Company", on_delete=models.PROTECT)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="announcement_idempotency_records",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["key_hash", "user"], name="uniq_announcement_idem_key_user")
+        ]
+        verbose_name = "announcement idempotency record"
+        verbose_name_plural = "announcement idempotency records"
+
+    def save(self, *args, **kwargs):
+        if self.company_id is None and self.user_id is not None:
+            self.company = self.user.company
+        super().save(*args, **kwargs)

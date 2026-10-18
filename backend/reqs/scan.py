@@ -54,34 +54,41 @@ def get_scanner() -> BaseMalwareScanner:
 force_scan_result: ScanResult | None = None
 
 
-def scan_attachment(attachment_id):
+def scan_attachment(attachment_id, model=None):
     """Run the configured scanner and persist the resulting scan status.
 
     Opens its own DB connection because it usually runs on a background
-    thread after the uploading transaction committed.
+    thread after the uploading transaction committed. ``model`` names the
+    attachment table to update; it defaults to the request attachment, and the
+    task attachment passes its own — one scanner, one status vocabulary, both
+    stores.
     """
     from .models import RequestAttachment
+
+    model = model or RequestAttachment
 
     def _run():
         if force_scan_result is not None:
             result = force_scan_result
         else:
             try:
-                attachment = RequestAttachment.objects.get(pk=attachment_id)
-            except RequestAttachment.DoesNotExist:
+                attachment = model.objects.get(pk=attachment_id)
+            except model.DoesNotExist:
                 return
             result = get_scanner().scan(attachment.storage_key)
-        status = RequestAttachment.ScanStatus.CLEAN if result.clean else RequestAttachment.ScanStatus.FAILED
-        RequestAttachment.objects.filter(pk=attachment_id).update(scan_status=status)
+        status = model.ScanStatus.CLEAN if result.clean else model.ScanStatus.FAILED
+        model.objects.filter(pk=attachment_id).update(scan_status=status)
 
     return _run()
 
 
-def schedule_scan(attachment_id):
+def schedule_scan(attachment_id, model=None):
     """Schedule the scan after the upload transaction commits (threading only)."""
 
     def _on_commit():
-        thread = threading.Thread(target=scan_attachment, args=(attachment_id,), daemon=True)
+        thread = threading.Thread(
+            target=scan_attachment, args=(attachment_id,), kwargs={"model": model}, daemon=True
+        )
         thread.start()
 
     transaction.on_commit(_on_commit)

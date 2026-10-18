@@ -34,14 +34,24 @@ const DECISION_TO_ACTION: Record<"APPROVE" | "REJECT" | "RETURN", DecisionAction
   RETURN: "return",
 };
 
+/* The stage after the reviewer acts. It is driven by what the SERVER says this
+   caller may do (permissions.can_decide) plus the row's own stage — never by a
+   hard-coded manager stage, which told HR its PENDING_HR rows had "no review
+   action available" while the row was decidable and the endpoint accepted the
+   decision. */
 function requestNextStage(request: ServerReviewRequestRow, locale: "ar" | "en") {
-  if (request.status !== "PENDING_MANAGER") {
-    return locale === "ar" ? "لا يوجد إجراء مراجعة متاح" : "No review action available";
+  const ar = locale === "ar";
+  if (!request.permissions.can_decide) {
+    return ar ? "لا يوجد إجراء مراجعة متاح" : "No review action available";
+  }
+  if (request.status === "PENDING_HR") {
+    // HR's decision is the final stage for a request that reached HR.
+    return ar ? "بعد الاعتماد: مكتمل" : "After approval: complete";
   }
   if (request.request_type.requires_hr_approval) {
-    return locale === "ar" ? "بعد الاعتماد: مراجعة الموارد البشرية" : "After approval: HR review";
+    return ar ? "بعد الاعتماد: مراجعة الموارد البشرية" : "After approval: HR review";
   }
-  return locale === "ar" ? "بعد الاعتماد: مكتمل" : "After approval: complete";
+  return ar ? "بعد الاعتماد: مكتمل" : "After approval: complete";
 }
 
 function requestStatusLabel(status: RequestStatusType, locale: "ar" | "en") {

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from accounts import assistant_views, attendance_views, company_views, department_views, employee_views, grant_views, task_views, views, work_schedule_views
+from accounts import announcement_views, assistant_views, attendance_views, company_views, department_views, employee_views, grant_views, task_attachment_views, task_views, views, work_schedule_views
 
 app_name = "accounts"
 
@@ -38,12 +38,32 @@ urlpatterns = [
     path("departments", department_views.DepartmentListView.as_view(), name="department-list"),
     path("attendance/today", attendance_views.AttendanceTodayView.as_view(), name="attendance-today"),
     path(
+        "attendance/history",
+        attendance_views.AttendanceHistoryView.as_view(),
+        name="attendance-history",
+    ),
+    path(
+        "attendance/snapshot",
+        attendance_views.AttendanceSnapshotView.as_view(),
+        name="attendance-snapshot",
+    ),
+    path(
         "attendance/<str:kind>",
         attendance_views.AttendanceEventView.as_view(),
         name="attendance-event",
     ),
     path("tasks", task_views.TaskListCreateView.as_view(), name="task-list"),
     path("tasks/<int:task_id>", task_views.TaskDetailView.as_view(), name="task-detail"),
+    path(
+        "tasks/<int:task_id>/attachments",
+        task_attachment_views.TaskAttachmentListView.as_view(),
+        name="task-attachment-list",
+    ),
+    path(
+        "tasks/<int:task_id>/attachments/<uuid:pk>/download",
+        task_attachment_views.TaskAttachmentDownloadView.as_view(),
+        name="task-attachment-download",
+    ),
     path(
         "departments/<int:department_id>",
         department_views.DepartmentDetailView.as_view(),
@@ -60,5 +80,14 @@ urlpatterns = [
         "manager-grants/<int:grant_id>",
         grant_views.ManagerGrantDetailView.as_view(),
         name="manager-grant-detail",
+    ),
+    # «الإعلانات الداخلية» — the send log route is listed before the publish
+    # route only for readability; `log` is not an <int>, so the two never clash.
+    path("announcements", announcement_views.AnnouncementListView.as_view(), name="announcement-list"),
+    path("announcements/log", announcement_views.AnnouncementLogView.as_view(), name="announcement-log"),
+    path(
+        "announcements/<int:announcement_id>/publish",
+        announcement_views.AnnouncementPublishView.as_view(),
+        name="announcement-publish",
     ),
 ]

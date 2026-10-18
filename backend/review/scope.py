@@ -171,15 +171,19 @@ def can_decide_request(user, request_obj) -> bool:
 def can_decide_timesheet(user, sheet) -> bool:
     """Whether `user` may act on this sheet per Story 4.1 READ permissions.
 
-    Story 4.1 QA decision: HR organization read scope is visibility only —
-    there is no explicit HR decision capability in the data model, so HR
-    reads ALWAYS serialize can_decide=false (finding 1), including on
-    SUBMITTED sheets. The timesheet decision/reopen command endpoints
-    (timesheets.review_services) keep their own independent authorization.
+    HR is a REVIEWER of the SUBMITTED stage, exactly as it is of a request's
+    PENDING_HR stage. timesheets.review_services._resolve_scope grants HR the
+    "hr" scope on a SUBMITTED sheet and Story 3.3 proves the decision endpoint
+    accepts HR's approve/reject/return there, so this flag has to be true in
+    the same place. The earlier "HR reads ALWAYS serialize can_decide=false"
+    rule was wrong: the review screen offers a decision from this flag alone,
+    so it left HR's whole SUBMITTED queue un-actionable while the server kept
+    accepting the decision. HR's reopen of an APPROVED/REJECTED sheet is a
+    separate endpoint with its own confirmation and is not this affordance.
+
     Managers mirror the current active direct-report scope (AC 4.1): the
-    sheet's employee must be their CURRENT active direct report and the
-    sheet must be in a relevant review state. The SUBMITTED act-on gate
-    itself stays with review_services; this flag only drives UI affordances.
+    sheet's employee must be their CURRENT active direct report and the sheet
+    must be in a relevant review state.
     """
     if not getattr(user, "is_authenticated", False) or not user.is_active:
         return False
@@ -189,4 +193,8 @@ def can_decide_timesheet(user, sheet) -> bool:
         if sheet.employee_id not in _scoped_employee_ids(user):
             return False
         return sheet.status in MANAGER_TIMESHEET_HISTORY_STATES
+    if user.role == User.Role.HR:
+        # HR's act-on state for a timesheet is SUBMITTED
+        # (timesheets.review_services._resolve_scope).
+        return sheet.status == Timesheet.Status.SUBMITTED
     return False

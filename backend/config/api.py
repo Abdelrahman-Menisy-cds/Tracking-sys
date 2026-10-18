@@ -89,6 +89,32 @@ class RequestPagination(PageNumberPagination):
         )
 
 
+class AttendanceHistoryPagination(PageNumberPagination):
+    """Bounded pagination for the caller's derived attendance history.
+
+    One page holds a month (30 days), which is also the endpoint's default
+    range, so the default view is a single page; ``page_size`` is capped at a
+    quarter so a range query cannot be turned into an unbounded scan.
+    """
+
+    page_size = 30
+    page_size_query_param = "page_size"
+    max_page_size = 90
+
+    def get_paginated_response(self, data):
+        return Response(
+            {
+                "data": data,
+                "meta": {
+                    "page": self.page.number,
+                    "page_size": self.get_page_size(self.request),
+                    "count": self.page.paginator.count,
+                    "total_pages": self.page.paginator.num_pages,
+                },
+            }
+        )
+
+
 def error_payload(*, code, message, fields, request):
     return {
         "error": {

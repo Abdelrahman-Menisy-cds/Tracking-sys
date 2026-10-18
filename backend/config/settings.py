@@ -41,6 +41,8 @@ INSTALLED_APPS = [
     "timesheets",
     "review",
     "holidays",
+    # Leave balances (أرصدة الإجازات): HR's entitlement per employee/type/year.
+    "leavebalances",
 ]
 
 # The Django admin is deliberately not installed for Story 1.1 (HR is an

@@ -21,6 +21,7 @@ urlpatterns = [
     path("api/v1/", include("timesheets.urls")),
     path("api/v1/", include("review.urls")),
     path("api/v1/", include("holidays.urls")),
+    path("api/v1/", include("leavebalances.urls")),
     re_path(r"^api/v1(?:/.*)?$", api_not_found),
     # --- the built SPA, declared LAST so it cannot shadow the API above ---
     # Served from this same origin on purpose: the session cookie and the CSRF

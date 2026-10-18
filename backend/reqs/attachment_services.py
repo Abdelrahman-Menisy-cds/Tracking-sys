@@ -34,7 +34,7 @@ class AttachmentValidationError(Exception):
         super().__init__(f"{field}: {message}")
 
 
-def _sniff_content_type(head: bytes) -> str | None:
+def sniff_content_type(head: bytes) -> str | None:
     """Detect real content type from file header bytes (magic-number sniffing)."""
     if head.startswith(b"%PDF-"):
         return "application/pdf"
@@ -70,7 +70,17 @@ def _file_sha256(fileobj) -> str:
     return digest.hexdigest()
 
 
-def _store_bytes(storage_key: str, payload: bytes) -> None:
+def new_storage_key() -> str:
+    """The ONE on-disk layout for every attachment in the product.
+
+    MEDIA_ROOT/attachments/<uuid>/<uuid>.bin — opaque, never filename-derived.
+    Request files and task files share it, so a single reader (the download
+    view's safe_join) governs the whole store and there is no second scheme.
+    """
+    return f"attachments/{uuid4().hex}/{uuid4().hex}.bin"
+
+
+def store_bytes(storage_key: str, payload: bytes) -> None:
     # safe_join, same as the read path: defense in depth against any future
     # caller passing a storage key that escapes MEDIA_ROOT.
     destination = Path(safe_join(settings.MEDIA_ROOT, *storage_key.split("/")))
@@ -110,7 +120,7 @@ def upload_attachment(*, user, request_obj: EmployeeRequest, fileobj: UploadedFi
     if len(payload) > MAX_PER_FILE:
         raise AttachmentValidationError("file", _("Each file must be 10 MB or smaller."))
 
-    detected = _sniff_content_type(payload[:512])
+    detected = sniff_content_type(payload[:512])
     if detected is None or detected != allowed_extension:
         raise AttachmentValidationError(
             "file",
@@ -125,8 +135,8 @@ def upload_attachment(*, user, request_obj: EmployeeRequest, fileobj: UploadedFi
         raise AttachmentValidationError("file", _("Attachment size exceeds the 25 MB request limit."))
 
     sha = sha256(payload).hexdigest()
-    storage_key = f"attachments/{uuid4().hex}/{uuid4().hex}.bin"
-    _store_bytes(storage_key, payload)
+    storage_key = new_storage_key()
+    store_bytes(storage_key, payload)
 
     attachment = create_attachment_record(
         user=user,
