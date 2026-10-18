@@ -16,6 +16,12 @@ import {
   type WorkScheduleDraft,
   type WorkScheduleIssues,
 } from "../../app/workSchedulesApi";
+import {
+  adjustLeaveBalance,
+  fetchLeaveBalances,
+  type LeaveBalancePayload,
+  type LeaveBalanceRow,
+} from "../../app/leaveBalancesApi";
 import type { PublicHoliday } from "../../app/serverTypes";
 import { Banner, Dialog, EmptyState, SkeletonRows, StatusPill, type StatusTone } from "../../components/ui";
 import PageHeader from "../../components/layout/PageHeader";
@@ -38,8 +44,12 @@ type DictKey = keyof Dict;
  *     `POST /work-schedules` with the whole week in one request (H39 - HR
  *     only, the server enforces it again). A failed read is not «no schedule»:
  *     the failure states stay separate. Scope deliberately excludes PATCH/
- *     DELETE UI and leave entitlement; the leave table still has no endpoint
- *     and keeps the honest unavailable state instead of fixture rows.
+ *     DELETE UI.
+ *   • §1.2 Leave entitlement: READ from `GET /leave-balances` and adjusted
+ *     through `POST /leave-balances/adjust` (HR only). An unconfigured row's
+ *     null entitlement reads «غير مُعرّف» - never 0 - and the derived used
+ *     count stays labelled as a count of approved requests; the «كل الموظفين» control
+ *     filters the rows the endpoint already returned.
  *   • Company identity stays on its real GET/PATCH /company widget.
  */
 
@@ -47,6 +57,9 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const dateIsValid = (value: string): boolean => ISO_DATE.test(value) && Number.isFinite(new Date(`${value}T12:00:00Z`).getTime());
 
 const numText = (value: number, locale: Locale): string => new Intl.NumberFormat(locale).format(value);
+// A year is an identifier, not a quantity: grouping would print «2,026».
+const yearText = (value: number, locale: Locale): string =>
+  new Intl.NumberFormat(locale, { useGrouping: false }).format(value);
 
 // Brief H3 - the ONE shared formatting path; no screen-local Intl date formatters.
 const fullDate = (value: string, locale: Locale): string =>
@@ -500,20 +513,375 @@ function ScheduleFormDialog({
   );
 }
 
-/* ==================== §1.2 Leave entitlement table (honest) ==================== */
+/* ==================== §1.2 Leave entitlement table (server-backed) ==================== */
 
+/**
+ * §1.2 - the leave entitlement panel, wired to the real server.
+ *
+ * GET /leave-balances returns a row per (employee, leave type) carrying the
+ * STORED entitlement and carry-over, the DERIVED used count, and the remaining.
+ * An unconfigured row sends entitled/carried/remaining as null - which is NOT
+ * zero - so those render «غير مُعرّف» with the adjust action beside them, while
+ * `used_days` (a real derived count) stays a number and is labelled as a count
+ * of approved requests, so the two can never be read as one another.
+ *
+ * The read is scoped by the server (HR sees the whole company). The «كل
+ * الموظفين» control filters the rows the endpoint already returned - the
+ * endpoint takes no employee parameter, so the filtering is client-side and
+ * loses no row. A failed read is a real error with a retry: never the empty
+ * table, and never the old "no endpoint" banner.
+ */
 function LeaveSection({ t, locale }: { t: (key: DictKey) => string; locale: Locale }) {
-  const unavailable = locale === "ar"
-    ? "جدول مخصص الإجازات غير متاح: لا توجد نقطة نهاية لأرصدة الإجازات على الخادم (قراءة أو تسوية)، فلا توجد صفوف مؤكدة لأي موظف ولا إجراء ضبط. الجدول يُستكمل عند توفر النقطة."
-    : "The leave entitlement table is not available: no leave-balances endpoint exists on the server (read or adjust), so there are no confirmed rows for any employee and no adjust action. The table completes when the endpoint does.";
+  const year = Number(cairoDayIso(new Date()).slice(0, 4)) || new Date().getFullYear();
+  const [payload, setPayload] = useState<LeaveBalancePayload | null>(null);
+  const [failure, setFailure] = useState<{ reason: ApiFailureKind; message: string } | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [employeeFilter, setEmployeeFilter] = useState("all");
+  const [adjustTarget, setAdjustTarget] = useState<LeaveBalanceRow | null>(null);
+  const [savedNotice, setSavedNotice] = useState(false);
+
+  /** Read the balances from the server. Never fakes a successful load. */
+  useEffect(() => {
+    let cancelled = false;
+    fetchLeaveBalances(year, locale)
+      .then((data) => {
+        if (cancelled) return;
+        setPayload(data);
+        setFailure(null);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        // A failed read hides the table: the empty state must not be reachable
+        // from a refusal, only from a genuinely empty tenant.
+        setPayload(null);
+        setFailure(describeApiFailure(error));
+      });
+    return () => { cancelled = true; };
+  }, [year, locale, attempt]);
+
+  const rows = payload?.rows ?? [];
+  const employees = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const row of payload?.rows ?? []) if (!seen.has(row.employee_id)) seen.set(row.employee_id, row.employee_name);
+    return [...seen.entries()].map(([id, name]) => ({ id, name }));
+  }, [payload]);
+  const visible = employeeFilter === "all" ? rows : rows.filter((row) => row.employee_id === employeeFilter);
+  const unsetCount = rows.filter((row) => !row.is_configured).length;
+
   return (
-    <section className="section" aria-labelledby="settings-leave-heading" id="settings-leave">
+    <section className="work-surface section" aria-labelledby="settings-leave-heading" id="settings-leave">
       <div className="section-heading">
         <h2 id="settings-leave-heading">{t("adminSettingsLeaveTitle")}</h2>
-        <span className="page-meta">{t("adminAllEmployees")}</span>
+        {payload ? <span className="page-meta">{`${t("lbYear")}: ${yearText(payload.year, locale)}`}</span> : null}
       </div>
-      <Banner tone="warning" role="alert">{unavailable}</Banner>
+
+      {savedNotice ? <Banner tone="success" role="status">{t("adminBalanceAdjusted")}</Banner> : null}
+
+      {/* Loading is a skeleton - never an empty card pretending data went missing. */}
+      {payload === null && !failure ? <SkeletonRows rows={3} /> : null}
+
+      {/* A failed read states what ACTUALLY happened, keyed on the failure kind. */}
+      {failure ? (
+        <div>
+          <Banner tone="error" role="alert">{describeLeaveFailure(failure, t)}</Banner>
+          <div style={{ marginBlockStart: "var(--sp-3)" }}>
+            <button className="btn btn-secondary" type="button" onClick={() => setAttempt((n) => n + 1)}>
+              {t("retry")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {payload && !failure ? (
+        payload.tracked && rows.length > 0 ? (
+          <>
+            <div className="summary-strip">
+              <div className="summary-item">
+                <span className="summary-value">{numText(employees.length, locale)}</span>
+                <span className="summary-label">{t("lbSummaryEmployees")}</span>
+              </div>
+              <div className="summary-item">
+                <span className="summary-value">{numText(rows.length, locale)}</span>
+                <span className="summary-label">{t("lbSummaryRows")}</span>
+              </div>
+              <div className="summary-item">
+                <span className="summary-value">{numText(unsetCount, locale)}</span>
+                <span className="summary-label">{t("lbSummaryUnset")}</span>
+              </div>
+            </div>
+
+            {/* §1.2 «كل الموظفين» - filters the rows the endpoint already returned
+                (the endpoint takes no employee parameter, so this is client-side). */}
+            <label className="field" htmlFor="settings-leave-employee" style={{ marginBlockStart: "var(--sp-4)" }}>
+              <span className="field-label">{t("employee")}</span>
+              <select
+                id="settings-leave-employee"
+                className="select"
+                value={employeeFilter}
+                onChange={(event) => setEmployeeFilter(event.target.value)}
+              >
+                <option value="all">{t("adminAllEmployees")}</option>
+                {employees.map((employee) => (
+                  <option key={employee.id} value={employee.id}>{employee.name}</option>
+                ))}
+              </select>
+            </label>
+
+            {visible.length === 0 ? (
+              <p className="page-meta">{t("adminSettingsNoFilteredRows")}</p>
+            ) : (
+              <div className="table-wrap table-wide">
+                <table>
+                  <caption className="table-caption">{t("lbUsedNote")}</caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">{t("employee")}</th>
+                      <th scope="col">{t("adminLeaveType")}</th>
+                      <th scope="col">{t("adminEntitlement")}</th>
+                      <th scope="col">{t("adminCarryOver")}</th>
+                      <th scope="col">{t("adminUsedDays")}</th>
+                      <th scope="col">{t("lbRemaining")}</th>
+                      <th scope="col">{t("adminAdjustBalance")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visible.map((row) => (
+                      <LeaveBalanceTableRow
+                        key={`${row.employee_id}-${row.request_type_id}`}
+                        row={row}
+                        t={t}
+                        locale={locale}
+                        onAdjust={() => { setSavedNotice(false); setAdjustTarget(row); }}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {unsetCount > 0 ? (
+              <p className="page-meta" style={{ marginBlockStart: "var(--sp-3)" }}>{t("lbUnsetNote")}</p>
+            ) : null}
+          </>
+        ) : (
+          <EmptyState message={payload.tracked ? t("lbEmpty") : t("lbNoTypes")} />
+        )
+      ) : null}
+
+      {adjustTarget ? (
+        <AdjustBalanceDialog
+          t={t}
+          locale={locale}
+          row={adjustTarget}
+          onClose={() => setAdjustTarget(null)}
+          onSaved={() => {
+            setAdjustTarget(null);
+            setSavedNotice(true);
+            // Re-read rather than trusting what we think changed.
+            setAttempt((n) => n + 1);
+          }}
+        />
+      ) : null}
     </section>
+  );
+}
+
+/** One table row: the stored entitlement, the derived used count, the remaining. */
+function LeaveBalanceTableRow({
+  row,
+  t,
+  locale,
+  onAdjust,
+}: {
+  row: LeaveBalanceRow;
+  t: (key: DictKey) => string;
+  locale: Locale;
+  onAdjust: () => void;
+}) {
+  return (
+    <tr>
+      <td>
+        <strong>{row.employee_name}</strong>
+        <div className="page-meta">{row.employee_number ?? row.employee_email}</div>
+      </td>
+      <td>{row.request_type_name}</td>
+      <td>{row.entitled_days === null ? <UnsetBalance t={t} /> : numText(row.entitled_days, locale)}</td>
+      <td>{row.carried_over_days === null ? <UnsetBalance t={t} /> : numText(row.carried_over_days, locale)}</td>
+      <td>
+        {/* used_days is DERIVED and may be a real count while the balance is unset;
+            the sub-label keeps it from being read as an entitlement. */}
+        <span>{numText(row.used_days, locale)}</span>
+        <div className="page-meta">{t("lbUsedUnit")}</div>
+      </td>
+      <td>{row.remaining_days === null ? <UnsetBalance t={t} /> : numText(row.remaining_days, locale)}</td>
+      <td>
+        <button className="btn btn-secondary btn-compact" type="button" onClick={onAdjust}>
+          {t("adminAdjustBalance")}
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+/** A null balance is NOT zero: it renders «غير مُعرّف», never as a number. */
+function UnsetBalance({ t }: { t: (key: DictKey) => string }) {
+  return <span className="pill pill-neutral">{t("lbNotSet")}</span>;
+}
+
+/** Why the balance table could not be read - keyed on the real failure kind. */
+function describeLeaveFailure(failure: { reason: ApiFailureKind; message: string }, t: (key: DictKey) => string): string {
+  if (failure.reason === "unauthenticated") return t("lbFailureAuth");
+  if (failure.reason === "forbidden") return t("lbFailureForbidden");
+  if (failure.reason === "unreachable") return t("lbFailureUnreachable");
+  if (failure.reason === "invalid" && failure.message) return `${t("lbFailureServer")} ${failure.message}`;
+  return t("lbFailureServer");
+}
+
+/**
+ * The HR adjust dialog - ABSOLUTE entitlements, matching the endpoint.
+ *
+ * HR sends the new entitled + carried-over days for the row's (employee, leave
+ * type, year), the version it last saw, and a mandatory reason. `used_days` is
+ * never sent: it is derived. A 409 is a stale version - the dialog says so and
+ * the caller re-reads rather than pretending the write landed.
+ */
+function AdjustBalanceDialog({
+  t,
+  locale,
+  row,
+  onClose,
+  onSaved,
+}: {
+  t: (key: DictKey) => string;
+  locale: Locale;
+  row: LeaveBalanceRow;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [entitled, setEntitled] = useState(row.entitled_days === null ? "" : String(row.entitled_days));
+  const [carried, setCarried] = useState(row.carried_over_days === null ? "" : String(row.carried_over_days));
+  const [reason, setReason] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  /** A non-negative number, or null when the field is empty / not a number. */
+  const daysValue = (raw: string): number | null => {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    const value = Number(trimmed);
+    return Number.isFinite(value) && value >= 0 ? value : null;
+  };
+
+  const submit = async () => {
+    setProblem(null);
+    const entitledDays = daysValue(entitled);
+    const carriedOverDays = daysValue(carried);
+    if (entitledDays === null || carriedOverDays === null) {
+      setProblem(t("lbErrorDays"));
+      return;
+    }
+    if (!reason.trim()) {
+      setProblem(t("adminErrorReason"));
+      return;
+    }
+    setSaving(true);
+    try {
+      await adjustLeaveBalance(
+        {
+          employeeId: row.employee_id,
+          requestTypeId: row.request_type_id,
+          year: row.year,
+          entitledDays,
+          carriedOverDays,
+          version: row.version,
+          reason: reason.trim(),
+        },
+        locale,
+      );
+      onSaved();
+    } catch (failure) {
+      if (failure instanceof ApiError && failure.code === "version_conflict") {
+        setProblem(t("lbVersionConflict"));
+      } else if (failure instanceof ApiError && (failure.kind === "forbidden" || failure.kind === "unauthenticated")) {
+        setProblem(t("hrAnnouncementActionDenied"));
+      } else {
+        setProblem(t("lbAdjustFailed"));
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const description = t("lbAdjustDescription")
+    .replace("%s", row.request_type_name)
+    .replace("%s", row.employee_name)
+    .replace("%s", yearText(row.year, locale));
+
+  return (
+    <Dialog
+      title={t("adminAdjustBalance")}
+      description={description}
+      busy={saving}
+      dirty={dirty}
+      onClose={onClose}
+    >
+      <form noValidate onSubmit={(event) => { event.preventDefault(); submit(); }}>
+        <label className="field" htmlFor="adjust-entitled">
+          <span className="field-label">{t("adminEntitlement")}</span>
+          <input
+            id="adjust-entitled"
+            className="input"
+            dir="ltr"
+            type="number"
+            min={0}
+            step="0.5"
+            inputMode="decimal"
+            value={entitled}
+            onChange={(event) => { setDirty(true); setEntitled(event.target.value); }}
+          />
+        </label>
+        <label className="field" htmlFor="adjust-carried">
+          <span className="field-label">{t("adminCarryOver")}</span>
+          <input
+            id="adjust-carried"
+            className="input"
+            dir="ltr"
+            type="number"
+            min={0}
+            step="0.5"
+            inputMode="decimal"
+            value={carried}
+            onChange={(event) => { setDirty(true); setCarried(event.target.value); }}
+          />
+        </label>
+        <p className="page-meta">{`${t("lbVersionLabel")}: ${numText(row.version, locale)}`}</p>
+        <label className="field" htmlFor="adjust-reason">
+          <span className="field-label">
+            {t("lbReasonLabel")} <span className="field-required">*</span>
+          </span>
+          <textarea
+            id="adjust-reason"
+            className="textarea"
+            rows={3}
+            placeholder={t("lbReasonPlaceholder")}
+            value={reason}
+            onChange={(event) => { setDirty(true); setReason(event.target.value); }}
+          />
+        </label>
+
+        {problem ? <Banner tone="error" role="alert">{problem}</Banner> : null}
+
+        <div className="dialog-actions">
+          <button className="btn btn-secondary" type="button" disabled={saving} onClick={onClose}>
+            {t("cancel")}
+          </button>
+          <button className="btn btn-primary" type="submit" disabled={saving} aria-busy={saving}>
+            {saving ? t("saving") : t("save")}
+          </button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 
