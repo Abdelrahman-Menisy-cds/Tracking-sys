@@ -50,7 +50,7 @@ export default function AdminAnnouncementsPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page announcements-page">
       <AdminNav />
       <PageHeader title={t("hrAnnouncementsTitle")} subtitle={t("hrAnnouncementsSubtitle")} />
       <AnnouncementsWorkspace t={t} locale={locale} />
@@ -129,6 +129,22 @@ function AnnouncementsWorkspace({ t, locale }: { t: T; locale: "ar" | "en" }) {
     setAudience("ALL");
     setSelected(new Set());
     setFieldIssues({});
+  };
+
+  /**
+   * The audience refusal is a function of the audience value alone: «اختيار محدد»
+   * with nobody chosen fails, «الجميع» cannot. So the act of changing it ANSWERS
+   * it, and the danger border and the sentence leave with it instead of sitting
+   * on a field that is valid again.
+   */
+  const chooseAudience = (next: AnnouncementAudience) => {
+    setAudience(next);
+    setFieldIssues((current) => {
+      if (!current.recipients) return current;
+      const remaining = { ...current };
+      delete remaining.recipients;
+      return remaining;
+    });
   };
 
   const submitDraft = async () => {
@@ -320,100 +336,103 @@ function AnnouncementsWorkspace({ t, locale }: { t: T; locale: "ar" | "en" }) {
             submitDraft();
           }}
         >
-          <div className="form-grid">
-            <label className="field" htmlFor="announcement-title">
-              <span className="field-label">
-                {t("hrAnnouncementSubject")} <span className="field-required">*</span>
-              </span>
-              <input
-                id="announcement-title"
-                className="input"
-                value={title}
-                aria-invalid={fieldIssues.title ? "true" : undefined}
-                onChange={(event) => setTitle(event.target.value)}
-              />
-              {fieldIssues.title ? (
-                <span className="field-error" role="alert">
-                  {fieldIssues.title.join(" · ")}
+          <div className="form-stack">
+            <div className="form-grid">
+              <label className="field" htmlFor="announcement-title">
+                <span className="field-label">
+                  {t("hrAnnouncementSubject")} <span className="field-required">*</span>
                 </span>
-              ) : null}
-            </label>
-
-            <label className="field" htmlFor="announcement-audience">
-              <span className="field-label">{t("hrAnnouncementAudience")}</span>
-              {/* ds-allow-native-select: two fixed options; listbox rewrite is deferred */}
-              <select
-                id="announcement-audience"
-                className="select"
-                value={audience}
-                onChange={(event) => setAudience(event.target.value as AnnouncementAudience)}
-              >
-                <option value="ALL">{t("hrAnnouncementAudienceAll")}</option>
-                <option value="SELECTED">{t("hrAnnouncementAudienceSelected")}</option>
-              </select>
-              <span className="field-hint">
-                {audience === "ALL"
-                  ? t("hrAnnouncementAudienceAllHint")
-                  : t("hrAnnouncementAudienceSelectedHint")}
-              </span>
-            </label>
-          </div>
-
-          {audience === "SELECTED" ? (
-            <fieldset
-              className="quiet-inset"
-              disabled={saving}
-              style={{ marginBlock: "var(--sp-4)" }}
-              aria-invalid={fieldIssues.recipients ? "true" : undefined}
-            >
-              <legend className="field-label">{t("hrAnnouncementRecipients")}</legend>
-              {employees === null ? <SkeletonRows rows={2} /> : null}
-              {employees !== null && activeEmployees.length === 0 ? (
-                <p className="page-meta">{t("hrAnnouncementEmployeesFailed")}</p>
-              ) : null}
-              {activeEmployees.map((person) => (
-                <label className="field" key={person.id} style={{ marginBlockEnd: "var(--sp-1)" }}>
-                  <span>
-                    <input
-                      type="checkbox"
-                      checked={selected.has(person.id)}
-                      onChange={() => toggleRecipient(person.id)}
-                    />{" "}
-                    {person.full_name || person.email}
+                <input
+                  id="announcement-title"
+                  className="input"
+                  value={title}
+                  aria-invalid={fieldIssues.title ? "true" : undefined}
+                  onChange={(event) => setTitle(event.target.value)}
+                />
+                {fieldIssues.title ? (
+                  <span className="field-error" role="alert">
+                    {fieldIssues.title.join(" · ")}
                   </span>
-                </label>
-              ))}
-              {fieldIssues.recipients ? (
+                ) : null}
+              </label>
+
+              <label className="field" htmlFor="announcement-audience">
+                <span className="field-label">{t("hrAnnouncementAudience")}</span>
+                {/* ds-allow-native-select: two fixed options; listbox rewrite is deferred */}
+                <select
+                  id="announcement-audience"
+                  className="select"
+                  value={audience}
+                  aria-invalid={fieldIssues.recipients ? "true" : undefined}
+                  aria-describedby={fieldIssues.recipients ? "announcement-audience-error" : undefined}
+                  onChange={(event) => chooseAudience(event.target.value as AnnouncementAudience)}
+                >
+                  <option value="ALL">{t("hrAnnouncementAudienceAll")}</option>
+                  <option value="SELECTED">{t("hrAnnouncementAudienceSelected")}</option>
+                </select>
+                <span className="field-hint">
+                  {audience === "ALL"
+                    ? t("hrAnnouncementAudienceAllHint")
+                    : t("hrAnnouncementAudienceSelectedHint")}
+                </span>
+                {/* «اختيار محدد» with nobody chosen is the one way this field
+                    fails. The refusal lives ON the field that has to change, so
+                    the danger border and the sentence always arrive together —
+                    and the field is silent while its value is valid. */}
+                {fieldIssues.recipients ? (
+                  <span className="field-error" id="announcement-audience-error" role="alert">
+                    {fieldIssues.recipients.join(" · ")}
+                  </span>
+                ) : null}
+              </label>
+            </div>
+
+            {audience === "SELECTED" ? (
+              <fieldset className="quiet-inset" disabled={saving}>
+                <legend className="field-label">{t("hrAnnouncementRecipients")}</legend>
+                {employees === null ? <SkeletonRows rows={2} /> : null}
+                {employees !== null && activeEmployees.length === 0 ? (
+                  <p className="page-meta">{t("hrAnnouncementEmployeesFailed")}</p>
+                ) : null}
+                {activeEmployees.map((person) => (
+                  <label className="field" key={person.id} style={{ marginBlockEnd: "var(--sp-1)" }}>
+                    <span>
+                      <input
+                        type="checkbox"
+                        checked={selected.has(person.id)}
+                        onChange={() => toggleRecipient(person.id)}
+                      />{" "}
+                      {person.full_name || person.email}
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+            ) : null}
+
+            <label className="field" htmlFor="announcement-body">
+              <span className="field-label">
+                {t("hrAnnouncementBody")} <span className="field-required">*</span>
+              </span>
+              <textarea
+                id="announcement-body"
+                className="textarea textarea-fixed"
+                rows={4}
+                value={body}
+                aria-invalid={fieldIssues.body ? "true" : undefined}
+                onChange={(event) => setBody(event.target.value)}
+              />
+              {fieldIssues.body ? (
                 <span className="field-error" role="alert">
-                  {fieldIssues.recipients.join(" · ")}
+                  {fieldIssues.body.join(" · ")}
                 </span>
               ) : null}
-            </fieldset>
-          ) : null}
+            </label>
 
-          <label className="field" htmlFor="announcement-body" style={{ marginBlockEnd: "var(--sp-4)" }}>
-            <span className="field-label">
-              {t("hrAnnouncementBody")} <span className="field-required">*</span>
-            </span>
-            <textarea
-              id="announcement-body"
-              className="textarea"
-              rows={4}
-              value={body}
-              aria-invalid={fieldIssues.body ? "true" : undefined}
-              onChange={(event) => setBody(event.target.value)}
-            />
-            {fieldIssues.body ? (
-              <span className="field-error" role="alert">
-                {fieldIssues.body.join(" · ")}
-              </span>
-            ) : null}
-          </label>
-
-          <div className="form-actions">
-            <button className="btn btn-primary" type="submit" disabled={saving} aria-busy={saving}>
-              {saving ? t("hrAnnouncementCreating") : t("hrAnnouncementCreateAction")}
-            </button>
+            <div className="form-actions">
+              <button className="btn btn-primary" type="submit" disabled={saving} aria-busy={saving}>
+                {saving ? t("hrAnnouncementCreating") : t("hrAnnouncementCreateAction")}
+              </button>
+            </div>
           </div>
         </form>
       </section>
@@ -422,15 +441,20 @@ function AnnouncementsWorkspace({ t, locale }: { t: T; locale: "ar" | "en" }) {
       <section className="section" aria-labelledby="announcements-list-heading">
         <div className="section-heading">
           <h2 id="announcements-list-heading">{t("hrAnnouncementListTitle")}</h2>
-          <div className="row-actions">
-            <button
-              className="btn btn-secondary"
-              type="button"
-              onClick={() => setAttempt((count) => count + 1)}
-            >
-              {t("retry")}
-            </button>
-          </div>
+          {/* A retry control is an answer to a failed read, so it exists only
+              while the read is actually failed. On a healthy empty list the
+              honest state is «لا توجد إعلانات بعد» and nothing to re-run. */}
+          {phase === "error" ? (
+            <div className="row-actions">
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => setAttempt((count) => count + 1)}
+              >
+                {t("retry")}
+              </button>
+            </div>
+          ) : null}
         </div>
 
         {phase === "loading" ? <SkeletonRows rows={3} /> : null}

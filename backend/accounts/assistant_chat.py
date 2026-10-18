@@ -260,6 +260,84 @@ def assistant_chat(user, config, incoming_messages: list) -> dict:
     }
 
 
+def assistant_prose(user, config, system_prompt: str, user_prompt: str) -> str:
+    """ONE tool-less provider round that returns plain prose (review advice).
+
+    The chat loop always ships the tool catalogue and can run several rounds;
+    a "turn these facts into two Arabic sentences" task needs neither. This
+    reuses the SAME credential resolution the chat loop uses (subscription
+    refresh, api-key decrypt) and the same typed error mapping, so an
+    unconfigured / inactive / unreachable / erroring assistant surfaces as a
+    ``ChatConfigError`` the caller can render honestly — never a fabricated
+    sentence. Returns the assistant's own text (stripped, non-empty).
+    """
+    from accounts.assistant_crypto import decrypt_key
+    from accounts import assistant_subscriptions
+
+    if not config.is_configured:
+        raise ChatConfigError("not_configured", "Link an active model in your settings first.")
+    if not config.is_active:
+        raise ChatConfigError("inactive", "The assistant is switched off for your account.")
+
+    spec = blob = None
+    if config.mode == "subscription":
+        try:
+            spec, blob = assistant_subscriptions.ensure_fresh(config)
+        except assistant_subscriptions.RefreshFailedError:
+            raise ChatConfigError(
+                "not_configured",
+                "Your subscription login expired and the refresh failed — link it again in settings.",
+            ) from None
+        stored_key = assistant_subscriptions.access_token(blob)
+        call_headers = assistant_subscriptions.chat_headers(spec, blob)
+        call_base_url = spec.base_url
+    else:
+        stored_key = decrypt_key(config.api_key_ciphertext)
+        call_headers = None
+        call_base_url = config.base_url
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt[:MAX_TOOL_RESULT_CHARS]},
+    ]
+
+    if config.mode == "subscription" and spec is not None and blob is not None and spec.wire_api == "responses":
+        call = assistant_subscriptions.completion_call(
+            spec, blob, config.model, messages, [], stream=True,
+        )
+        url, call_headers, call_body = call
+        try:
+            message = assistant_subscriptions.post_responses_stream(url, call_headers, call_body)
+        except assistant_provider.ProviderResponseError as error:
+            raise ChatConfigError("provider_error", f"provider {error.status_code}: {error.detail}")
+        except assistant_provider.ProviderUnreachableError as error:
+            raise ChatConfigError("provider_error", str(error))
+    else:
+        try:
+            message = assistant_provider.chat_round(
+                base_url=call_base_url,
+                api_key=stored_key,
+                model=config.model,
+                messages=messages,
+                tools=[],
+                extra_headers=call_headers,
+            )
+        except assistant_provider.ProviderResponseError as error:
+            raise ChatConfigError("provider_error", f"provider {error.status_code}: {error.detail}")
+        except (assistant_provider.ProviderUnreachableError, assistant_provider.ProviderBadBodyError) as error:
+            raise ChatConfigError("provider_error", str(error))
+
+    content = message.get("content")
+    text = content.strip() if isinstance(content, str) else ""
+    if not text:
+        provider_name = config.subscription_provider or "the linked provider"
+        raise ChatConfigError(
+            "provider_error",
+            f"The {provider_name} model ({config.model}) returned no text for this turn.",
+        )
+    return text
+
+
 def confirm_action(user, token: str) -> dict:
     """Run ONE pending write (POST /assistant/actions/<token>/confirm).
 

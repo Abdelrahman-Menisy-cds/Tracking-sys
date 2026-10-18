@@ -10,6 +10,7 @@ import type {
   DecisionAction,
   PagedPayload,
   ServerMyRequest,
+  ServerReviewAdvice,
   ServerReviewRequest,
   ServerReviewRequestRow,
 } from "./serverTypes";
@@ -109,6 +110,28 @@ export function listReviewRequests(
 /** GET /review/requests/{id} - scoped read-only detail with events + attachments. */
 export function getReviewRequest(id: string, locale: string): Promise<ServerReviewRequest> {
   return apiRequest<{ data: ServerReviewRequest }>(`/review/requests/${id}`, { acceptLanguage: locale }).then((payload) => payload.data);
+}
+
+/** GET /review/requests/{id}/advice - the rule verdict + the assistant's prose. */
+export function getReviewRequestAdvice(id: string, locale: string): Promise<ServerReviewAdvice> {
+  return apiRequest<{ data: ServerReviewAdvice }>(`/review/requests/${id}/advice`, { acceptLanguage: locale }).then((payload) => payload.data);
+}
+
+/**
+ * GET /review/requests/advice?ids=... - the advice for a whole page in ONE call.
+ * The table must never fire once per row; the server asks the assistant once
+ * for every in-scope id and returns a map keyed by request id.
+ */
+export function listReviewAdvice(
+  ids: string[],
+  locale: string,
+): Promise<Record<string, ServerReviewAdvice>> {
+  const params = new URLSearchParams();
+  params.set("ids", ids.join(","));
+  return apiRequest<{ data: Record<string, ServerReviewAdvice> }>(
+    `/review/requests/advice?${params.toString()}`,
+    { acceptLanguage: locale },
+  ).then((payload) => payload.data ?? {});
 }
 
 /** One attempt, one key: a retry after an unknown outcome must never reuse it. */

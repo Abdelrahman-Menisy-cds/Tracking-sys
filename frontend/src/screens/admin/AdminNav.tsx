@@ -5,6 +5,13 @@ import { useApp } from "../../app/AppContext";
  * Admin suite sub-navigation (spec §0.1 navigation model).
  * Real routed links (not a tablist) so each area is deep-linkable; renders
  * on every sub-page. `aria-current="page"` marks the active item.
+ *
+ * NavLink writes `aria-current="page"` on the active link itself, and the
+ * stylesheet's current-item rule keys on exactly that attribute - so the routed
+ * sub-nav and the rail agree on how "current" is spelled, and the active area is
+ * actually visible. Marking a nested <span> instead (as this used to) left the
+ * item looking inactive, so the rail's section link was the only highlight on
+ * screen.
  */
 export default function AdminNav() {
   const { t } = useApp();
@@ -23,9 +30,7 @@ export default function AdminNav() {
           end={item.end}
           className={({ isActive }: { isActive: boolean }) => `review-tab${isActive ? " is-current" : ""}`}
         >
-          {({ isActive }: { isActive: boolean }) => (
-            <span aria-current={isActive ? "page" : undefined}>{item.label}</span>
-          )}
+          {item.label}
         </NavLink>
       ))}
     </nav>

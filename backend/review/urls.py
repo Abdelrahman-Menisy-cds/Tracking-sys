@@ -7,6 +7,10 @@ app_name = "review"
 
 urlpatterns = [
     path("review/requests/queue", views.RequestQueueView.as_view(), name="request-queue"),
+    # The batch advice path precedes the <uuid:pk> route so a page of the queue
+    # is served in ONE call (the table never fires once per row).
+    path("review/requests/advice", views.RequestAdviceBatchView.as_view(), name="request-advice-batch"),
+    path("review/requests/<uuid:pk>/advice", views.RequestAdviceView.as_view(), name="request-advice"),
     path("review/requests/<uuid:pk>", views.RequestReviewDetailView.as_view(), name="request-detail"),
     path("review/timesheets/queue", views.TimesheetQueueView.as_view(), name="timesheet-queue"),
     path("review/timesheets/<uuid:pk>", views.TimesheetReviewDetailView.as_view(), name="timesheet-detail"),

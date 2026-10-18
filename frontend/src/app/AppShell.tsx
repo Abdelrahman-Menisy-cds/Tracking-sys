@@ -266,14 +266,27 @@ export default function AppShell() {
         }]
       : []),
     ...(capabilities.canSetOrgSchedule && capabilities.canManageLeaveBalance && capabilities.canViewOrgAttendance
-      ? [{ label: locale === "ar" ? "الإدارة" : "Administration", items: [{ to: "/admin", label: t("navAdmin"), icon: GlobeIcon }] }]
+      ? [{ label: locale === "ar" ? "الإدارة" : "Administration", items: [{ to: "/admin", label: t("navAdmin"), end: true, icon: GlobeIcon }] }]
       : []),
   ];
-  const matchedCurrentItem = navGroups
-    .flatMap((group) => group.items)
-    .filter((item) => item.to === location.pathname || (item.to !== "/" && location.pathname.startsWith(item.to)))
+  const railItems = navGroups.flatMap((group) => group.items);
+  /**
+   * The rail marks ONE item current, and it must be the item that OWNS the
+   * route. A section root (`end`) is current only on its own path: `/admin`
+   * used to claim every `/admin/*` sub-route by prefix, so on
+   * `/admin/announcements` the rail lit «لوحة الموارد البشرية» while the suite's
+   * own sub-nav lit «الإعلانات» - two navs both announcing "current page" for one
+   * route, with the wrong one winning the eye. The sub-nav owns the sub-route.
+   */
+  const matchedCurrentItem = railItems
+    .filter((item) => item.to === location.pathname || (!item.end && item.to !== "/" && location.pathname.startsWith(item.to)))
+    .sort((left, right) => right.to.length - left.to.length)[0];
+  /** The header still names the SECTION you are in on a sub-route the rail does not own. */
+  const sectionItem = railItems
+    .filter((item) => item.to !== "/" && location.pathname.startsWith(item.to))
     .sort((left, right) => right.to.length - left.to.length)[0];
   const currentItem = matchedCurrentItem ?? { to: "", label: t("navHome"), icon: HomeIcon };
+  const headerItem = matchedCurrentItem ?? sectionItem ?? currentItem;
   const sidebarOpen = isCompact ? drawerOpen : !railCollapsed;
   const targetLocale: Locale = locale === "en" ? "ar" : "en";
   const targetTheme: Exclude<Appearance, "system"> = resolvedTheme === "light" ? "dark" : "light";
@@ -391,7 +404,7 @@ export default function AppShell() {
               <RtlChevronIcon locale={locale} direction={sidebarOpen ? "back" : "forward"} />
             </button>
             <div className="header-page-context">
-              <strong className="header-page-indicator">{currentItem.label}</strong>
+              <strong className="header-page-indicator">{headerItem.label}</strong>
               <NavLink
                 to="/notifications"
                 className="btn btn-secondary icon-only header-notifications"

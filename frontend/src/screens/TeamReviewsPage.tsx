@@ -3,9 +3,9 @@ import { Link, useParams } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
 import { useServerData } from "../app/useServerData";
 import { formatDateTime, formatMinutes, weekInterval } from "../app/format";
-import { listReviewRequests, getReviewRequest, decideRequest } from "../app/requestsApi";
+import { listReviewRequests, getReviewRequest, decideRequest, listReviewAdvice } from "../app/requestsApi";
 import { listReviewTimesheets, getReviewTimesheet, decideTimesheet } from "../app/timesheetsApi";
-import type { DecisionAction, ServerMyRequest, ServerMyTimesheet, ServerReviewRequestRow, ServerReviewTimesheetRow, RequestStatusType, TimesheetStatusType } from "../app/serverTypes";
+import type { AdviceSupport, AdviceVerdict, DecisionAction, ServerMyRequest, ServerMyTimesheet, ServerReviewAdvice, ServerReviewRequestRow, ServerReviewTimesheetRow, RequestStatusType, TimesheetStatusType } from "../app/serverTypes";
 import { ApiError } from "../app/api";
 import {
   Banner,
@@ -14,6 +14,7 @@ import {
   ErrorState,
   RequestStatusPill,
   SkeletonRows,
+  StatusPill,
   TimesheetStatusPill,
 } from "../components/ui";
 import OperationalTable, { type OperationalColumn } from "../components/data/OperationalTable";
@@ -24,8 +25,10 @@ import Timeline from "../components/record/Timeline";
  * The review lane is now server-backed end to end: the queue and details ask
  * /review/* (the backend scopes every row by who is asking), and decisions go
  * through the Idempotency-Key'd decision endpoints. The queue keeps its
- * short-staffed columns; the decision suggestion column is gone - nothing on
- * the server carries the attendance/workload fixtures it was computed from.
+ * short-staffed columns and adds «رأي المساعد»: a server-computed rule verdict
+ * with the assistant's Arabic explanation, fetched for the whole page in ONE
+ * batched call (never once per row) and never blocking the decision button.
+ * The old client-side "smart suggestion" is gone - nothing local could compute it.
  */
 
 const DECISION_TO_ACTION: Record<"APPROVE" | "REJECT" | "RETURN", DecisionAction> = {
@@ -78,6 +81,33 @@ function timesheetStatusLabel(status: TimesheetStatusType, locale: "ar" | "en") 
   return labels[status][locale];
 }
 
+/* «رأي المساعد» - the verdict's visual weight: approve-leaning is success,
+   reject-leaning is danger, a coverage warning is warning, none is neutral.
+   The tone never affects the decision button, which is its own column. */
+const ADVICE_TONE: Record<AdviceVerdict, "success" | "danger" | "warning" | "neutral"> = {
+  RECOMMEND_APPROVE: "success",
+  RECOMMEND_REJECT: "danger",
+  NEEDS_ATTENTION: "warning",
+  NO_OPINION: "neutral",
+};
+
+const ADVICE_ICON: Record<AdviceVerdict, "approved" | "rejected" | "returned" | "draft"> = {
+  RECOMMEND_APPROVE: "approved",
+  RECOMMEND_REJECT: "rejected",
+  NEEDS_ATTENTION: "returned",
+  NO_OPINION: "draft",
+};
+
+/* When the assistant's prose is absent, the heaviest rule reason is the honest
+   fallback: the server computed it, so it is never invented client-side. */
+const ADVICE_WEIGHT: Record<AdviceSupport, number> = { reject: 3, warn: 2, approve: 1, info: 0 };
+
+function topAdviceReason(advice: ServerReviewAdvice, locale: "ar" | "en"): string {
+  const ranked = [...advice.facts].sort((a, b) => ADVICE_WEIGHT[b.supports] - ADVICE_WEIGHT[a.supports]);
+  const best = ranked[0];
+  return best ? (locale === "ar" ? best.reason_ar : best.reason_en) : "";
+}
+
 export default function TeamReviewsPage() {
   const { t, locale } = useApp();
   const [tab, setTab] = useState<"requests" | "timesheets">("requests");
@@ -106,6 +136,34 @@ export default function TeamReviewsPage() {
   const pendingRequests = requestState.phase === "ready" ? requestState.data.filter((request) => request.permissions.can_decide) : [];
   const pendingTimesheets = timesheetState.phase === "ready" ? timesheetState.data.filter((sheet) => sheet.permissions.can_decide) : [];
 
+  /* One batched call for the whole visible page - the table must never fire
+     once per row. The rule verdict is deterministic and always present; the
+     Arabic explanation is the assistant's and may be absent (never faked). */
+  const adviceIds = pendingRequests.map((request) => request.id);
+  const adviceKey = adviceIds.join(",");
+  const adviceState = useServerData(
+    () => (adviceIds.length ? listReviewAdvice(adviceIds, locale) : Promise.resolve<Record<string, ServerReviewAdvice>>({})),
+    [adviceKey, locale],
+  );
+
+  const adviceCell = (request: ServerReviewRequestRow) => {
+    if (adviceState.phase === "loading") return <span className="muted">{t("reviewAdviceLoading")}</span>;
+    if (adviceState.phase === "error") return <span className="muted">{t("reviewAdviceUnavailable")}</span>;
+    const advice = adviceState.data[request.id];
+    if (!advice) return <span className="muted">-</span>;
+    const label = advice.verdict_label[locale] ?? advice.verdict_label.ar;
+    const reason = advice.explanation.available && advice.explanation.text_ar
+      ? advice.explanation.text_ar
+      : topAdviceReason(advice, locale);
+    return (
+      <div>
+        <StatusPill tone={ADVICE_TONE[advice.verdict]} label={label} icon={ADVICE_ICON[advice.verdict]} />
+        {reason ? <div className="muted advice-reason"><bdi>{reason}</bdi></div> : null}
+        {!advice.explanation.available ? <div className="muted">{t("reviewAdviceExplanationUnavailable")}</div> : null}
+      </div>
+    );
+  };
+
   const requestColumns: OperationalColumn<ServerReviewRequestRow>[] = [
     {
       key: "request",
@@ -122,6 +180,7 @@ export default function TeamReviewsPage() {
     /* The server queue carries no submitted_at; creation time is the honest column. */
     { key: "submitted", label: t("submittedAt"), render: (request) => formatDateTime(request.created_at, locale) },
     { key: "next", label: locale === "ar" ? "المرحلة التالية" : "Next stage", render: (request) => requestNextStage(request, locale) },
+    { key: "advice", label: t("reviewAdviceColumn"), render: (request) => adviceCell(request) },
     {
       key: "action",
       label: t("decision"),

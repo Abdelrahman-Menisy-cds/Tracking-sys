@@ -243,6 +243,47 @@ def build_balance_payload(*, user, year):
     }
 
 
+def employee_leave_balance(*, employee, request_type, year):
+    """One employee's balance for ONE leave type/year, reusing the read path.
+
+    The review advice reads a REQUESTER's balance, but
+    ``build_balance_payload`` scopes its rows to the CALLER (a manager only
+    ever sees their own). This computes the same figures for a named
+    employee without a second truth: ``used`` comes from ``used_days_map`` and
+    ``remaining`` is ``entitled + carried_over − used`` exactly as ``_row``
+    derives it, so the advice and the balance screen can never disagree.
+    Returns a plain dict (no model row is leaked).
+    """
+    balance = LeaveBalance.objects.filter(
+        company=employee.company,
+        employee=employee,
+        request_type=request_type,
+        year=year,
+    ).first()
+    used = used_days_map(
+        company=employee.company,
+        employee_ids=[employee.pk],
+        type_ids=[request_type.pk],
+        year=year,
+    ).get((employee.pk, request_type.pk), 0)
+    entitled = balance.entitled_days if balance is not None else None
+    carried = balance.carried_over_days if balance is not None else None
+    remaining = None
+    if balance is not None:
+        remaining = balance.entitled_days + balance.carried_over_days - used
+    return {
+        "request_type_id": request_type.pk,
+        "request_type_name": request_type.name,
+        "year": year,
+        "entitled_days": _days(entitled),
+        "carried_over_days": _days(carried),
+        "used_days": used,
+        "remaining_days": _days(remaining),
+        "is_configured": balance is not None,
+        "version": balance.version if balance is not None else 0,
+    }
+
+
 def idempotency_fingerprint(
     *, key, employee_id, request_type_id, year, entitled_days, carried_over_days, version
 ):

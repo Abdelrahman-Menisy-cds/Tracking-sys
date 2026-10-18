@@ -136,6 +136,38 @@ export interface ServerReviewTimesheet extends Omit<ServerReviewTimesheetRow, "e
   updated_at: string;
 }
 
+/** «رأي المساعد» — the review-advice verdict vocabulary (review/advice.py). */
+export type AdviceVerdict = "RECOMMEND_APPROVE" | "RECOMMEND_REJECT" | "NEEDS_ATTENTION" | "NO_OPINION";
+/** Whether one rule argues for approving, rejecting, merely warns, or is just a fact. */
+export type AdviceSupport = "approve" | "reject" | "warn" | "info";
+
+/** One cited rule fact (the numbers it was derived from + its own reason). */
+export interface ServerAdviceFact {
+  rule: "balance" | "overlap" | "coverage" | "hr_approval";
+  supports: AdviceSupport;
+  fact: Record<string, unknown>;
+  reason_ar: string;
+  reason_en: string;
+}
+
+/** The assistant's half: present only when one is configured and reachable. */
+export interface ServerAdviceExplanation {
+  available: boolean;
+  text_ar: string | null;
+  reason_unavailable: string | null;
+  message: string | null;
+}
+
+/** GET /review/requests/{id}/advice — the rule verdict + the assistant's prose. */
+export interface ServerReviewAdvice {
+  request_id: string;
+  verdict: AdviceVerdict;
+  verdict_label: { ar: string; en: string };
+  period: { start: string; end: string; days: number; source: string } | null;
+  facts: ServerAdviceFact[];
+  explanation: ServerAdviceExplanation;
+}
+
 /** NotificationSerializer - title/body are server-language STRINGS, not {ar,en}. */
 export interface ServerNotification {
   id: number;
