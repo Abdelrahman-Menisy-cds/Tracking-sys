@@ -28,9 +28,12 @@ export default function HomePage() {
   const reviewTimesheetsState = useServerData(() => listReviewTimesheets(locale, { status: "SUBMITTED" }).then((payload) => payload.data), [locale]);
   const reviewQueue = capabilities.canReview ? { requests: reviewRequestsState, timesheets: reviewTimesheetsState } : null;
   const notifications: ServerNotification[] = notificationState.phase === "ready" ? notificationState.data : [];
-  const attentionRequests = requestState.phase === "ready"
-    ? requestState.data.filter((request) => ["RETURNED", "DRAFT"].includes(request.status))
-    : [];
+  /* The personal list is the SAME read «طلباتي» makes - every request the user
+     owns, in every status. It used to be filtered down to RETURNED/DRAFT, so a
+     user whose only request sat with HR saw «العمل الشخصي · 0» and «لا توجد
+     طلبات بعد» while «طلباتي» listed it. Zero here now means zero requests. */
+  const myRequests = requestState.phase === "ready" ? requestState.data : [];
+  const attentionRequests = myRequests.filter((request) => ["RETURNED", "DRAFT"].includes(request.status));
   const reviewRequestCount = reviewQueue?.requests.phase === "ready" ? reviewQueue.requests.data.length : null;
   const reviewTimesheetCount = reviewQueue?.timesheets.phase === "ready" ? reviewQueue.timesheets.data.length : null;
   const currentWeek: ServerMyTimesheet | null = timesheetState.phase === "ready" ? timesheetState.data[0] ?? null : null;
@@ -46,11 +49,11 @@ export default function HomePage() {
       {attentionRequests.length > 0 && <section className="attention-strip" aria-label={locale === "ar" ? "يحتاج إلى انتباه" : "Needs attention"}><AlertTriangleIcon /><div><strong>{locale === "ar" ? "يحتاج إلى انتباه" : "Needs your attention"}</strong><span>{locale === "ar" ? "لديك عمل مُعاد أو مسودة يمكنك متابعتها." : "You have returned work or a draft to continue."}</span></div><Link className="btn btn-secondary btn-compact" to="/requests">{locale === "ar" ? "متابعة الطلبات" : "Review requests"}</Link></section>}
       <div className="dashboard-grid">
         <section className="section" aria-labelledby="my-work-heading">
-          <div className="section-heading"><h2 id="my-work-heading"><DocumentIcon />{locale === "ar" ? `العمل الشخصي · ${attentionRequests.length}` : `My work · ${attentionRequests.length}`}</h2><Link to="/requests">{t("viewAll")}</Link></div>
-          {loading ? <SkeletonRows rows={2} /> : requestState.phase === "error" || timesheetState.phase === "error" ? <ErrorState onRetry={retryPersonal} /> : attentionRequests.length === 0 ? <EmptyState message={t("noRequestsYet")} action={<Link className="btn btn-secondary" to="/requests">{t("viewAll")}</Link>} /> : <div className="work-surface"><ul className="compact-list">{attentionRequests.map((request) => {
+          <div className="section-heading"><h2 id="my-work-heading"><DocumentIcon />{locale === "ar" ? `العمل الشخصي · ${myRequests.length}` : `My work · ${myRequests.length}`}</h2><Link to="/requests">{t("viewAll")}</Link></div>
+          {loading ? <SkeletonRows rows={2} /> : requestState.phase === "error" || timesheetState.phase === "error" ? <ErrorState onRetry={retryPersonal} /> : myRequests.length === 0 ? <EmptyState message={t("noRequestsYet")} action={<Link className="btn btn-secondary" to="/requests">{t("viewAll")}</Link>} /> : <div className="work-surface"><ul className="compact-list">{myRequests.map((request) => {
             const split = splitContextTitle(request.title);
             const openRequestLabel = locale === "ar" ? `فتح الطلب: ${split.title}` : `Open request: ${split.title}`;
-            return <li key={request.id} className="compact-row"><div><Link to={`/requests/${request.id}`}><strong><bdi>{split.title}</bdi></strong></Link>{split.meta ? <div className="muted"><bdi>{split.meta}</bdi></div> : null}<div className="muted">{request.status === "RETURNED" ? (locale === "ar" ? "مطلوب تصحيح" : "Correction required") : t("draft")}</div></div><Link className="actionable-pill" to={`/requests/${request.id}`} aria-label={openRequestLabel}><RequestStatusPill status={request.status} /></Link></li>;
+            return <li key={request.id} className="compact-row"><div><Link to={`/requests/${request.id}`}><strong><bdi>{split.title}</bdi></strong></Link>{split.meta ? <div className="muted"><bdi>{split.meta}</bdi></div> : null}<div className="muted">{t("lastUpdate")}: {formatDateTime(request.updated_at, locale)}</div></div><Link className="actionable-pill" to={`/requests/${request.id}`} aria-label={openRequestLabel}><RequestStatusPill status={request.status} /></Link></li>;
           })}</ul></div>}
         </section>
         {currentWeek && <section className="section" aria-labelledby="week-heading">
