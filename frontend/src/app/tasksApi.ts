@@ -37,7 +37,7 @@ export async function createTask(
   const payload = await apiRequest<{ data: Task }>("/tasks", {
     acceptLanguage: locale,
     method: "POST",
-    body: JSON.stringify(input),
+    body: input,
   });
   return payload.data;
 }
@@ -51,7 +51,7 @@ export async function updateTaskStatus(
   const payload = await apiRequest<{ data: Task }>(`/tasks/${id}`, {
     acceptLanguage: locale,
     method: "PATCH",
-    body: JSON.stringify({ status }),
+    body: { status },
   });
   return payload.data;
 }
