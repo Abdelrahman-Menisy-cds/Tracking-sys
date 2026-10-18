@@ -242,7 +242,11 @@ def update_employee(*, actor, user, validated_data):
         department = getattr(getattr(user, "employee_profile", None), "department", None)
     # The pair is checked against the EFFECTIVE values, so moving either side of
     # the relationship can never leave a manager outside the employee's department.
-    _validate_manager_department(manager, department)
+    # It only runs when one of the two is actually being changed: a reporting line
+    # that predates this rule (or was set before a department move) must not make
+    # the whole row uneditable — the unrelated fields have nothing to do with it.
+    if "manager" in validated_data or "department" in validated_data:
+        _validate_manager_department(manager, department)
 
     before = _snapshot(user, getattr(user, "employee_profile", None))
     user_fields = {
