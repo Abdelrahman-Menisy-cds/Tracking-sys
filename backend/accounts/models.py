@@ -707,3 +707,46 @@ class AttendanceEvent(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user_id} {self.kind} @ {self.occurred_at:%Y-%m-%d %H:%M}"
+
+
+class Task(models.Model):
+    """One piece of work: created by someone, assigned to someone.
+
+    «مهامي» and «مهام أنشأتها» are the two sides of the same row, which is why the
+    owner and the assignee are separate columns rather than one.
+    """
+
+    class Status(models.TextChoices):
+        OPEN = "OPEN", "Open"
+        IN_PROGRESS = "IN_PROGRESS", "In progress"
+        DONE = "DONE", "Done"
+
+    company = models.ForeignKey("Company", on_delete=models.CASCADE, related_name="tasks")
+    owner = models.ForeignKey(
+        "User", on_delete=models.CASCADE, related_name="tasks_created"
+    )
+    assignee = models.ForeignKey(
+        "User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="tasks_assigned",
+    )
+    title = models.CharField(max_length=200)
+    details = models.TextField(blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN)
+    due_date = models.DateField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "task"
+        verbose_name_plural = "tasks"
+        indexes = [
+            models.Index(fields=["company", "assignee"], name="task_company_assignee"),
+            models.Index(fields=["company", "owner"], name="task_company_owner"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.title} ({self.status})"

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from accounts import assistant_views, attendance_views, company_views, department_views, employee_views, grant_views, views, work_schedule_views
+from accounts import assistant_views, attendance_views, company_views, department_views, employee_views, grant_views, task_views, views, work_schedule_views
 
 app_name = "accounts"
 
@@ -42,6 +42,8 @@ urlpatterns = [
         attendance_views.AttendanceEventView.as_view(),
         name="attendance-event",
     ),
+    path("tasks", task_views.TaskListCreateView.as_view(), name="task-list"),
+    path("tasks/<int:task_id>", task_views.TaskDetailView.as_view(), name="task-detail"),
     path(
         "departments/<int:department_id>",
         department_views.DepartmentDetailView.as_view(),
