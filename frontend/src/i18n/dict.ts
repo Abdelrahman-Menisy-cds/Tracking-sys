@@ -578,6 +578,7 @@ export const dict = {
     adminOverviewNotYetIn: "لسه مسجّلش",
     adminOverviewNoSchedule: "لا يوجد جدول دوام نشط للمؤسسة، فكل يوم يُقرأ كـ«لا يوجد جدول» حتى يُعتمد الجدول.",
     adminOverviewSnapshotCaption: "لقطة المؤسسة لهذا اليوم",
+    adminOverviewSnapshotRows: "صفوف الموظفين في لقطة اليوم",
     // admin suite - shared "Adjust leave balance" dialog §1.2 + §2.4
     adminAdjustDialogDescription: "تسجيل تعديل موقّع على رصيد إجازة مع سبب إلزامي.",
     adminAdjustPending: "جارٍ تسجيل التعديل…",
@@ -1760,6 +1761,7 @@ export const dict = {
     adminOverviewNotYetIn: "Not clocked in yet",
     adminOverviewNoSchedule: "The organisation has no active work schedule, so every day reads as \"No schedule\" until one is activated.",
     adminOverviewSnapshotCaption: "The organisation's snapshot for this day",
+    adminOverviewSnapshotRows: "Employee rows in today's snapshot",
     // admin suite - shared "Adjust leave balance" dialog §1.2 + §2.4
     adminAdjustDialogDescription: "Record a signed leave-balance adjustment with a mandatory reason.",
     adminAdjustPending: "Recording adjustment…",
