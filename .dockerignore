@@ -33,7 +33,12 @@ backend/logs/
 backend/shots/
 shots/
 attachments/
-docs/
+# The contents, not the directory: Docker cannot re-include a file whose parent
+# directory is itself excluded, so the negation below needs docs/ to exist.
+docs/*
+# ...except the product guide, which spa_guide serves at /guide and therefore has
+# to be in the image.
+!docs/user-guide.html
 *_brief-*.md
 brief-*.md
 2026-*.png
