@@ -6,12 +6,11 @@
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#F4F4F5" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0E0E10" media="(prefers-color-scheme: dark)" />
-    <!-- The brand mark in the tab. /favicon.svg is the app's own scalable mark
-         (public/favicon.svg, served from the dist root by config/spa.py); the
-         PNGs are the raster fallbacks the app has always linked, and
-         /brand/mark-512.png is the touch/home-screen icon. Every path here is
-         verified to resolve in the built output. -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- The brand mark in the tab. The SVG that used to be listed first is the
+         app's drawn placeholder, and a browser takes the first icon it can
+         use - so the tab showed that instead of the brand. The brand PNGs lead
+         now, with /brand/mark-512.png as the touch/home-screen icon. Every path
+         here is verified to resolve in the built output. -->
     <link rel="icon" type="image/png" sizes="256x256" href="/brand/favicon.png" />
     <link rel="icon" type="image/png" sizes="64x64" href="/brand/favicon-64.png" />
     <link rel="apple-touch-icon" href="/brand/mark-512.png" />
