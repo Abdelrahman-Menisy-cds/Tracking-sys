@@ -28,6 +28,8 @@ urlpatterns = [
     # decision to get wrong. See config/spa.py.
     # Keep the `assets/` prefix: spa_file resolves the path against dist/ itself.
     re_path(r"^(?P<path>assets/.*)$", spa.spa_file),
+    # The product guide, before the SPA catch-all (which would return the shell).
+    path("guide", spa.spa_guide, name="product-guide"),
     # public/brand/ is copied verbatim by the build; its files sit one level deep,
     # so the root-file pattern below would never match them and the logo request
     # fell through to the shell (an <img> fed index.html renders as broken).

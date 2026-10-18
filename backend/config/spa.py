@@ -85,3 +85,16 @@ def spa_file(request, path):
         # cache would pin a replaced logo in the browser. Short, revalidating.
         response["Cache-Control"] = "public, max-age=300"
     return response
+def spa_guide(request):
+    """The product guide, served straight from the repository's docs/.
+
+    It is a standalone page that ships with the repo, not a built asset: dist/
+    is rebuilt on every deploy, so a copy there would be lost. Served before the
+    SPA catch-all, which would otherwise answer with the app shell.
+    """
+    guide = Path(settings.BASE_DIR).parent / "docs" / "user-guide.html"
+    if not guide.is_file():
+        raise Http404("The product guide is not present in this checkout.")
+    return FileResponse(guide.open("rb"), content_type="text/html; charset=utf-8")
+
+
