@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>هي فوضى؟ — دليل المنتج</title>
+<style>
+  :root{
+    --bg:#F7F7F9; --surface:#FFFFFF; --text:#18181B; --muted:#52525B;
+    --border:#E4E4E7; --accent:#C2185B; --accent-soft:#FCE7F1;
+    --ok:#15803D; --warn:#B45309; --sp:16px; --radius:14px;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:"Segoe UI",system-ui,-apple-system,"Noto Sans Arabic",Tahoma,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#0E0E10; --surface:#18181B; --text:#FAFAFA; --muted:#A1A1AA;
+           --border:#27272A; --accent:#F472B6; --accent-soft:#3B0A22; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);
+       line-height:1.85;font-size:17px}
+  .wrap{display:grid;grid-template-columns:280px 1fr;gap:0;max-width:1280px;margin:0 auto;
+        background:var(--surface);min-height:100vh;box-shadow:0 0 40px rgba(0,0,0,.06)}
+  nav{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+      padding:28px 20px;border-inline-start:1px solid var(--border);background:var(--surface)}
+  nav .brand{font-weight:800;font-size:19px;color:var(--accent);margin-bottom:4px}
+  nav .tag{font-size:13px;color:var(--muted);margin-bottom:22px}
+  nav a{display:block;padding:7px 10px;color:var(--muted);text-decoration:none;
+        border-radius:9px;font-size:15px;margin-bottom:2px}
+  nav a:hover{background:var(--accent-soft);color:var(--accent)}
+  nav .sub{padding-inline-start:22px;font-size:14px}
+  main{padding:44px 52px 90px;min-width:0}
+  h1{font-size:36px;line-height:1.3;margin:0 0 10px}
+  h2{font-size:26px;margin:52px 0 14px;padding-bottom:10px;border-bottom:2px solid var(--border)}
+  h3{font-size:20px;margin:32px 0 10px;color:var(--accent)}
+  h4{font-size:17px;margin:22px 0 8px}
+  p,li{color:var(--text)}
+  .lead{font-size:19px;color:var(--muted);margin-bottom:8px}
+  .tagline{display:inline-block;background:var(--accent-soft);color:var(--accent);
+           padding:6px 14px;border-radius:999px;font-weight:700;font-size:15px;margin-bottom:24px}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:15.5px}
+  th,td{text-align:right;padding:11px 14px;border-bottom:1px solid var(--border)}
+  th{background:var(--bg);font-weight:700}
+  code{font-family:var(--mono);background:var(--bg);padding:2px 7px;border-radius:6px;font-size:14.5px}
+  pre{background:var(--bg);padding:16px 18px;border-radius:var(--radius);overflow-x:auto;
+      border:1px solid var(--border);font-size:14.5px;line-height:1.7}
+  pre code{background:none;padding:0}
+  blockquote{margin:18px 0;padding:14px 18px;background:var(--accent-soft);
+             border-inline-start:4px solid var(--accent);border-radius:10px;color:var(--text)}
+  blockquote p{margin:0}
+  .card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);
+        padding:20px 22px;margin:18px 0}
+  .ai{border:2px solid var(--accent);background:var(--surface)}
+  .ai h3{color:var(--accent)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:18px 0}
+  .grid .card{margin:0}
+  .pill{display:inline-block;background:var(--accent-soft);color:var(--accent);
+        border-radius:999px;padding:2px 11px;font-size:13px;font-weight:700;margin-inline-start:6px}
+  .ok{color:var(--ok);font-weight:700}
+  .warn{color:var(--warn);font-weight:700}
+  hr{border:0;border-top:1px solid var(--border);margin:44px 0}
+  footer{padding:30px 0 10px;color:var(--muted);font-size:14px;border-top:1px solid var(--border);margin-top:50px}
+  @media (max-width:900px){
+    .wrap{grid-template-columns:1fr}
+    nav{position:static;height:auto;border-inline-start:0;border-bottom:1px solid var(--border)}
+    main{padding:26px 20px 70px}
+    h1{font-size:28px} h2{font-size:22px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<nav>
+  <div class="brand">هي فوضى؟</div>
+  <div class="tag">دليل المنتج</div>
+  <a href="#what">١ · إيه ده؟</a>
+  <a href="#glance">٢ · لمحة سريعة</a>
+  <a href="#roles">٣ · الأدوار التلاتة</a>
+  <a href="#modules">٤ · دليل الأقسام</a>
+  <a class="sub" href="#m-auth">تسجيل الدخول</a>
+  <a class="sub" href="#m-requests">طلباتي</a>
+  <a class="sub" href="#m-timesheets">سجلات وقتي</a>
+  <a class="sub" href="#m-reviews">مراجعات الفريق</a>
+  <a class="sub" href="#m-hr">لوحة الموارد البشرية</a>
+  <a class="sub" href="#m-reports">التقارير</a>
+  <a class="sub" href="#m-attendance">الحضور</a>
+  <a class="sub" href="#m-notifications">الإشعارات</a>
+  <a href="#ai" style="color:var(--accent);font-weight:700">٥ · الذكاء الاصطناعي ★</a>
+  <a href="#security">٦ · الأمان والعزل</a>
+  <a href="#stack">٧ · التقنيات</a>
+  <a href="#try">٨ · جرّب بنفسك</a>
+  <a href="#faq">٩ · أسئلة شائعة</a>
+</nav>
+
+<main>
+  <h1>هي فوضى؟</h1>
+  <div class="tagline">خلي السيستم يتصرف.</div>
+  <p class="lead">
+    نظام واحد يجمع <strong>طلبات الموظفين</strong> و<strong>سجل الوقت والحضور</strong>،
+    بثلاثة أدوار (موظف · مدير · موارد بشرية)، ومساعد ذكي جواه
+    <strong>يسألك قبل أي تغيير</strong>.
+  </p>
+
+  <h2 id="what">١ · إيه ده؟</h2>
+  <p>شركة عندها نفس المشكلة كل يوم: الطلبات بتتوه (إيميلات · واتساب · ورقة على
+     المكتب)، وساعات الشغل مش بتتسجّل بدقة، ومحدش عارف الطلب وصل لفين.</p>
+  <p><strong>«هي فوضى؟»</strong> بيحل ده بإنه يحط كل ده في مكان واحد:</p>
+  <ul>
+    <li><strong>الطلب</strong> بيتقدّم من النظام، وحالته معروفة لحظة بلحظة
+        (مسودة · بانتظار المدير · بانتظار HR · معتمد · مرفوض · معاد للتعديل).</li>
+    <li><strong>الوقت</strong> بيتسجّل يوميًا وبيتجمّع في سجل أسبوعي للمراجعة.</li>
+    <li><strong>الصلاحيات</strong> محددة على السيرفر: الموظف يشوف بتاعه، المدير
+        فريقه، والموارد البشرية الشركة كلها.</li>
+  </ul>
+  <p><strong>لمين؟</strong> أي شركة عندها موظفين ومديرين وقسم موارد بشرية.</p>
+
+  <h2 id="glance">٢ · لمحة سريعة</h2>
+  <table>
+    <tr><th>السؤال</th><th>الإجابة</th></tr>
+    <tr><td>بيشتغل على إيه؟</td><td>متصفح — ديسكتوب · تابلت · موبايل</td></tr>
+    <tr><td>اللغة؟</td><td>عربي (RTL) وإنجليزي (LTR) — تبديل لحظي</td></tr>
+    <tr><td>الوضع الليلي؟</td><td>فاتح · غامق · أو حسب النظام</td></tr>
+    <tr><td>الأدوار؟</td><td>موظف · مدير · موارد بشرية</td></tr>
+    <tr><td>العزل؟</td><td>كل شركة معزولة تمامًا عن التانية</td></tr>
+  </table>
+
+  <h2 id="roles">٣ · الأدوار التلاتة</h2>
+  <div class="grid">
+    <div class="card">
+      <h4>موظف</h4>
+      <ul>
+        <li>ملفه الشخصي وبياناته</li>
+        <li>ينشئ طلبات (إجازة · إذن · سلفة · شهادة) ويحفظها مسودة</li>
+        <li>يسجّل وقته يوميًا ويقدّم السجل الأسبوعي</li>
+        <li>يتابع الحالة وسجل النشاط</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>مدير</h4>
+      <ul>
+        <li>يشوف <strong>الموظفين اللي بيتبعوه بس</strong></li>
+        <li>يراجع طلبات فريقه: موافقة · رفض · إعادة للتعديل</li>
+        <li>يراجع سجلات الوقت ويرجّع اللي محتاج تصحيح</li>
+        <li>داشبورد الفريق</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h4>موارد بشرية</h4>
+      <ul>
+        <li>إدارة الموظفين وخطوط الإبلاغ والأدوار</li>
+        <li>إشراف على كل الطلبات والسجلات</li>
+        <li>التقارير وتصدير CSV</li>
+        <li>إعدادات المؤسسة: أنواع الطلبات · جدول الدوام · الأعياد</li>
+      </ul>
+    </div>
+  </div>
+  <blockquote><p><strong>مهم:</strong> الصلاحيات مطبقة على السيرفر، مش بمجرد
+    إخفاء أزرار في الشاشة.</p></blockquote>
+
+  <h2 id="modules">٤ · دليل الأقسام</h2>
+
+  <h3 id="m-auth">٤.١ تسجيل الدخول والإنشاء</h3>
+  <ul>
+    <li><strong>دخول</strong> بإيميل وباسورد مع جلسة آمنة (حماية CSRF).</li>
+    <li><strong>إنشاء شركة جديدة</strong>: خطوتين — بيانات الشركة + كود التفعيل
+        أولًا، وبعدها حساب الموارد البشرية (أول حساب). الشركة بتتعمل في قاعدة
+        البيانات بعد التأكد إن كل حاجة تمام.</li>
+    <li><strong>أول زيارة</strong> بتفتح بالوضع الفاتح، وبعدها بيفضل اختيارك.</li>
+  </ul>
+
+  <h3 id="m-requests">٤.٢ طلباتي</h3>
+  <ul>
+    <li><strong>إنشاء طلب</strong>: النوع + عنوان + تفاصيل + إمكانية إرفاق مستندات.</li>
+    <li><strong>مسودة</strong> → مراجعة → <strong>إرسال</strong> → بتتحوّل للمدير
+        (أو HR حسب نوع الطلب).</li>
+    <li><strong>متابعة الحالة</strong> وسجل النشاط (مين عمل إيه وامتى).</li>
+    <li><strong>إلغاء</strong> في الحالات المسموح بيها.</li>
+  </ul>
+
+  <h3 id="m-timesheets">٤.٣ سجلات وقتي</h3>
+  <ul>
+    <li><strong>إدخال يومي</strong>: التاريخ + من/إلى أو الساعات + وصف الشغل.</li>
+    <li><strong>مسودة</strong> للسجل الأسبوعي → <strong>إرسال للمراجعة</strong>.</li>
+    <li><strong>بعد الإرسال</strong> السجل بيبقى <em>للقراءة فقط</em> — إلا لو
+        اترجع للتعديل أو فتحه دور مصرّح له.</li>
+    <li><strong>الأسبوع الحالي</strong>: نسبة الإنجاز · المتبقي · مقابل الهدف.</li>
+  </ul>
+
+  <h3 id="m-reviews">٤.٤ مراجعات الفريق</h3>
+  <ul>
+    <li>طلبات وسجلات <strong>بانتظار قرارك</strong>: موافقة · رفض · إعادة للتعديل
+        (مع سبب).</li>
+    <li><strong>شريط الانتباه</strong> بيوريك اللي محتاج تصرّف فورًا.</li>
+  </ul>
+
+  <h3 id="m-hr">٤.٥ لوحة الموارد البشرية</h3>
+  <ul>
+    <li><strong>الموظفين</strong>: إضافة · تعديل · تفعيل/إيقاف · تحديد المدير والقسم.</li>
+    <li><strong>الأقسام</strong>: إنشاء وإدارة.</li>
+    <li><strong>جدول دوام المؤسسة</strong>: زرار «إضافة جدول دوام» — الاسم ·
+        تاريخ السريان · الأيام السبعة (يوم عمل؟ · من/إلى · استراحة) — والجدول
+        الساري بيظهر بأيامه.</li>
+    <li><strong>الأعياد الرسمية</strong>: عرض وإضافة.</li>
+  </ul>
+
+  <h3 id="m-reports">٤.٦ التقارير</h3>
+  <ul>
+    <li>أربعة تبويبات من السيرفر مباشرة: <strong>الطلبات · السجلات الزمنية ·
+        الحضور · الأشخاص</strong>.</li>
+    <li><strong>فلاتر مترابطة</strong>: اختيار القسم بيقصّر قايمة الموظفين على
+        القسم ده بس، ومن/إلى مربوطين (مش ممكن تعكسهم).</li>
+    <li><strong>تصدير CSV</strong> لأي تقرير.</li>
+    <li>المدير بيشوف فريقه، والـHR بيشوف الشركة كلها.</li>
+  </ul>
+
+  <h3 id="m-attendance">٤.٧ الحضور والانصراف</h3>
+  <ul>
+    <li><strong>تسجيل دخول/خروج</strong> بضغطة، وسجل بيوم بيوم.</li>
+    <li><strong>حالة اليوم</strong> بتتحسب من الإدخالات: حاضر · ناقص · غياب محتمل.</li>
+  </ul>
+
+  <h3 id="m-notifications">٤.٨ الإشعارات والتنقّل</h3>
+  <ul>
+    <li>إشعارات عند الإرسال · الموافقة · الرفض · الإرجاع للتعديل — مع مقروء/غير مقروء.</li>
+    <li><strong>القائمة الجانبية</strong> بتفتح وتقفل بزر سهم، والحالة بتتفتكر.</li>
+    <li>الوضع الفاتح/الغامق + تبديل اللغة + تصميم متجاوب من الموبايل للديسكتوب.</li>
+  </ul>
+
+  <h2 id="ai">٥ · الذكاء الاصطناعي في النظام</h2>
+  <p>النظام فيه ذكاء اصطناعي حقيقي بيشتغل جواه — مش واجهة ديكور.</p>
+
+  <div class="card ai">
+    <h3>٥.١ المساعد «مدام عفاف»</h3>
+    <p><strong>إيه هو؟</strong> مساعد ذكي جوه التطبيق، بتكلّمه بالعربي عن شغلك:</p>
+    <blockquote>
+      <p>«إيه رصيد إجازاتي؟» · «إيه آخر تحديث على طلباتي؟» ·
+         «إيه جدول شغلي الأسبوع ده؟» · «ساعدني أقدّم طلب إجازة.»</p>
+    </blockquote>
+
+    <h4>١) بيقرا من السيستم فعلاً</h4>
+    <p>المساعد مش بيخمّن. عنده <strong>أدوات</strong> بتقرا الطلبات والسجلات
+       والحضور والموظفين من قاعدة البيانات، و<strong>كل أداة مربوطة بصلاحيات
+       اللي بيسأل</strong>: الموظف يشوف بتاعه، المدير فريقه، والـHR الشركة كلها.
+       ولو مفيش معلومة، <strong>بيقول الحقيقة</strong> بدل ما يخترع رقم.</p>
+
+    <h4>٢) ★ بيسأل قبل أي تغيير</h4>
+    <p>أي عملية بتغيّر بيانات (إنشاء طلب · اعتماد · رفض · إعادة للتعديل)
+       <strong>بتعدّي على خطوتين إجباريتين</strong>:</p>
+    <pre><code>المساعد بيجهّز الإجراء
+      ↓
+النظام بيعرض بطاقة تأكيد  (نوع الطلب · العنوان · التفاصيل · فوري؟)
+      ↓
+المستخدم يوافق
+      ↓
+ساعتها بس الإجراء بيتنفّذ</code></pre>
+    <p>والبطاقة بتقول الحقيقة عن الفعل: <strong>مسودة</strong> →
+       «مفيش حاجة هتتغير — هيتحفظ كمسودة بس» · <strong>إرسال فوري</strong> →
+       «هيتغيّر في النظام».</p>
+
+    <h4>٣) التوكن الموقّع (pending_action)</h4>
+    <p>الإجراء بيتوقّع بتوكن قصير الأجل مربوط بالمستخدم والأداة والوسائط. فمفيش
+       طريقة إن حاجة تتنفّذ من غير موافقة صريحة، ولو التوكن انتهت صلاحيته أو
+       اتستخدم قبل كده → <strong>رسالة واضحة</strong>.</p>
+
+    <h4>٤) إيصال رسمي بالنتيجة</h4>
+    <p>بعد التنفيذ بتظهر نتيجة مفهومة: <strong>رقم الطلب · حالته · والرسالة</strong> —
+       مش كود تقني ولا <code>[object Object]</code>.</p>
+
+    <p><strong>ليه ده مهم؟</strong> لأن أخطر حاجة في أي مساعد ذكي إنه يعمل حاجة من
+       غير ما تسأله. النظام هنا بيمنع ده بالتصميم:
+       <strong>القراءة مفتوحة للصلاحيات، والكتابة محتاجة تأكيد.</strong></p>
+  </div>
+
+  <div class="card ai">
+    <h3>٥.٢ «ذكاء اصطناعي: تحديد أيام العطل»</h3>
+    <p>في <strong>إعدادات المؤسسة</strong> → كارت <strong>الأعياد الرسمية</strong> →
+       زرار بيستخدم الذكاء الاصطناعي <strong>يقترح أيام العطل الرسمية للسنة</strong>،
+       والمستخدم <strong>يراجع ويعتمد</strong> — بنفس مبدأ «مفيش تغيير من غير تأكيد».</p>
+  </div>
+
+  <div class="card ai">
+    <h3>٥.٣ الذكاء الاصطناعي في تطوير النظام نفسه</h3>
+    <p>النظام اتبنى بمساعدة <strong>وكلاء ذكاء اصطناعي متخصصين</strong> — وده جزء
+       من التقييم:</p>
+    <ul>
+      <li><strong>كل وكيل بمهمة محددة</strong>: واحد للواجهة، واحد للباك إند، واحد
+          للنشر — وكل واحد بياخد <strong>بريف مكتوب</strong> فيه المطلوب + القيود
+          + <strong>متطلبات تحقق إلزامية</strong>.</li>
+      <li><strong>★ مفيش قبول أعمى</strong>: كل نتيجة اتفحصت بنفسي — قياسات في
+          المتصفح، اختبارات على الـAPI، ومقارنة اللي اتقال باللي ظهر فعلاً.</li>
+      <li><strong>★ أخطاء حقيقية اتصلّحت</strong> (الشفافية جزء من الشغل):
+        <ul>
+          <li>بطاقة تأكيد كانت بتعرض <code>[object Object]</code> → اتصلّحت.</li>
+          <li>بطاقة كانت بتتقطع أفقيًا → اتصلّحت.</li>
+          <li>الإرسال كان بيفشل ويطلّع للمستخدم
+              <code>validation_error: request_type</code> → اتصلّحت الرسالة
+              والسبب الجذري.</li>
+          <li><strong>تسريب بين الشركات</strong>: نقطة الأقسام كانت بترجّع أقسام
+              كل الشركات لأي HR → اتقفلت في ٤ مواضع + اتضافت اختبارات عزل.</li>
+          <li>الجولة الإرشادية كانت بتظهر كل مرة → بقت مرة واحدة لكل حساب.</li>
+        </ul>
+      </li>
+    </ul>
+  </div>
+
+  <h2 id="security">٦ · الأمان والعزل</h2>
+  <ul>
+    <li><strong>الصلاحيات على السيرفر</strong>: دور · ملكية السجل · نطاق الفريق —
+        مش إخفاء أزرار.</li>
+    <li><strong>العزل بين الشركات</strong>: كل استعلام مربوط بالشركة. محاولة قراءة
+        سجل شركة تانية بترجّع <strong>404</strong> (مش 403) عشان ما تتسرّبش حتى
+        معلومة وجوده.</li>
+    <li><strong>حماية الكتابة</strong>: CSRF على كل عملية تغيير + توكن موقّع
+        لعمليات المساعد.</li>
+    <li><strong>الأسرار برّه الكود</strong>: متغيرات البيئة على السيرفر، والملفات
+        المحلية مستثناة من الرفع.</li>
+    <li><strong>التحقق من المدخلات</strong>: كل حقل بيتفحص، والأخطاء بترجع
+        <strong>بحقول واضحة</strong> جنب الحقل الغلط.</li>
+  </ul>
+
+  <h2 id="stack">٧ · التقنيات</h2>
+  <table>
+    <tr><th>الطبقة</th><th>التقنية</th></tr>
+    <tr><td>الباك إند</td><td>Django + Django REST Framework</td></tr>
+    <tr><td>قاعدة البيانات</td><td>PostgreSQL (والنسخة المحلية SQLite للتطوير)</td></tr>
+    <tr><td>الفرونت</td><td>React + TypeScript + Vite</td></tr>
+    <tr><td>النشر</td><td>Railway (Docker) — والـmigrations بتتنفّذ عند التشغيل</td></tr>
+    <tr><td>التستات</td><td>١٣٨ ملف اختبار (مصادقة · أدوار · ملكية · طلبات ·
+        سجلات · فلاتر · عزل)</td></tr>
+    <tr><td>التوثيق</td><td><code>specs/</code> (الدستور + مصفوفة الصلاحيات + آلات
+        الحالة) + <code>docs/</code></td></tr>
+  </table>
+
+  <h2 id="try">٨ · جرّب بنفسك</h2>
+  <p><strong>الرابط:</strong>
+     <code>https://heya-fawda-production.up.railway.app</code></p>
+  <table>
+    <tr><th>الدور</th><th>الإيميل</th><th>الباسورد</th></tr>
+    <tr><td><strong>موارد بشرية</strong></td><td><code>hr@demo.local</code></td><td><code>demo1234</code></td></tr>
+    <tr><td><strong>مدير</strong></td><td><code>manager@demo.local</code></td><td><code>demo1234</code></td></tr>
+    <tr><td><strong>موظف</strong></td><td><code>emp1@demo.local</code></td><td><code>demo1234</code></td></tr>
+  </table>
+  <p><strong>جرّب ده بالترتيب:</strong></p>
+  <ol>
+    <li>ادخل كـ<strong>موظف</strong> → اعمل طلب إجازة → اتبعه من «طلباتي».</li>
+    <li>سجّل وقتك النهاردة → قدّم السجل.</li>
+    <li>اطلع وادخل كـ<strong>مدير</strong> → «مراجعات الفريق» → اقبل أو رجّع.</li>
+    <li>اطلع وادخل كـ<strong>HR</strong> → «لوحة الموارد البشرية» → «التقارير» →
+        جرّب الفلاتر (اختار قسم، شوف قايمة الموظفين بتتقصر) → صدّر CSV.</li>
+    <li>افتح <strong>المساعد</strong> → اسأله «إيه رصيد إجازاتي؟» → بعدها
+        «اعملي طلب إجازة يوم ٢٥ الجاي» → <strong>شوف بطاقة التأكيد</strong> → وافق.</li>
+  </ol>
+
+  <h2 id="faq">٩ · أسئلة شائعة</h2>
+  <h4>هل المساعد الذكي يقدر يعمل حاجة من غير إذني؟</h4>
+  <p>لأ. أي عملية كتابة بتعرض بطاقة تأكيد الأول، ومفيش تنفيذ من غير موافقة صريحة.</p>
+  <h4>هل المدير يشوف كل الشركة؟</h4>
+  <p>لأ. بيشوف الموظفين اللي بيتبعوه مباشرة بس، وده مطبّق على السيرفر.</p>
+  <h4>هل شركة تقدر تشوف بيانات شركة تانية؟</h4>
+  <p>لأ. كل استعلام مربوط بالشركة، وقراءة سجل شركة تانية بترجّع 404.</p>
+  <h4>إيه اللي يحصل لو رجّعت السجل للتعديل؟</h4>
+  <p>بيرجع للموظف مع السبب، ويقدر يعدّل ويقدّمه تاني.</p>
+  <h4>أقدر أستخدم النظام على الموبايل؟</h4>
+  <p>أيوه — التصميم متجاوب، والقائمة الجانبية بتتحول لدرج على الشاشات الصغيرة.</p>
+
+  <footer>
+    هي فوضى؟ — دليل المنتج · <span class="ok">النسخة الكاملة في
+    <code>docs/USER-GUIDE.md</code></span>
+  </footer>
+</main>
+</div>
+</body>
+</html>
