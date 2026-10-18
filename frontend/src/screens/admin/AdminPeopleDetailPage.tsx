@@ -1,8 +1,8 @@
 import { Link, Navigate, useParams } from "react-router-dom";
 import { useApp, usePageTitle } from "../../app/AppContext";
 import { useServerData } from "../../app/useServerData";
-import { getEmployee } from "../../app/orgApi";
-import { Banner, EmptyState, ErrorState, SkeletonRows } from "../../components/ui";
+import { getEmployee, type ServerEmployee } from "../../app/orgApi";
+import { Banner, ErrorState, SkeletonRows } from "../../components/ui";
 import PageHeader from "../../components/layout/PageHeader";
 import AdminNav from "./AdminNav";
 import ManagerGrantsPanel from "./ManagerGrantsPanel";
@@ -32,9 +32,24 @@ export default function AdminPeopleDetailPage() {
 
   if (!capabilities.canManageDirectory) return <Navigate to="/" replace />;
 
-  const unavailable = locale === "ar"
-    ? "إعدادات التوظيف (نوع التعاقد، سياسة الهجين، استثناء الجدول، مخصص الإجازات، أعلام قدرات المهام) وملف الموظف من المستوى الحصري للموارد البشرية (الراتب، الرقم القومي، البنك، العقود) حاضرة كان لديها بيانات من طبقة العرض التجريبية المحذوفة؛ لا توجد نقطة نهاية على الخادم تقدمها الآن، فلا يوجد مسار كتابة حقيقي. أعمال منح الصلاحيات وإعدادات المساعد تعمل من نقاطهما الحقيقية."
-    : "The employment settings (contract type, hybrid policy, schedule exception, leave allocation, task capability flags) and the HR-only file tier (salary, national id, bank, contracts) came from the deleted demo/mock layer; no server endpoint serves them now, so there is no real write path. Manager grants and the assistant panel keep working from their real endpoints.";
+  /* What the server actually serves for one employee: identity, the roster
+     fields, and the reporting line. The exclusive HR tier (salary, national id,
+     bank, contracts) and the employment-policy settings have no endpoint and no
+     model, so they are named honestly as absent rather than shown as blanks. */
+  const employeeFields = (row: ServerEmployee) =>
+    ([
+      [locale === "ar" ? "البريد الإلكتروني" : "Email", row.email],
+      [locale === "ar" ? "المسمى الوظيفي" : "Job title", row.job_title],
+      [locale === "ar" ? "الإدارة" : "Department", [locale === "ar" ? row.department_name_ar : row.department_name_en, row.department_code].filter(Boolean).join(" · ")],
+      [locale === "ar" ? "الرقم الوظيفي" : "Employee number", row.employee_number ?? ""],
+      [locale === "ar" ? "المدير" : "Manager", row.manager_name ?? ""],
+      [locale === "ar" ? "الدور" : "Role", row.role],
+      [locale === "ar" ? "نشط" : "Active", row.is_active ? (locale === "ar" ? "نعم" : "Yes") : (locale === "ar" ? "لا" : "No")],
+    ] as [string, string][]).filter(([, value]) => value !== "" && value !== null && value !== undefined);
+
+  const notOnServer = locale === "ar"
+    ? "الملف الحصري للموارد البشرية (الراتب، الرقم القومي، البنك، العقود) وإعدادات التوظيف (نوع التعاقد، سياسة الهجين، استثناء الجدول) مالهاش نقطة على الخادم، فمش معروضة. اللي فوق هو اللي الخادم بيقوله فعلًا."
+    : "The exclusive HR file (salary, national id, bank, contracts) and the employment settings (contract type, hybrid policy, schedule exception) have no server endpoint, so they are not shown. Everything above is what the server actually reports.";
 
   return (
     <div className="page people-detail-page">
@@ -56,10 +71,20 @@ export default function AdminPeopleDetailPage() {
           {!employee.data.is_active ? (
             <Banner tone="warning" role="status">{locale === "ar" ? "هذا الموظف غير نشط على الخادم." : "This employee is inactive on the server."}</Banner>
           ) : null}
-          <Banner tone="warning" role="alert">{unavailable}</Banner>
-          <EmptyState
-            message={locale === "ar" ? "لا توجد إعدادات توظيف أو ملف موارد بشرية مؤكد من الخادم لهذا الموظف بعد." : "There are no server-confirmed employment settings or HR file for this employee yet."}
-          />
+          <section className="work-surface section">
+            <div className="section-heading">
+              <h2>{locale === "ar" ? "ملف الموظف" : "Employee file"}</h2>
+            </div>
+            <dl className="profile-details">
+              {employeeFields(employee.data).map(([label, value]) => (
+                <div className="record-field" key={label}>
+                  <dt className="record-field-label">{label}</dt>
+                  <dd><bdi>{value}</bdi></dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+          <Banner tone="info" role="status">{notOnServer}</Banner>
           <ManagerGrantsPanel employeeEmail={employee.data.email} />
           <EmployeeAssistantPanel employeeEmail={employee.data.email} />
         </>
