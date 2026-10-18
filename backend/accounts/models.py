@@ -677,3 +677,33 @@ class WorkScheduleDay(models.Model):
     def __str__(self) -> str:
         kind = "working" if self.is_working_day else "rest"
         return f"{self.schedule_id} day {self.weekday} ({kind})"
+
+
+class AttendanceEvent(models.Model):
+    """One clock-in or clock-out. The day's state is derived from these, never stored.
+
+    Storing a derived status would drift the moment an event is corrected; the
+    schedule plus the events is the whole truth.
+    """
+
+    class Kind(models.TextChoices):
+        CLOCK_IN = "CLOCK_IN", "Clock in"
+        CLOCK_OUT = "CLOCK_OUT", "Clock out"
+
+    company = models.ForeignKey("Company", on_delete=models.CASCADE, related_name="attendance_events")
+    user = models.ForeignKey("User", on_delete=models.CASCADE, related_name="attendance_events")
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    occurred_at = models.DateTimeField()
+    note = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["occurred_at"]
+        verbose_name = "attendance event"
+        verbose_name_plural = "attendance events"
+        indexes = [
+            models.Index(fields=["company", "user", "occurred_at"], name="attend_company_user_time"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user_id} {self.kind} @ {self.occurred_at:%Y-%m-%d %H:%M}"
