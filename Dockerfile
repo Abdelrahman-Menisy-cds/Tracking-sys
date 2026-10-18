@@ -61,7 +61,10 @@ RUN python -m pip install --no-cache-dir -r backend/requirements.txt
 
 COPY backend/ backend/
 # spa.py resolves <backend>/../frontend/dist, so the image mirrors the repo
-# layout: /app/backend + /app/frontend (nothing else of the repo is needed).
+# layout: /app/backend + /app/frontend. The product guide is the one file outside
+# those two trees that is served (spa_guide reads /app/docs/user-guide.html), and
+# without this copy the route 404s in the image while working in the checkout.
+COPY docs/user-guide.html docs/user-guide.html
 COPY --from=spa-build /app/frontend/dist frontend/dist
 
 # No collectstatic: Django serves no /static/ route (config/urls.py has none)
