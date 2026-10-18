@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useApp, usePageTitle } from "../app/AppContext";
 import { Banner, Dialog, EmptyState } from "../components/ui";
 import PageHeader from "../components/layout/PageHeader";
+import { listEmployees } from "../app/orgApi";
 import {
   createTask,
   fetchTasks,
@@ -32,6 +33,11 @@ export default function TasksPage() {
   const [busy, setBusy] = useState(false);
   const [composing, setComposing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [assigneeId, setAssigneeId] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [people, setPeople] = useState<
+    { id: number; full_name: string; department_code?: string | null }[]
+  >([]);
 
   const copy = {
     newTask: locale === "ar" ? "مهمة جديدة" : "New task",
@@ -53,6 +59,14 @@ export default function TasksPage() {
     createFailed: locale === "ar" ? "تعذّر إنشاء المهمة. جرّب تاني." : "Could not create the task. Try again.",
     due: locale === "ar" ? "الاستحقاق" : "Due",
     titleRequired: locale === "ar" ? "العنوان مطلوب." : "A title is required.",
+    assigneeLabel: locale === "ar" ? "المكلَّف بالمهمة (اختياري)" : "Assignee (optional)",
+    unassigned: locale === "ar" ? "بدون تكليف" : "Unassigned",
+    attachmentsLabel: locale === "ar" ? "مرفقات (اختياري)" : "Attachments (optional)",
+    attachmentsHint:
+      locale === "ar"
+        ? "تقدر ترفع أكتر من ملف."
+        : "You can attach more than one file.",
+    filesChosen: locale === "ar" ? "ملف مختار" : "file(s) selected",
   };
 
   const reload = () => {
@@ -63,6 +77,22 @@ export default function TasksPage() {
   };
 
   useEffect(reload, [locale]);
+
+  /* The people a task may be handed to: whoever the server lists for this
+     caller. A failure leaves the picker empty rather than blocking the dialog. */
+  useEffect(() => {
+    listEmployees(locale)
+      .then((rows) =>
+        setPeople(
+          rows.map((person) => ({
+            id: person.id,
+            full_name: person.full_name,
+            department_code: person.department_code,
+          })),
+        ),
+      )
+      .catch(() => setPeople([]));
+  }, [locale]);
 
   const move = async (task: Task, status: TaskStatus) => {
     try {
@@ -78,7 +108,16 @@ export default function TasksPage() {
     setBusy(true);
     setError(null);
     try {
-      await createTask({ title: draft.title.trim(), details: draft.details.trim() }, locale);
+      await createTask(
+        {
+          title: draft.title.trim(),
+          details: draft.details.trim(),
+          assignee_id: assigneeId === "" ? null : Number(assigneeId),
+        },
+        locale,
+      );
+      setAssigneeId("");
+      setFiles([]);
       setDraft({ title: "", details: "" });
       setComposing(false);
       reload();
@@ -94,6 +133,8 @@ export default function TasksPage() {
     setComposing(false);
     setError(null);
     setDraft({ title: "", details: "" });
+    setAssigneeId("");
+    setFiles([]);
   };
 
   if (failed) {
@@ -124,7 +165,7 @@ export default function TasksPage() {
 
       <div className="work-surface">
         <div className="section-heading">
-          <div className="role-segmented" role="tablist" aria-label={t("tasksTitle")}>
+          <div className="role-segmented segmented-full" role="tablist" aria-label={t("tasksTitle")}>
             {(["mine", "created"] as const).map((key) => (
               <button
                 key={key}
@@ -183,7 +224,7 @@ export default function TasksPage() {
           busy={busy}
         >
           {error ? <Banner tone="error" role="alert">{error}</Banner> : null}
-          <div className="form-grid">
+          <div className="form-stack">
             <label className="field">
               <span>{copy.titlePlaceholder}</span>
               <input
@@ -201,6 +242,34 @@ export default function TasksPage() {
                 value={draft.details}
                 onChange={(event) => setDraft({ ...draft, details: event.target.value })}
               />
+            </label>
+            <label className="field">
+              <span>{copy.assigneeLabel}</span>
+              <select
+                className="input"
+                value={assigneeId}
+                onChange={(event) => setAssigneeId(event.target.value)}
+              >
+                <option value="">{copy.unassigned}</option>
+                {people.map((person) => (
+                  <option key={person.id} value={String(person.id)}>
+                    {person.full_name}
+                    {person.department_code ? ` · ${person.department_code}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>{copy.attachmentsLabel}</span>
+              <input
+                className="input"
+                type="file"
+                multiple
+                onChange={(event) => setFiles([...(event.target.files ?? [])])}
+              />
+              <span className="page-meta">
+                {files.length > 0 ? `${files.length} ${copy.filesChosen}` : copy.attachmentsHint}
+              </span>
             </label>
           </div>
           <div className="dialog-actions">

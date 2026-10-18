@@ -521,6 +521,12 @@ button { cursor: pointer; }
 .interval-row { display: flex; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3); border-block-end: var(--timeline-width) solid var(--border-subtle); }
 .attendance-status-stack { display: grid; gap: var(--sp-1); min-inline-size: 0; }
 .form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-4); }
+/* One column: a form that reads top to bottom, not a row of peers. */
+.form-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-4); }
+/* A segmented control that owns its row and splits it evenly between options,
+   rather than sitting at the end of a space-between heading. */
+.segmented-full { display: flex; inline-size: 100%; }
+.segmented-full .role-segmented-option { flex: 1 1 0; text-align: center; }
 .people-facts-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); } /* ds-allow-hardcode: facts card measure */
 .people-contract-grid { flex: 1; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); } /* ds-allow-hardcode: contract card measure */
 .people-sticky-actions { position: sticky; bottom: 0; z-index: 2; padding-block: var(--sp-3); border-block-start: var(--timeline-width) solid var(--border-subtle); background: var(--surface); }
