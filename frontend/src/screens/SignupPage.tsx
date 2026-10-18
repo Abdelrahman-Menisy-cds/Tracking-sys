@@ -397,7 +397,12 @@ export default function SignupPage() {
                   </label>
                   <p className="login-signup-contact">
                     {t("signupCodeMissing")}{" "}
-                    <a href="tel:01200704564" className="login-signup-phone">
+                    <a
+                      href="https://wa.me/201200704564"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="login-signup-phone"
+                    >
                       <bdi>01200704564</bdi>
                     </a>
                   </p>
