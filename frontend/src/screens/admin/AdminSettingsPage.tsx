@@ -758,6 +758,10 @@ function AdjustBalanceDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  /* An adjustment is ONE thing: either the entitlement or the carry-over. The
+     other value is sent back unchanged from the row, so nothing is silently
+     zeroed and the operator is never asked to fill a field they did not choose. */
+  const [mode, setMode] = useState<"entitlement" | "carryOver">("entitlement");
   const [entitled, setEntitled] = useState(row.entitled_days === null ? "" : String(row.entitled_days));
   const [carried, setCarried] = useState(row.carried_over_days === null ? "" : String(row.carried_over_days));
   const [reason, setReason] = useState("");
@@ -775,12 +779,13 @@ function AdjustBalanceDialog({
 
   const submit = async () => {
     setProblem(null);
-    const entitledDays = daysValue(entitled);
-    const carriedOverDays = daysValue(carried);
-    if (entitledDays === null || carriedOverDays === null) {
+    const chosen = mode === "entitlement" ? daysValue(entitled) : daysValue(carried);
+    if (chosen === null) {
       setProblem(t("lbErrorDays"));
       return;
     }
+    const entitledDays = mode === "entitlement" ? chosen : (row.entitled_days ?? 0);
+    const carriedOverDays = mode === "carryOver" ? chosen : (row.carried_over_days ?? 0);
     if (!reason.trim()) {
       setProblem(t("adminErrorReason"));
       return;
@@ -827,7 +832,28 @@ function AdjustBalanceDialog({
       onClose={onClose}
     >
       <form noValidate onSubmit={(event) => { event.preventDefault(); submit(); }}>
-        <label className="field" htmlFor="adjust-entitled">
+                {/* One adjustment at a time: the operator picks which figure they are
+            setting, and only that field is asked for. */}
+        <div className="role-segmented" role="group">
+          <button
+            type="button"
+            className={`role-segmented-option${mode === "entitlement" ? " is-selected" : ""}`}
+            aria-pressed={mode === "entitlement"}
+            onClick={() => { setDirty(true); setMode("entitlement"); setProblem(null); }}
+          >
+            {t("adminEntitlement")}
+          </button>
+          <button
+            type="button"
+            className={`role-segmented-option${mode === "carryOver" ? " is-selected" : ""}`}
+            aria-pressed={mode === "carryOver"}
+            onClick={() => { setDirty(true); setMode("carryOver"); setProblem(null); }}
+          >
+            {t("adminCarryOver")}
+          </button>
+        </div>
+        {mode === "entitlement" ? (
+<label className="field" htmlFor="adjust-entitled">
           <span className="field-label">{t("adminEntitlement")}</span>
           <input
             id="adjust-entitled"
@@ -841,7 +867,8 @@ function AdjustBalanceDialog({
             onChange={(event) => { setDirty(true); setEntitled(event.target.value); }}
           />
         </label>
-        <label className="field" htmlFor="adjust-carried">
+        ) : (
+<label className="field" htmlFor="adjust-carried">
           <span className="field-label">{t("adminCarryOver")}</span>
           <input
             id="adjust-carried"
@@ -855,7 +882,8 @@ function AdjustBalanceDialog({
             onChange={(event) => { setDirty(true); setCarried(event.target.value); }}
           />
         </label>
-        <p className="page-meta">{`${t("lbVersionLabel")}: ${numText(row.version, locale)}`}</p>
+        )}
+                <p className="page-meta">{`${t("lbVersionLabel")}: ${numText(row.version, locale)}`}</p>
         <label className="field" htmlFor="adjust-reason">
           <span className="field-label">
             {t("lbReasonLabel")} <span className="field-required">*</span>
