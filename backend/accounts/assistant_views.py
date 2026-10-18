@@ -22,6 +22,7 @@ import logging
 import time
 
 from django.db import transaction
+from django.utils.translation import gettext as _
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -105,6 +106,33 @@ def _error(request, code, message, fields, status_code):
     )
 
 
+def _missing_required(validated, fields):
+    """The per-field 400 body for names a validated payload must carry but does
+    not. The company_views.py precedent: a body this endpoint cannot honour is
+    a readable 400 naming the field — never an unhandled KeyError (which the
+    caller reads as Django's HTML 500 page). The msgid is DRF's own, so an ar
+    caller gets DRF's Arabic sentence.
+    """
+    return {
+        field: [_("This field is required.")]
+        for field in fields
+        if not validated.get(field)
+    }
+
+
+# The provider's own import failure modes, mapped to the status the SPA's
+# error surface already expects. ONE table, shared by every path that links a
+# subscription (the PUT below and /assistant/subscription/import), so the two
+# cannot drift apart.
+SUBSCRIPTION_IMPORT_STATUS = {
+    "unknown_provider": status.HTTP_422_UNPROCESSABLE_ENTITY,
+    "no_local_login": status.HTTP_409_CONFLICT,
+    "provider_unreachable": status.HTTP_502_BAD_GATEWAY,
+    "provider_error": status.HTTP_502_BAD_GATEWAY,
+    "codex_import_failed": status.HTTP_502_BAD_GATEWAY,
+}
+
+
 def _get_own_config(user) -> AssistantConfig:
     config, _created = AssistantConfig.objects.get_or_create(
         user=user, defaults={"company": user.company}
@@ -154,7 +182,20 @@ class AssistantConfigView(APIView):
 
     def put(self, request):
         serializer = AssistantConfigSelfWriteSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        # A body this endpoint cannot honour is a 400 carrying the shared
+        # envelope (fields names the offending input) — the company_views.py
+        # PATCH precedent. It is NEVER a 500: the api path below used to index
+        # base_url/model straight out of validated_data, so a partial body
+        # ({"model": ...} — what «تحديث الموديل» sent) raised KeyError and the
+        # caller got Django's HTML error page instead of a readable refusal.
+        if not serializer.is_valid():
+            return _error(
+                request,
+                "validation_error",
+                "Validation failed.",
+                serializer.errors,
+                status.HTTP_400_BAD_REQUEST,
+            )
         validated = serializer.validated_data
         config = _get_own_config(request.user)
 
@@ -165,9 +206,33 @@ class AssistantConfigView(APIView):
             # credential per row: linking clears the api-key fields.
             # model is OPTIONAL here: a re-save that only changes the model
             # (pulled from /assistant/subscription/models) must not re-import
-            # or touch the credential.
+            # or touch the credential — which is why the client sends mode +
+            # model and NO provider for that change.
+            if not validated.get("subscription_provider") and not config.subscription_provider:
+                # Neither a provider to link nor a linked credential whose
+                # model could change: there is nothing this body can honour.
+                return _error(
+                    request,
+                    "validation_error",
+                    "Validation failed.",
+                    {"subscription_provider": ["Pick a provider (opencode or codex)."]},
+                    status.HTTP_400_BAD_REQUEST,
+                )
             if validated.get("subscription_provider"):
-                import_result = import_local(validated["subscription_provider"])
+                try:
+                    import_result = import_local(validated["subscription_provider"])
+                except SubscriptionError as error:
+                    # The provider's own failure (no local CLI login, an
+                    # unreachable provider, a wedged import) is the operator's
+                    # answer: the same envelope /assistant/subscription/import
+                    # returns. Left uncaught it was an HTML 500 page.
+                    return _error(
+                        request,
+                        error.code,
+                        error.message,
+                        {},
+                        SUBSCRIPTION_IMPORT_STATUS.get(error.code, status.HTTP_409_CONFLICT),
+                    )
                 store_subscription(config, import_result, validated["subscription_provider"], "local")
             if validated.get("model"):
                 config.model = validated["model"]
@@ -181,7 +246,17 @@ class AssistantConfigView(APIView):
             return Response({"data": AssistantConfigReadSerializer(config).data})
 
         # api mode (H18): base_url/model required; also UNLINKS a previous
-        # subscription — exactly one credential per row.
+        # subscription — exactly one credential per row. A body missing either
+        # is refused with a 400 naming the field, never indexed blindly.
+        missing = _missing_required(validated, ("base_url", "model"))
+        if missing:
+            return _error(
+                request,
+                "validation_error",
+                "Validation failed.",
+                missing,
+                status.HTTP_400_BAD_REQUEST,
+            )
         if config.subscription_provider:
             assistant_subscriptions.clear_subscription(config)
             config.refresh_from_db()
@@ -431,14 +506,13 @@ class AssistantSubscriptionImportView(APIView):
             # mode carries an actionable code (the provider's own status/
             # body travels in the message, scrubbed + truncated), and no
             # timeout path can escape this handler unbounded.
-            http_status = {
-                "unknown_provider": status.HTTP_422_UNPROCESSABLE_ENTITY,
-                "no_local_login": status.HTTP_409_CONFLICT,
-                "provider_unreachable": status.HTTP_502_BAD_GATEWAY,
-                "provider_error": status.HTTP_502_BAD_GATEWAY,
-                "codex_import_failed": status.HTTP_502_BAD_GATEWAY,
-            }.get(error.code, status.HTTP_409_CONFLICT)
-            return _error(request, error.code, error.message, {}, http_status)
+            return _error(
+                request,
+                error.code,
+                error.message,
+                {},
+                SUBSCRIPTION_IMPORT_STATUS.get(error.code, status.HTTP_409_CONFLICT),
+            )
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
         # Self-serve activation mirrors the api-key rule (H18 fix-up 2).

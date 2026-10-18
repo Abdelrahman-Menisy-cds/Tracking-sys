@@ -1167,3 +1167,198 @@ def test_migration_seeds_the_app_vocabulary(client_csrf):
     if names:
         assert names == {"إجازة اعتيادية", "إجازة مرضية", "تصحيح سجل وقت", "تصريح خروج أثناء اليوم"}
 
+
+# ---------------------------------------------------------------------------
+# H44 — a PUT /assistant/config body the endpoint cannot honour is a readable
+# 4xx carrying the shared envelope, NEVER an unhandled exception. The live
+# reproduction: the profile screen's «تحديث الموديل» sent a model-only body and
+# the api path indexed validated_data["base_url"] -> KeyError -> Django's HTML
+# 500 page (and the SPA showed «تعذر الاتصال بالخادم... (500)»).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("label", "body", "expected_fields"),
+    (
+        ("model-only", {"model": "deepseek-v4.1-flash"}, {"base_url"}),
+        ("base_url-only", {"base_url": "https://api.example.com/v1"}, {"model"}),
+        ("empty", {}, {"base_url", "model"}),
+    ),
+)
+def test_partial_body_is_a_400_naming_every_missing_field(client_csrf, label, body, expected_fields):
+    client, token = client_csrf
+    user = _mk_user(f"h44.partial.{label}@example.com")
+    _configured(user)
+    client.force_login(user)
+
+    response = _put(client, token, "/api/v1/assistant/config", body)
+
+    assert response.status_code == 400, (label, response.status_code, response.content[:200])
+    error = response.json()["error"]
+    assert error["code"] == "validation_error"
+    assert expected_fields <= set(error["fields"]), (label, error["fields"])
+    # A refused write never half-applies.
+    config = AssistantConfig.objects.get(user=user)
+    assert (config.base_url, config.model) == ("https://api.example.com/v1", "test-model")
+
+
+@pytest.mark.django_db
+def test_unknown_mode_and_protected_field_are_400s(client_csrf):
+    client, token = client_csrf
+    user = _mk_user("h44.mode@example.com")
+    _configured(user)
+    client.force_login(user)
+
+    bad_mode = _put(client, token, "/api/v1/assistant/config", {"mode": "carrier-pigeon", "model": "x"})
+    assert bad_mode.status_code == 400
+    assert "mode" in bad_mode.json()["error"]["fields"]
+
+    protected = _put(client, token, "/api/v1/assistant/config", {"model": "x", "is_active": True})
+    assert protected.status_code == 400
+    assert "is_active" in protected.json()["error"]["fields"]
+
+
+@pytest.mark.django_db
+def test_subscription_body_with_nothing_linked_is_a_400(client_csrf):
+    """mode=subscription with neither a provider to link nor a linked row has
+    no credential to keep and no model to change: it is refused, not silently
+    applied to the api row (the old build answered 200 and just set the model)."""
+    client, token = client_csrf
+    user = _mk_user("h44.sub.nothing@example.com")
+    _configured(user)
+    client.force_login(user)
+
+    response = _put(
+        client, token, "/api/v1/assistant/config",
+        {"mode": "subscription", "model": "glm-5.3-flash"},
+    )
+
+    assert response.status_code == 400
+    assert "subscription_provider" in response.json()["error"]["fields"]
+    assert AssistantConfig.objects.get(user=user).model == "test-model"
+
+
+@pytest.mark.django_db
+def test_model_only_body_for_a_linked_subscription_is_a_400_not_a_500(client_csrf):
+    """The owner's exact reproduction, against a subscription-linked row."""
+    client, token = client_csrf
+    user = _mk_user("h44.sub.modelonly@example.com")
+    AssistantConfig.objects.create(
+        company=default_company(),
+        user=user,
+        model="glm-5.3-flash",
+        subscription_provider="opencode",
+        subscription_cred_type="key",
+        subscription_source="device",
+        subscription_hint="••••88",
+        subscription_ciphertext=encrypt_key(json.dumps({"key": "k-device", "type": "key"})),
+        is_active=True,
+    )
+    client.force_login(user)
+
+    response = _put(client, token, "/api/v1/assistant/config", {"model": "deepseek-v4.1-flash"})
+
+    assert response.status_code == 400
+    assert response["Content-Type"].startswith("application/json")  # never the HTML 500 page
+    assert response.json()["error"]["code"] == "validation_error"
+    assert "base_url" in response.json()["error"]["fields"]
+    config = AssistantConfig.objects.get(user=user)
+    assert config.model == "glm-5.3-flash"  # nothing moved
+
+
+@pytest.mark.django_db
+def test_subscription_model_resave_leaves_the_credential_untouched(client_csrf):
+    """The client's model-change body (mode + model, NO provider) is the one
+    the view honours without re-importing: the stored credential's bytes, its
+    source and its provider all stay exactly as they were."""
+    client, token = client_csrf
+    user = _mk_user("h44.sub.resave@example.com")
+    AssistantConfig.objects.create(
+        company=default_company(),
+        user=user,
+        model="glm-5.3-flash",
+        subscription_provider="opencode",
+        subscription_cred_type="key",
+        subscription_source="device",
+        subscription_hint="••••88",
+        subscription_ciphertext=encrypt_key(json.dumps({"key": "k-device", "type": "key"})),
+        is_active=True,
+    )
+    client.force_login(user)
+    before = bytes(AssistantConfig.objects.get(user=user).subscription_ciphertext)
+
+    with mock.patch("accounts.assistant_views.import_local") as import_local:
+        response = _put(
+            client, token, "/api/v1/assistant/config",
+            {"mode": "subscription", "model": "deepseek-v4.1-flash"},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["model"] == "deepseek-v4.1-flash"
+    import_local.assert_not_called()  # a model-only change must not re-import
+    config = AssistantConfig.objects.get(user=user)
+    assert bytes(config.subscription_ciphertext) == before
+    assert config.subscription_source == "device"
+    assert config.subscription_provider == "opencode"
+    assert config.subscription_hint == "••••88"
+
+
+@pytest.mark.django_db
+def test_subscription_link_without_a_local_login_is_the_import_envelope(client_csrf):
+    """The provider's own import failure (no local CLI login) reaches the
+    caller as the envelope /assistant/subscription/import publishes — the
+    uncaught SubscriptionError was an HTML 500 page."""
+    from accounts.assistant_subscriptions import SubscriptionError
+
+    client, token = client_csrf
+    user = _mk_user("h44.sub.nologin@example.com")
+    client.force_login(user)
+
+    with mock.patch(
+        "accounts.assistant_views.import_local",
+        side_effect=SubscriptionError("no_local_login", "No local CLI login found."),
+    ):
+        response = _put(
+            client, token, "/api/v1/assistant/config",
+            {"mode": "subscription", "subscription_provider": "opencode"},
+        )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "no_local_login"
+
+
+@pytest.mark.django_db
+def test_hr_put_accepts_the_shared_subscription_model_body(client_csrf):
+    """The employee widget and the HR employee-file panel share ONE client
+    body, so the HR serializer applies the same rule: a provider is required
+    to link, not to change the model."""
+    client, token = client_csrf
+    hr = _mk_user("h44.hr@example.com", role=User.Role.HR)
+    employee = _mk_user("h44.hr.emp@example.com")
+    EmployeeProfile.objects.create(company=default_company(), user=employee, employee_number="E-H44")
+    AssistantConfig.objects.create(
+        company=default_company(),
+        user=employee,
+        model="glm-5.3-flash",
+        subscription_provider="opencode",
+        subscription_cred_type="key",
+        subscription_source="device",
+        subscription_hint="••••88",
+        subscription_ciphertext=encrypt_key(json.dumps({"key": "k-device", "type": "key"})),
+        is_active=True,
+    )
+    client.force_login(hr)
+
+    response = _put(
+        client, token, f"/api/v1/employees/{employee.pk}/assistant",
+        {"mode": "subscription", "model": "deepseek-v4.1-flash"},
+    )
+
+    assert response.status_code == 200, response.content[:200]
+    assert AssistantConfig.objects.get(user=employee).model == "deepseek-v4.1-flash"
+    # …and linking still demands a provider.
+    linking = _put(client, token, f"/api/v1/employees/{employee.pk}/assistant", {"mode": "subscription"})
+    assert linking.status_code == 422
+    assert "subscription_provider" in linking.json()["error"]["fields"]
+

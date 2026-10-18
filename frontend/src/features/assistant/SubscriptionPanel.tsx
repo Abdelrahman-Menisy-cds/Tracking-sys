@@ -191,18 +191,21 @@ export default function SubscriptionPanel({ config, provider, applyWrite, onChan
     setSavingModel(true);
     setProblem(null);
     try {
-      // The provider's own model id travels to the server, which is the only
-      // writer of the row. The subscription write shape re-links the SAME
-      // provider - and the server never echoes a token back, so the read
-      // shape that returns is safe to render.
-      const next = await applyWrite({ mode: "subscription", subscription_provider: provider, model: pickedModel });
+      // ONLY the model changes here. Sending subscription_provider would make
+      // the server re-import this machine's local CLI login — overwriting the
+      // credential the row already holds (a device-flow link would silently
+      // become a "local" one). The view's own rule is that a re-save that
+      // changes only the model "must not re-import or touch the credential",
+      // so the subscription shape is mode + model alone: the provider is
+      // already linked (this button only renders on the linked face).
+      const next = await applyWrite({ mode: "subscription", model: pickedModel });
       onChanged(next);
     } catch (failure) {
       setProblem(failureText(failure, t("errorNetwork"), t("signIn")));
     } finally {
       setSavingModel(false);
     }
-  }, [applyWrite, pickedModel, provider, t, onChanged]);
+  }, [applyWrite, pickedModel, t, onChanged]);
 
   const stateLabel = state === "linked" ? t("assistantSubStateLinked") : t("assistantSubStateUnlinked");
   // The device login exists ONLY where the provider genuinely offers one -

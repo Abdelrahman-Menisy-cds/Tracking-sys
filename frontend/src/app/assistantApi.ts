@@ -80,9 +80,14 @@ export interface AssistantSaveInput {
  * picker sends mode="subscription" + the provider, and the server clears the
  * api-key fields itself. Switching to api mode sends the api subset, which
  * unlinks the subscription on the server.
+ *
+ * The provider is REQUIRED only when linking. Changing the model of an
+ * already-linked subscription sends mode + model with NO provider, which is
+ * the one body the server honours without re-importing (or otherwise
+ * touching) the stored credential.
  */
 export type AssistantModeSaveInput =
-  | ({ mode: "subscription"; subscription_provider: SubscriptionProvider } & Partial<AssistantSaveInput>)
+  | ({ mode: "subscription"; subscription_provider?: SubscriptionProvider } & Partial<AssistantSaveInput>)
   | ({ mode: "api" } & AssistantSaveInput);
 
 /**

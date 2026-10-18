@@ -112,11 +112,15 @@ class AssistantConfigHRWriteSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         mode = attrs.get("mode")
-        if mode == "subscription" and attrs.get("subscription_provider") is None:
-            raise serializers.ValidationError(
-                {"subscription_provider": ["Pick a provider (opencode or codex)."]}
-            )
-        if mode != "subscription" and attrs.get("subscription_provider") is not None:
+        if mode == "subscription":
+            # Linking requires a provider; CHANGING ONLY THE MODEL keeps the
+            # linked credential untouched — the same rule the self-serve
+            # serializer applies, so one client body serves both endpoints.
+            if attrs.get("subscription_provider") is None and not attrs.get("model"):
+                raise serializers.ValidationError(
+                    {"subscription_provider": ["Pick a provider (opencode or codex)."]}
+                )
+        elif attrs.get("subscription_provider") is not None:
             raise serializers.ValidationError(
                 {"subscription_provider": ["Only sent with mode=subscription."]}
             )

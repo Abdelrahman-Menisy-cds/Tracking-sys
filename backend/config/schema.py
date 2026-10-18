@@ -418,13 +418,20 @@ _ASSISTANT_CONFIG_ITEM = {
 _ASSISTANT_CONFIG_WRITE = {
     "title": "AssistantConfigWrite",
     "type": "object",
+    "description": (
+        "api mode (mode absent, or \"api\"): base_url AND model are required. "
+        "subscription mode: subscription_provider links that provider's local CLI login; "
+        "model alone re-saves the model of an ALREADY-linked subscription and neither "
+        "re-imports nor touches its credential. Any body the endpoint cannot honour is a "
+        "400 whose `fields` names the input it needs."
+    ),
     "properties": {
         "base_url": {"type": "string", "format": "uri"},
         "model": {"type": "string"},
         # write-only in practice: documented but never returned.
         "api_key": {"type": "string", "description": "Stored encrypted at rest; never returned."},
-        "mode": {"type": "string", "enum": ["api", "subscription"], "description": "api (default): base_url/model required. subscription: links the picked provider from this machine's local CLI login."},
-        "subscription_provider": {"nullable": True, "type": "string", "enum": ["opencode", "codex", None], "description": "With mode=subscription only. No other presets exist (owner's rule)."},
+        "mode": {"type": "string", "enum": ["api", "subscription"], "description": "api (default): base_url/model required. subscription: links the picked provider from this machine's local CLI login, or re-saves the model of one already linked."},
+        "subscription_provider": {"nullable": True, "type": "string", "enum": ["opencode", "codex", None], "description": "With mode=subscription only, and only when LINKING. No other presets exist (owner's rule)."},
     },
     "required": ["base_url", "model"],
 }
@@ -558,9 +565,9 @@ class AssistantConfigSchema(_ViewSchema):
             **_json_response("200", "The caller's own assistant config; the key (and any subscription token) is never returned.", _data_envelope(_ASSISTANT_CONFIG_ITEM)),
         },
         "put": {
-            **_json_response("200", "Config saved (the read shape is returned). With mode=subscription the picked provider is linked from this machine's local CLI login; one credential per row, so the previous subscription/api key is cleared.", _data_envelope(_ASSISTANT_CONFIG_ITEM)),
+            **_json_response("200", "Config saved (the read shape is returned). With mode=subscription the picked provider is linked from this machine's local CLI login; with model alone only the model of the ALREADY-linked subscription moves (the credential is neither re-imported nor touched). One credential per row, so the previous subscription/api key is cleared.", _data_envelope(_ASSISTANT_CONFIG_ITEM)),
+            **_error_response("400", "validation_error: the body cannot be honoured as sent — a missing base_url/model, an unknown mode, a protected field, or a subscription write with nothing linked (`fields` names the input it needs)."),
             **_error_response("409", "no_local_login: no local CLI login exists for the picked provider on this machine."),
-            **_error_response("422", "Validation failed (bad base_url/model, an unknown provider, or a protected field)."),
         },
     }
 
