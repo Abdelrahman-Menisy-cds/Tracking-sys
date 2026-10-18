@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
 import { useServerData } from "../app/useServerData";
 import { formatDateTime, formatMinutes, weekInterval } from "../app/format";
-import { listReviewRequests, getReviewRequest, decideRequest, listReviewAdvice } from "../app/requestsApi";
+import { listReviewRequests, getReviewRequest, decideRequest, listReviewAdvice, getReviewRequestAdvice } from "../app/requestsApi";
 import { listReviewTimesheets, getReviewTimesheet, decideTimesheet } from "../app/timesheetsApi";
 import type { AdviceSupport, AdviceVerdict, DecisionAction, ServerMyRequest, ServerMyTimesheet, ServerReviewAdvice, ServerReviewRequestRow, ServerReviewTimesheetRow, RequestStatusType, TimesheetStatusType } from "../app/serverTypes";
 import { ApiError } from "../app/api";
@@ -455,18 +455,46 @@ export function ReviewRequestDetailPage() {
       return null;
     }
   }, [id, locale]);
+  /* The single-row advice: the rule verdict + the assistant's prose for THIS
+     record. The table batches; the record the reviewer opens asks once. */
+  const adviceState = useServerData(async () => {
+    try {
+      return await getReviewRequestAdvice(id ?? "", locale);
+    } catch {
+      return null;
+    }
+  }, [id, locale]);
   usePageTitle(t("details"));
   if (state.phase === "loading") return <div className="page"><PageHeader title={t("details")} /><SkeletonRows rows={3} /></div>;
   if (state.phase === "error") return <div className="page"><PageHeader title={t("details")} /><ErrorState onRetry={state.retry} /></div>;
   const request = state.phase === "ready" ? state.data : null;
   if (!request) return <SafeReviewUnavailable backToReviews />;
+  const advice = adviceState.phase === "ready" ? adviceState.data : null;
   return (
     <div className="page reading-page">
       <PageHeader title={<bdi>{request.title}</bdi>} subtitle={`${t("employee")}: ${request.requester_name}`} breadcrumb={<Link to="/reviews">{t("teamReviewsTitle")}</Link>} />
       <div className="status-action-block"><RequestStatusPill status={request.status} /><p>{requestNextStage(request, locale)}</p></div>
-      {/* The review detail carries no picked period - the server serializes
-          only type/title/details, so that block renders its honest empty state. */}
-      <section className="work-surface section" aria-labelledby="review-period"><h2 id="review-period">{t("requestPeriod")}</h2><EmptyState message={locale === "ar" ? "الخادم لا يعرض الفترة المختارة على هذا المسار بعد." : "The server does not expose the picked period on this endpoint yet."} /></section>
+      {/* «رأي المساعد»: the rule verdict is always shown; the Arabic prose is
+          the assistant's and its absence is stated, never filled in. */}
+      <section className="work-surface section" aria-labelledby="review-advice">
+        <h2 id="review-advice">{t("reviewAdviceHeading")}</h2>
+        {adviceState.phase === "loading" ? <p className="muted">{t("reviewAdviceLoading")}</p> : null}
+        {adviceState.phase === "error" ? <p className="muted">{t("reviewAdviceUnavailable")}</p> : null}
+        {advice ? (
+          <>
+            <p><StatusPill tone={ADVICE_TONE[advice.verdict]} label={advice.verdict_label[locale] ?? advice.verdict_label.ar} icon={ADVICE_ICON[advice.verdict]} /></p>
+            {advice.explanation.available && advice.explanation.text_ar
+              ? <p className="preserve-lines"><bdi>{advice.explanation.text_ar}</bdi></p>
+              : <p className="muted">{t("reviewAdviceExplanationMissing")}</p>}
+            <ul className="attachment-list">
+              {advice.facts.map((fact) => (
+                <li className="attachment-row" key={fact.rule}><bdi>{locale === "ar" ? fact.reason_ar : fact.reason_en}</bdi></li>
+              ))}
+            </ul>
+            <p className="muted">{t("reviewAdviceNotAdvisory")}</p>
+          </>
+        ) : null}
+      </section>
       <section className="work-surface section" aria-labelledby="review-details"><h2 id="review-details">{t("requestReason")}</h2><p className="preserve-lines"><bdi>{request.details}</bdi></p></section>
       <section className="work-surface section" aria-labelledby="review-attachments"><h2 id="review-attachments">{t("attachments")}</h2>
         {request.attachments.length
