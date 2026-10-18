@@ -18,12 +18,14 @@
             document.documentElement.lang = locale;
             document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
           }
+          // Light on a first visit: with nothing stored the OS theme used to
+          // decide, which handed a new visitor a dark app they never chose.
           const resolved = appearance === "light" || appearance === "dark"
             ? appearance
-            : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+            : "light";
           document.documentElement.dataset.theme = resolved;
         } catch {
-          document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          document.documentElement.dataset.theme = "light";
         }
       })();
     </script>

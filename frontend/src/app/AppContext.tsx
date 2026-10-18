@@ -27,12 +27,15 @@ function readStoredLocale(): Locale {
 }
 
 function readStoredAppearance(): Appearance {
-  if (typeof window === "undefined") return "system";
+  // A first visit opens in light. Following the OS here meant a dark desktop
+  // handed a brand-new visitor a dark app before they had chosen anything; the
+  // stored value still wins, so anyone who picked a theme (or "system") keeps it.
+  if (typeof window === "undefined") return "light";
   try {
     const value = window.localStorage.getItem(APPEARANCE_STORAGE_KEY);
-    return value === "system" || value === "light" || value === "dark" ? value : "system";
+    return value === "system" || value === "light" || value === "dark" ? value : "light";
   } catch {
-    return "system";
+    return "light";
   }
 }
 
