@@ -76,12 +76,19 @@ export default function TeamReviewsPage() {
   const [deciding, setDeciding] = useState<ServerReviewRequestRow | ServerReviewTimesheetRow | null>(null);
   const [queueResult, setQueueResult] = useState<null | { subject: string; status: string; stage: string; version: number }>(null);
   const queueHeadingRef = useRef<HTMLHeadingElement>(null);
+  /* No status filter: the server scopes the queue to the caller, and the rows
+     carry can_decide. Hard-coding PENDING_MANAGER left HR — whose work is the
+     PENDING_HR stage — staring at an empty queue while 19 rows waited. The
+     filter below keeps exactly what this caller may act on. */
   const requestState = useServerData(
-    () => listReviewRequests(locale, { status: "PENDING_MANAGER" }).then((payload) => payload.data),
+    () => listReviewRequests(locale).then((payload) => payload.data),
     [locale, tab === "requests" ? queueRefresh : null],
   );
+  /* Same rule as the requests queue: let the server scope it, then keep what
+     this caller may decide. Pinning SUBMITTED hid every row from a caller whose
+     stage is the one after it. */
   const timesheetState = useServerData(
-    () => listReviewTimesheets(locale, { status: "SUBMITTED" }).then((payload) => payload.data),
+    () => listReviewTimesheets(locale).then((payload) => payload.data),
     [locale, tab === "timesheets" ? queueRefresh : null],
   );
   usePageTitle(t("teamReviewsTitle"));
