@@ -62,6 +62,9 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/" element={<HomePage />} />
             <Route path="/requests" element={<MyRequestsPage />} />
             <Route path="/requests/new" element={<NewRequestPage />} />
+            {/* The correction of a RETURNED (or DRAFT) request edits THAT record
+                through the server's own edit+submit path — never /requests/new. */}
+            <Route path="/requests/:id/correct" element={<NewRequestPage />} />
             <Route path="/requests/:id" element={<RequestDetailPage />} />
             <Route path="/timesheets" element={<MyTimesheetsPage />} />
             <Route path="/timesheets/:id" element={<TimesheetDetailPage />} />

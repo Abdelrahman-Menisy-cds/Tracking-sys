@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useApp, usePageTitle } from "../app/AppContext";
 import { useServerData } from "../app/useServerData";
 import { formatDateTime } from "../app/format";
 import { ApiError } from "../app/api";
 import {
   createRequestDraft,
+  getMyRequest,
   listMyRequestAttachments,
   listMyRequests,
   listRequestTypes,
@@ -15,6 +16,7 @@ import {
   type ServerAttachmentRow,
 } from "../app/requestsApi";
 import type { RequestStatusType, ServerMyRequest, ServerRequestType } from "../app/serverTypes";
+import { isQuarantined, scanStatusLabel } from "../app/scanStatus";
 import { Banner, EmptyState, ErrorState, RequestStatusPill, SkeletonRows } from "../components/ui";
 import OperationalTable, { type OperationalColumn } from "../components/data/OperationalTable";
 import PageHeader from "../components/layout/PageHeader";
@@ -99,17 +101,41 @@ function buildRequestTitle(typeName: string, fromDate: string, toDate: string, l
   return `${typeName} - ${fromDate} ${locale === "ar" ? "إلى" : "to"} ${toDate}`;
 }
 
-function scanLabel(scanStatus: string, locale: "ar" | "en"): string {
-  // The server emits the model's uppercase choices (PENDING/CLEAN/FAILED/REJECTED).
-  if (scanStatus === "CLEAN") return locale === "ar" ? "فحص سليم" : "Scan clean";
-  if (scanStatus === "PENDING") return locale === "ar" ? "بانتظار الفحص" : "Awaiting scan";
-  return locale === "ar" ? "محجوز؛ الملف غير متاح" : "Quarantined; file unavailable";
+/**
+ * The period this form wrote into the title, read back for a correction.
+ *
+ * The create form stores the period as ISO dates inside the title (the same
+ * free-text convention the server's own reader, review.advice.parse_request_period,
+ * uses). A returned request carries that title, so the correction form reads
+ * its period back from it. A title that names no ISO date (an older or
+ * hand-written title) yields an empty period — the correction then keeps the
+ * existing title verbatim rather than inventing one.
+ */
+function parseRequestPeriod(title: string, typeName: string): { from: string; to: string } {
+  const prefix = `${typeName} - `;
+  const body = title.startsWith(prefix) ? title.slice(prefix.length) : title;
+  const dates = body.match(/\d{4}-\d{2}-\d{2}/g) ?? [];
+  const from = dates[0];
+  if (from === undefined) return { from: "", to: "" };
+  return { from, to: dates.length > 1 ? dates[dates.length - 1] ?? "" : "" };
 }
+
+/** The load state of a correction: the returned request being edited. */
+type CorrectionState =
+  | { phase: "idle" }
+  | { phase: "loading" }
+  | { phase: "ready" }
+  | { phase: "error"; message: string | null };
 
 export function NewRequestPage() {
   const { t, locale } = useApp();
   const navigate = useNavigate();
-  usePageTitle(t("newRequest"));
+  // Mounted at /requests/new (create) and /requests/:id/correct (correction).
+  // The presence of an :id is what makes this the correction of THAT record
+  // instead of a brand-new draft.
+  const { id: correctionId } = useParams<{ id?: string }>();
+  const correcting = Boolean(correctionId);
+  usePageTitle(correcting ? t("requestCorrectTitle") : t("newRequest"));
 
   const [types, setTypes] = useState<TypesState>({ phase: "loading" });
   const [typesAttempt, setTypesAttempt] = useState(0);
@@ -123,6 +149,38 @@ export function NewRequestPage() {
   const [failure, setFailure] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: "draft" | "submitted"; status: RequestStatusType; id: string } | null>(null);
   const [errors, setErrors] = useState<{ type?: string; from?: string; to?: string }>({});
+  const [correction, setCorrection] = useState<CorrectionState>({ phase: correcting ? "loading" : "idle" });
+
+  // Correction: load the returned (or draft) request and its attachments, then
+  // seed the form from the record itself. This is the server's own edit path
+  // (PATCH /requests/{id} then POST /requests/{id}/submit) — never a new draft.
+  useEffect(() => {
+    if (!correctionId) return;
+    let cancelled = false;
+    setCorrection({ phase: "loading" });
+    Promise.all([getMyRequest(correctionId, locale), listMyRequestAttachments(correctionId, locale)])
+      .then(([request, rows]) => {
+        if (cancelled) return;
+        // Only a draft or a returned request is editable server-side; anything
+        // else is a read-only record, and the form must say so, not fake an edit.
+        if (request.status !== "DRAFT" && request.status !== "RETURNED") {
+          setCorrection({ phase: "error", message: t("requestCorrectionNotEditable") });
+          return;
+        }
+        setDraft(request);
+        setTypeId(request.request_type.id);
+        setReason(request.details);
+        const period = parseRequestPeriod(request.title, request.request_type.name);
+        setFromDate(period.from);
+        setToDate(period.to);
+        setAttachments(rows);
+        setCorrection({ phase: "ready" });
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) setCorrection({ phase: "error", message: error instanceof ApiError ? error.message : null });
+      });
+    return () => { cancelled = true; };
+  }, [correctionId, locale, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,7 +196,7 @@ export function NewRequestPage() {
   // A quarantined (not yet CLEAN) attachment blocks the submit server-side, so
   // the page re-reads the list while a scan is outstanding instead of leaving a
   // stale "awaiting scan" that the operator cannot clear.
-  const scanPending = attachments.some((attachment) => attachment.scan_status !== "CLEAN");
+  const scanPending = attachments.some((attachment) => isQuarantined(attachment.scan_status));
   useEffect(() => {
     if (!draft || !scanPending) return;
     const timer = window.setInterval(() => {
@@ -148,15 +206,21 @@ export function NewRequestPage() {
   }, [draft, scanPending, locale]);
 
   const selectedType = types.phase === "ready" ? types.rows.find((row) => row.id === typeId) ?? null : null;
-  const title = selectedType ? buildRequestTitle(selectedType.name, fromDate, toDate, locale) : "";
+  const composedTitle = selectedType ? buildRequestTitle(selectedType.name, fromDate, toDate, locale) : "";
+  // A correction keeps the record's own title when the period is left as-is:
+  // the server's edit path takes {title, details} and the request already has
+  // a title, so only a restated period recomposes it.
+  const title = composedTitle || (correcting && draft ? draft.title : "");
   const submitted = notice?.kind === "submitted";
   const editable = !submitted && (draft === null || draft.status === "DRAFT" || draft.status === "RETURNED");
 
   const validate = () => {
     const next: { type?: string; from?: string; to?: string } = {};
     if (typeId === null) next.type = t("requestTypeRequired");
-    if (!fromDate) next.from = t("requestPeriodFromRequired");
-    else if (toDate && toDate < fromDate) next.to = t("requestPeriodReversed");
+    // A correction may keep the existing title, so the period is required only
+    // when creating — or, when one is entered, it must be in order.
+    if (!correcting && !fromDate) next.from = t("requestPeriodFromRequired");
+    else if (fromDate && toDate && toDate < fromDate) next.to = t("requestPeriodReversed");
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -252,18 +316,32 @@ export function NewRequestPage() {
     </label>
   );
 
+  // A correction shows the record's own load state; the form renders only once
+  // the returned request is in hand.
+  if (correcting && correction.phase !== "ready") {
+    return (
+      <div className="page reading-page new-request-page">
+        <PageHeader title={t("requestCorrectTitle")} breadcrumb={<Link to="/requests">{t("myRequestsTitle")}</Link>} />
+        {correction.phase === "error"
+          ? <><Banner tone="error" role="alert">{correction.message ?? t("requestRetryFailure")}</Banner><p><Link to={`/requests/${correctionId}`}>{t("requestViewRecord")}</Link></p></>
+          : <SkeletonRows rows={3} />}
+      </div>
+    );
+  }
+
   return (
     <div className="page reading-page new-request-page">
       <PageHeader
-        title={t("newRequest")}
-        subtitle={t("newRequestSubtitle")}
-        breadcrumb={<Link to="/requests">{t("myRequestsTitle")}</Link>}
+        title={correcting ? t("requestCorrectTitle") : t("newRequest")}
+        subtitle={correcting ? t("requestCorrectSubtitle") : t("newRequestSubtitle")}
+        breadcrumb={correcting ? <Link to={`/requests/${correctionId}`}>{t("requestViewRecord")}</Link> : <Link to="/requests">{t("myRequestsTitle")}</Link>}
         primaryAction={<span className="page-meta new-request-steps" aria-hidden="true">{t("newRequestSteps")}</span>}
       />
+      {correcting && <Banner tone="info" role="status">{t("requestCorrectBanner")}</Banner>}
       {failure && <Banner tone="error" role="alert">{failure}</Banner>}
       {notice && (
         <Banner tone={submitted ? "success" : "info"} role="status">
-          {submitted ? t("requestSubmitted") : t("draftSaved")}{" "}
+          {submitted ? t("requestSubmitted") : correcting ? t("requestCorrectionsSaved") : t("draftSaved")}{" "}
           <RequestStatusPill status={notice.status} />{" "}
           <Link to={`/requests/${notice.id}`}>{t("requestViewRecord")}</Link>
         </Banner>
@@ -296,7 +374,7 @@ export function NewRequestPage() {
                   </button>
                 ))}
               </div>)}
-          {draft !== null && !submitted && <span className="field-hint">{t("requestTypeLockedAfterDraft")}</span>}
+          {draft !== null && !submitted && <span className="field-hint">{correcting ? t("requestTypeLockedOnCorrect") : t("requestTypeLockedAfterDraft")}</span>}
           {errors.type && <span className="field-error" role="alert">{errors.type}</span>}
         </fieldset>
 
@@ -345,7 +423,7 @@ export function NewRequestPage() {
                 : <ul className="attachment-list">{attachments.map((attachment) => (
                     <li className="attachment-row" key={attachment.id}>
                       <bdi dir="ltr">{attachment.original_filename}</bdi>
-                      <span className="muted">{attachment.content_type} · {Math.round(attachment.size_bytes / 1024)} KB · {scanLabel(attachment.scan_status, locale)}</span>
+                      <span className="muted">{attachment.content_type} · {Math.round(attachment.size_bytes / 1024)} KB · {scanStatusLabel(attachment.scan_status, locale)}</span>
                     </li>
                   ))}</ul>}
               {scanPending && <span className="field-hint" role="status">{t("requestAttachmentScanPending")}</span>}
@@ -375,10 +453,10 @@ export function NewRequestPage() {
             title={scanPending ? t("requestSubmitHeldByScan") : undefined}
             onClick={onSubmit}
           >
-            {busy === "submit" ? <><span className="spinner" aria-hidden="true" />{t("saving")}</> : t("submitRequest")}
+            {busy === "submit" ? <><span className="spinner" aria-hidden="true" />{t("saving")}</> : correcting ? t("requestResubmit") : t("submitRequest")}
           </button>
           <button className="btn btn-secondary" type="button" disabled={busy !== null || !editable} onClick={onSaveDraft}>
-            {busy === "save" ? <><span className="spinner" aria-hidden="true" />{t("saving")}</> : t("saveDraft")}
+            {busy === "save" ? <><span className="spinner" aria-hidden="true" />{t("saving")}</> : correcting ? t("requestSaveCorrections") : t("saveDraft")}
           </button>
           <button className="btn btn-ghost" type="button" onClick={() => navigate("/requests")}>{t("back")}</button>
         </div>

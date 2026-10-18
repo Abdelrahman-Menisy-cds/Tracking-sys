@@ -4,6 +4,7 @@ import { useApp, usePageTitle } from "../app/AppContext";
 import { useServerData } from "../app/useServerData";
 import { formatDateTime, formatMinutes, weekInterval } from "../app/format";
 import { listReviewRequests, getReviewRequest, decideRequest, listReviewAdvice, getReviewRequestAdvice } from "../app/requestsApi";
+import { scanStatusLabel } from "../app/scanStatus";
 import { listReviewTimesheets, getReviewTimesheet, decideTimesheet } from "../app/timesheetsApi";
 import type { AdviceSupport, AdviceVerdict, DecisionAction, ServerMyRequest, ServerMyTimesheet, ServerReviewAdvice, ServerReviewRequestRow, ServerReviewTimesheetRow, RequestStatusType, TimesheetStatusType } from "../app/serverTypes";
 import { ApiError } from "../app/api";
@@ -498,7 +499,7 @@ export function ReviewRequestDetailPage() {
       <section className="work-surface section" aria-labelledby="review-details"><h2 id="review-details">{t("requestReason")}</h2><p className="preserve-lines"><bdi>{request.details}</bdi></p></section>
       <section className="work-surface section" aria-labelledby="review-attachments"><h2 id="review-attachments">{t("attachments")}</h2>
         {request.attachments.length
-          ? <ul className="attachment-list">{request.attachments.map((attachment) => <li className="attachment-row" key={attachment.id}><bdi dir="ltr">{attachment.original_filename}</bdi><span className="muted">{attachment.declared_content_type} · {Math.round(attachment.size_bytes / 1024)} KB · {attachment.scan_status === "clean" ? (locale === "ar" ? "فحص سليم" : "Scan clean") : attachment.scan_status === "pending" ? (locale === "ar" ? "بانتظار الفحص" : "Awaiting scan") : (locale === "ar" ? "محجوز؛ الملف غير متاح" : "Quarantined; file unavailable")}</span></li>)}</ul>
+          ? <ul className="attachment-list">{request.attachments.map((attachment) => <li className="attachment-row" key={attachment.id}><bdi dir="ltr">{attachment.original_filename}</bdi><span className="muted">{attachment.declared_content_type} · {Math.round(attachment.size_bytes / 1024)} KB · {scanStatusLabel(attachment.scan_status, locale)}</span></li>)}</ul>
           : <EmptyState message={t("noAttachments")} />}
       </section>
       <section className="work-surface section" aria-labelledby="review-history"><h2 id="review-history">{t("history")}</h2><Timeline events={request.events} /></section>

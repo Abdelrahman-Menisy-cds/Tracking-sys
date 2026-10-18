@@ -128,6 +128,36 @@ class SubmitHappyPathTests(SubmissionTestBase):
         event = RequestEvent.objects.get(request=request_obj, action=RequestEvent.Action.SUBMITTED)
         self.assertEqual(event.from_status, EmployeeRequest.Status.RETURNED)
 
+    def test_returned_correction_edits_then_resubmits_the_same_request(self):
+        """The UI correction flow: PATCH the returned record, then submit it.
+
+        The «متابعة التصحيح» link used to open /requests/new, which created a
+        second draft and left the original RETURNED forever. The server's own
+        path is edit-then-resubmit on the SAME row; this pins it end to end and
+        asserts no second request is ever created.
+        """
+        request_obj = EmployeeRequest.objects.create(
+            requester=self.user,
+            request_type=self.type_manager,
+            title="Equipment - 2026-04-01",
+            status=EmployeeRequest.Status.RETURNED,
+        )
+        before = EmployeeRequest.objects.count()
+        detail_url = reverse("reqs:request-detail", kwargs={"pk": request_obj.pk})
+        patched = self.client.patch(
+            detail_url, {"title": "Equipment - 2026-04-02", "details": "Corrected"}
+        )
+        self.assertEqual(patched.status_code, status.HTTP_200_OK, patched.json())
+        # PATCH bumps the version; the resubmit must carry the fresh one.
+        new_version = patched.json()["data"]["version"]
+        response = self.submit(req=request_obj, version=new_version, key="k-correct")
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.json())
+        request_obj.refresh_from_db()
+        self.assertEqual(request_obj.status, EmployeeRequest.Status.PENDING_MANAGER)
+        self.assertEqual(request_obj.details, "Corrected")
+        # Exactly the same rows: a correction never spawns a second request.
+        self.assertEqual(EmployeeRequest.objects.count(), before)
+
     def test_clean_attachments_allow_submission(self):
         self._add_attachment(self.draft, RequestAttachment.ScanStatus.CLEAN)
         response = self.submit(version=1, key="k-clean")

@@ -40,13 +40,16 @@ export interface ServerRecordEvent {
   created_at: string;
 }
 
+/** RequestAttachment.ScanStatus - reqs/models.py. UPPERCASE on the wire, exactly. */
+export type ScanStatus = "PENDING" | "CLEAN" | "FAILED" | "REJECTED";
+
 /** Attachment metadata as the endpoints emit it (both the employee and review paths). */
 export interface ServerAttachmentSummary {
   id: string;
   original_filename: string;
   declared_content_type: string;
   size_bytes: number;
-  scan_status: string;
+  scan_status: ScanStatus;
   created_at: string;
 }
 

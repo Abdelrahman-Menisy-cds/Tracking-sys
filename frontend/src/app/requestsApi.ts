@@ -9,6 +9,7 @@ import { apiRequest } from "./api";
 import type {
   DecisionAction,
   PagedPayload,
+  ScanStatus,
   ServerMyRequest,
   ServerRequestType,
   ServerReviewAdvice,
@@ -44,7 +45,7 @@ export interface ServerAttachmentRow {
   content_type: string;
   detected_content_type: string;
   size_bytes: number;
-  scan_status: string;
+  scan_status: ScanStatus;
   created_at: string;
   download_url: string;
 }
