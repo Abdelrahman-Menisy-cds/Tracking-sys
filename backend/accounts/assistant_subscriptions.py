@@ -646,7 +646,10 @@ def list_models(config) -> dict:
     listing_url = f"{spec.base_url.rstrip('/')}{spec.models_path}"
     if spec.models_query:
         listing_url = f"{listing_url}?{spec.models_query}"
-    request = urllib.request.Request(listing_url, headers=spec.headers(), method="GET")
+    # chat_headers, not headers(): the codex gateway answers 401 Unauthorized to
+    # a bearer alone — it also wants chatgpt-account-id, which lives in the
+    # credential blob. Without it a linked account could not list its own models.
+    request = urllib.request.Request(listing_url, headers=chat_headers(spec, blob), method="GET")
     try:
         answer = _http_json(request, timeout=15)
     except ProviderResponseError as error:

@@ -310,6 +310,7 @@ class _StubHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         _STATE["posted_paths"].append(self.path)
+        _STATE["last_get_headers"] = {k.lower(): v for k, v in self.headers.items()}
         # Match on the path alone: a listing may carry a required query
         # (codex's client_version), so endswith on the raw target misses it.
         if self.path.split("?", 1)[0].endswith("/models"):
@@ -807,7 +808,7 @@ def test_models_for_codex_listing_carries_the_required_client_version(stub_serve
         subscription_cred_type="oauth",
         subscription_source="local",
         subscription_hint="••••ZZ9",
-        subscription_ciphertext=encrypt_key(json.dumps({"access": ACCESS_TOKEN, "refresh": REFRESH_TOKEN})),
+        subscription_ciphertext=encrypt_key(json.dumps({"access": ACCESS_TOKEN, "refresh": REFRESH_TOKEN, "group_id": "acc-42"})),
         subscription_expires=timezone.now() + datetime.timedelta(hours=2),
         is_active=True,
     )
@@ -815,6 +816,9 @@ def test_models_for_codex_listing_carries_the_required_client_version(stub_serve
     response = client.get("/api/v1/assistant/subscription/models")
     assert response.status_code == 200
     data = response.json()["data"]
+    # A bearer alone is refused (401 Unauthorized): the gateway also wants the
+    # account id from the credential blob, which the chat headers carry.
+    assert _STATE["last_get_headers"].get("chatgpt-account-id") == "acc-42"
     # Codex's listing exists but demands client_version (measured live: without
     # it the endpoint answers 400 'Field required'). Its answer is the only
     # trustworthy list — the CLI's own strings carry slugs a ChatGPT account
