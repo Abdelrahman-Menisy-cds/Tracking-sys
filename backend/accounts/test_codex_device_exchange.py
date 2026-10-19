@@ -69,3 +69,44 @@ def test_the_exchange_posts_the_form_codex_expects(codex_calls):
     assert form["code_verifier"] == "cv-456"
     assert form["redirect_uri"].endswith("/deviceauth/callback")
     assert form["client_id"] == assistant_subscriptions.CODEX.device_client_id
+
+
+# ---------------------------------------------------------------------------
+# The listing falls back to the measured slugs when the gateway refuses
+# ---------------------------------------------------------------------------
+
+
+def test_listing_falls_back_when_the_gateway_refuses(monkeypatch, django_db_setup=None):
+    """Codex rejects a refreshed token on /models (missing_end_user_auth) while
+    the same token still serves /responses, so a working link would otherwise
+    lose its picker entirely. The fallback carries the slugs the account's own
+    listing returned — never a guess."""
+    import urllib.error
+
+    def refuse(request, timeout=None):
+        raise urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, None)
+
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    monkeypatch.setattr(
+        assistant_subscriptions, "ensure_fresh", lambda config: (assistant_subscriptions.CODEX, {"access": "tok"})
+    )
+    answer = assistant_subscriptions.list_models(object())
+    assert answer["supported"] is True
+    assert answer["models"] == list(assistant_subscriptions.CODEX.fallback_models)
+    assert "gpt-5.6-luna" in answer["models"]
+
+
+def test_a_provider_without_a_fallback_still_reports_the_refusal(monkeypatch):
+    """The fallback is not a blanket silence: a provider that has none keeps
+    answering with the provider's own error."""
+    import urllib.error
+
+    def refuse(request, timeout=None):
+        raise urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, None)
+
+    monkeypatch.setattr(urllib.request, "urlopen", refuse)
+    monkeypatch.setattr(
+        assistant_subscriptions, "ensure_fresh", lambda config: (assistant_subscriptions.OPENCODE, {"key": "k"})
+    )
+    with pytest.raises(assistant_subscriptions.SubscriptionError):
+        assistant_subscriptions.list_models(object())

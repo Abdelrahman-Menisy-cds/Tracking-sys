@@ -100,7 +100,7 @@ class ProviderSpec:
     def __init__(self, *, slug: str, base_url: str,
                  token_url: str, models_path: str, session_header: str = "",
                  models_supported: bool = True, default_model: str = "",
-                 models_query: str = "",
+                 models_query: str = "", fallback_models=None,
                  wire_api: str = "chat", account_id_field: str = "", extra_static_headers=None,
                  device_code_url: str = "", device_token_url: str = "",
                  device_client_id: str = ""):
@@ -116,6 +116,7 @@ class ProviderSpec:
         # memory — a typo there only surfaces as a failed connection later.
         # A required query on the listing call (codex demands client_version).
         self.models_query = models_query
+        self.fallback_models = tuple(fallback_models or ())
         self.default_model = default_model  # preselected; the user can change it
         # 'chat' = OpenAI chat-completions; 'responses' = the Codex
         # backend-api /responses SSE shape (its ONLY accepted wire api).
@@ -184,6 +185,23 @@ CODEX = ProviderSpec(
     # "The 'X' model is not supported when using Codex with a ChatGPT account".
     models_supported=True,
     models_query=_env("ASSISTANT_CODEX_MODELS_QUERY", "client_version=0.162.1"),
+    # MEASURED from this provider's own listing (an account's real answer), kept
+    # only as a fallback for when that call is refused. Codex's gateway rejects a
+    # refreshed token on /models with missing_end_user_auth while the same token
+    # still serves /responses, so without a fallback the picker vanishes for a
+    # perfectly working link. These are NOT guesses: a guessed slug is exactly
+    # what made every reply fail with "not supported ... with a ChatGPT account".
+    fallback_models=(
+        "gpt-5.6-luna",
+        "gpt-5.6-terra",
+        "gpt-5.6-sol",
+        "gpt-5-reserve",
+        "gpt-6-luna",
+        "gpt-6-sol",
+        "gpt-6-astra",
+        "gpt-6.1-sol",
+        "codex-auto-review",
+    ),
     default_model=_env("ASSISTANT_CODEX_MODEL", "gpt-5.6-luna"),
     wire_api="responses",
     account_id_field="chatgpt-account-id",
@@ -653,8 +671,12 @@ def list_models(config) -> dict:
     try:
         answer = _http_json(request, timeout=15)
     except ProviderResponseError as error:
+        if spec.fallback_models:
+            return {"supported": True, "models": list(spec.fallback_models), "detail": ""}
         raise SubscriptionError("provider_error", f"HTTP {error.status_code} listing models: {error.detail}") from None
     except ProviderUnreachableError as error:
+        if spec.fallback_models:
+            return {"supported": True, "models": list(spec.fallback_models), "detail": ""}
         raise SubscriptionError("provider_unreachable", f"{error.url}: {error.raw or 'the connection failed'}") from None
     listing = []
     # Providers disagree on the envelope: opencode answers {"data": [...]},
