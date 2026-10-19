@@ -73,6 +73,13 @@ COVERAGE_WARNING_THRESHOLD = 1
 #: bounded to this many ids in one call.
 MAX_BATCH = 50
 
+#: The assistant answers the whole batch as ONE JSON array, and a long array is
+#: where it stops being JSON: measured live, 7 rows parsed and 25 came back
+#: unusable, so every row reported «شرح المساعد غير متاح» while the assistant was
+#: working fine. The rows are asked for in chunks this size, so a long queue is
+#: explained as reliably as a short one.
+BATCH_CHUNK = 8
+
 _ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
 _DATE_RE = re.compile(r"(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})")
 
@@ -534,13 +541,19 @@ def batch_explanations(user, entries):
         )
     if not config.is_active:
         return {}, _explanation_absent("inactive", "The assistant is switched off for this account.")
-    try:
-        text = assistant_prose(user, config, ADVICE_SYSTEM_PROMPT, _batch_prompt(entries))
-    except ChatConfigError as error:
-        return {}, _explanation_absent(error.code, error.message)
-    except AssistantSecretError as error:
-        return {}, _explanation_absent("key_unreadable", str(error))
-    return _parse_batch_reply(text), _explanation_absent(
+    explanations: dict = {}
+    for start in range(0, len(entries), BATCH_CHUNK):
+        chunk = entries[start : start + BATCH_CHUNK]
+        try:
+            text = assistant_prose(user, config, ADVICE_SYSTEM_PROMPT, _batch_prompt(chunk))
+        except ChatConfigError as error:
+            # The credential is the same for every chunk: a failure here is not
+            # per-row, so it is reported once for the whole batch.
+            return explanations, _explanation_absent(error.code, error.message)
+        except AssistantSecretError as error:
+            return explanations, _explanation_absent("key_unreadable", str(error))
+        explanations.update(_parse_batch_reply(text))
+    return explanations, _explanation_absent(
         "provider_error", "The assistant returned no explanation for this row."
     )
 

@@ -331,3 +331,63 @@ class AdviceAssistantPresentTests(AdviceBase):
         self.assertFalse(data["explanation"]["available"])
         self.assertEqual(data["explanation"]["reason_unavailable"], "provider_error")
         self.assertIsNone(data["explanation"]["text_ar"])
+
+
+import json
+
+
+class BatchChunkingTests(TestCase):
+    """A long queue must be explained as reliably as a short one.
+
+    The assistant answers a batch as ONE JSON array, and a long array is where it
+    stops being JSON: measured live, 7 rows parsed and 25 came back unusable, so
+    every row reported «شرح المساعد غير متاح» while the assistant was fine.
+    """
+
+    def _entries(self, count):
+        class _Type:
+            name = "إجازة اعتيادية"
+
+        class _Request:
+            def __init__(self, pk):
+                self.pk = pk
+                self.title = f"طلب {pk}"
+                self.request_type = _Type()
+
+        return [
+            (_Request(f"r{i:02d}"), {"facts": [], "verdict_label": {"ar": "يوصى بالاعتماد"}})
+            for i in range(count)
+        ]
+
+    def test_a_long_batch_is_asked_for_in_chunks_and_every_row_comes_back(self):
+        from unittest import mock
+
+        from review import advice as advice_module
+
+        entries = self._entries(20)
+        calls = []
+
+        def fake_prose(user, config, system_prompt, user_prompt):
+            calls.append(user_prompt)
+            ids = [line.split(": ", 1)[1] for line in user_prompt.splitlines() if line.startswith("معرف الطلب: ")]
+            return json.dumps([{"id": i, "explanation": f"شرح {i}"} for i in ids], ensure_ascii=False)
+
+        # assistant_prose is imported inside the function, so it is patched on
+        # its own module rather than on review.advice.
+        class _Config:
+            is_configured = True
+            is_active = True
+            mode = "api"
+            model = "glm-5.3-flash"
+            base_url = "https://provider.example/v1"
+            api_key_ciphertext = b""
+
+        with mock.patch.object(advice_module, "_config_for", return_value=_Config()), \
+             mock.patch("accounts.assistant_chat.assistant_prose", fake_prose):
+            explanations, absent = advice_module.batch_explanations(object(), entries)
+
+        self.assertGreater(len(calls), 1, "a 20-row batch must not ride one call")
+        self.assertEqual(len(explanations), 20)
+        for index in range(20):
+            self.assertEqual(explanations[f"r{index:02d}"], f"شرح r{index:02d}")
+        self.assertEqual(absent["reason_unavailable"], "provider_error")
