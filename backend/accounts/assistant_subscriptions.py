@@ -100,6 +100,7 @@ class ProviderSpec:
     def __init__(self, *, slug: str, base_url: str,
                  token_url: str, models_path: str, session_header: str = "",
                  models_supported: bool = True, default_model: str = "",
+                 static_models=None,
                  wire_api: str = "chat", account_id_field: str = "", extra_static_headers=None,
                  device_code_url: str = "", device_token_url: str = "",
                  device_client_id: str = ""):
@@ -109,6 +110,11 @@ class ProviderSpec:
         self.models_path = models_path
         self.session_header = session_header
         self.models_supported = models_supported
+        # A provider whose models are known but NOT listable over the wire (the
+        # codex backend exposes no /models we may call): the CLI's own shipped
+        # slugs, so the user picks from a list instead of retyping an id from
+        # memory — a typo there only surfaces as a failed connection later.
+        self.static_models = tuple(static_models or ())
         self.default_model = default_model  # preselected; the user can change it
         # 'chat' = OpenAI chat-completions; 'responses' = the Codex
         # backend-api /responses SSE shape (its ONLY accepted wire api).
@@ -172,6 +178,20 @@ CODEX = ProviderSpec(
     models_path="/models",
     models_supported=False,  # no listing endpoint our side can call honestly
     default_model=_env("ASSISTANT_CODEX_MODEL", "gpt-5.6-luna"),
+    # Measured from the codex binary's own model slugs (the list its UI offers),
+    # newest first, the preselected default leading.
+    static_models=(
+        "gpt-5.6-luna",
+        "gpt-5.6-terra",
+        "gpt-5.6-sol",
+        "gpt-5.5",
+        "gpt-5.4",
+        "gpt-5.3-codex",
+        "gpt-5.2-codex",
+        "gpt-5.2",
+        "gpt-5.1-codex-max",
+        "gpt-5.1-codex",
+    ),
     wire_api="responses",
     account_id_field="chatgpt-account-id",
     extra_static_headers={
@@ -628,6 +648,10 @@ def list_models(config) -> dict:
     """The models the subscription actually offers; the owner picks one.
     A provider with no listing endpoint says so honestly instead of lying."""
     spec, blob = ensure_fresh(config)
+    if spec.static_models:
+        # Known-but-not-listable: the slugs its own CLI ships. Offered as a list
+        # for the same reason a listing is — a mistyped id fails only later.
+        return {"supported": True, "models": list(spec.static_models), "detail": ""}
     if not spec.models_supported:
         return {"supported": False, "models": [], "detail": "This provider exposes no model-listing endpoint — type the model id (its own documentation one)."}
     request = urllib.request.Request(
