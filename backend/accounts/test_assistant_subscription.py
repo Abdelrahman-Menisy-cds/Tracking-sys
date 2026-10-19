@@ -309,7 +309,10 @@ class _StubHandler(BaseHTTPRequestHandler):
             self._json({"error": "not_found"}, status=404)
 
     def do_GET(self):
-        if self.path.endswith("/models"):
+        _STATE["posted_paths"].append(self.path)
+        # Match on the path alone: a listing may carry a required query
+        # (codex's client_version), so endswith on the raw target misses it.
+        if self.path.split("?", 1)[0].endswith("/models"):
             self._json({"data": [{"id": "glm-5.3-flash"}, {"id": "claude-sonnet-4"}]})
         else:
             self._json({"error": "not_found"}, status=404)
@@ -788,7 +791,7 @@ def test_models_listing_lists_what_the_subscription_offers(stub_server, client_c
 
 
 @pytest.mark.django_db
-def test_models_for_codex_are_its_own_cli_slugs(client_csrf):
+def test_models_for_codex_listing_carries_the_required_client_version(stub_server, client_csrf):
     client, token = client_csrf
     user = _mk_user("h19.codex.models@example.com")
     AssistantConfig.objects.create(company=default_company(), 
@@ -806,13 +809,17 @@ def test_models_for_codex_are_its_own_cli_slugs(client_csrf):
     response = client.get("/api/v1/assistant/subscription/models")
     assert response.status_code == 200
     data = response.json()["data"]
-    # Codex exposes no /models we may call, but its models are not unknown: the
-    # CLI ships them. Offering them is the point — a blank field made the user
-    # retype an id from memory, and a typo only surfaced as a failed connection.
+    # Codex's listing exists but demands client_version (measured live: without
+    # it the endpoint answers 400 'Field required'). Its answer is the only
+    # trustworthy list — the CLI's own strings carry slugs a ChatGPT account
+    # refuses with "The 'X' model is not supported when using Codex with a
+    # ChatGPT account", which is exactly how the wrong list reached the user.
     assert data["supported"] is True
-    assert data["models"][0] == "gpt-5.6-luna"
-    assert "gpt-5.3-codex" in data["models"]
+    assert data["models"] == ["glm-5.3-flash", "claude-sonnet-4"]
     assert data["detail"] == ""
+    listing = [path for path in _STATE["posted_paths"] if path.split("?", 1)[0].endswith("/models")]
+    assert listing, "the listing call must have gone out"
+    assert "client_version=" in listing[-1]
 
 
 # ---------------------------------------------------------------------------
