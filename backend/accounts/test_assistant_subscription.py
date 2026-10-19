@@ -788,7 +788,7 @@ def test_models_listing_lists_what_the_subscription_offers(stub_server, client_c
 
 
 @pytest.mark.django_db
-def test_models_for_codex_say_no_listing_endpoint_honestly(client_csrf):
+def test_models_for_codex_are_its_own_cli_slugs(client_csrf):
     client, token = client_csrf
     user = _mk_user("h19.codex.models@example.com")
     AssistantConfig.objects.create(company=default_company(), 
@@ -806,9 +806,13 @@ def test_models_for_codex_say_no_listing_endpoint_honestly(client_csrf):
     response = client.get("/api/v1/assistant/subscription/models")
     assert response.status_code == 200
     data = response.json()["data"]
-    assert data["supported"] is False
-    assert data["models"] == []
-    assert "no model-listing endpoint" in data["detail"]
+    # Codex exposes no /models we may call, but its models are not unknown: the
+    # CLI ships them. Offering them is the point — a blank field made the user
+    # retype an id from memory, and a typo only surfaced as a failed connection.
+    assert data["supported"] is True
+    assert data["models"][0] == "gpt-5.6-luna"
+    assert "gpt-5.3-codex" in data["models"]
+    assert data["detail"] == ""
 
 
 # ---------------------------------------------------------------------------
