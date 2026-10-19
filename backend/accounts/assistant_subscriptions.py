@@ -703,7 +703,12 @@ def chat_headers(spec: ProviderSpec, blob: dict) -> dict:
     """Extra headers for provider API calls in subscription mode. The codex
     gateway additionally requires its account id (stored inside the
     credential blob) and its CLI-identity headers."""
-    headers = dict(spec.extra_static_headers)
+    # Start from the spec's own base headers: they carry the explicit
+    # User-Agent the opencode edge demands (Cloudflare 403s the default
+    # Python-urllib signature with error 1010). Building from the extras alone
+    # dropped it, and the listing — which now rides these headers — was refused.
+    headers = dict(spec.headers())
+    headers.update(spec.extra_static_headers)
     if spec.account_id_field:
         account_id = blob.get("group_id") or ""
         if account_id:

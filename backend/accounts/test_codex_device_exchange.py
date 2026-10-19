@@ -110,3 +110,21 @@ def test_a_provider_without_a_fallback_still_reports_the_refusal(monkeypatch):
     )
     with pytest.raises(assistant_subscriptions.SubscriptionError):
         assistant_subscriptions.list_models(object())
+
+
+# ---------------------------------------------------------------------------
+# Every outbound call carries the explicit User-Agent the edge demands
+# ---------------------------------------------------------------------------
+
+
+def test_chat_headers_carry_the_explicit_user_agent():
+    """Cloudflare 403s the default Python-urllib signature (error 1010), so the
+    listing — which rides these headers — is refused without the UA. Building
+    from the extras alone dropped it once already."""
+    for spec, blob in (
+        (assistant_subscriptions.OPENCODE, {"key": "k"}),
+        (assistant_subscriptions.CODEX, {"access": "t", "group_id": "g"}),
+    ):
+        headers = assistant_subscriptions.chat_headers(spec, blob)
+        assert headers.get("User-Agent"), spec.slug
+        assert "python-urllib" not in headers["User-Agent"].lower(), spec.slug
