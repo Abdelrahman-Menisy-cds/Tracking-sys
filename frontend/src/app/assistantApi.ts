@@ -148,6 +148,16 @@ export async function saveAssistantConfig(input: AssistantSaveInput, locale?: st
   return payload.data;
 }
 
+/** POST /assistant/subscription/unlink - end the link without starting another. */
+export async function unlinkAssistantSubscription(locale?: string): Promise<AssistantConfig> {
+  const payload = await apiRequest<{ data: AssistantConfig }>("/assistant/subscription/unlink", {
+    method: "POST",
+    body: {},
+    acceptLanguage: locale,
+  });
+  return payload.data;
+}
+
 export async function testAssistant(locale?: string): Promise<AssistantTestResult> {
   const payload = await apiRequest<{ data: AssistantTestResult }>("/assistant/test", {
     method: "POST",

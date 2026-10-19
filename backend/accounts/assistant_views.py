@@ -463,6 +463,25 @@ class AssistantSubscriptionCapabilityView(APIView):
         return Response({"data": capability})
 
 
+class AssistantSubscriptionUnlinkView(APIView):
+    """POST /assistant/subscription/unlink - drop the linked credential.
+
+    The panel already says «الربط الجديد يلغي القديم»; this is the other half of
+    that sentence, so the user can end a link without having to start another one.
+    clear_subscription is the same path a switch to an api key takes, so the row
+    can never be left holding two credentials.
+    """
+
+    permission_classes = [IsAuthenticated401]
+    throttle_classes = [MutationRateThrottle]
+
+    def post(self, request):
+        config = _get_own_config(request.user)
+        assistant_subscriptions.clear_subscription(config)
+        config.refresh_from_db()
+        return Response({"data": AssistantConfigReadSerializer(config).data})
+
+
 class AssistantSubscriptionImportView(APIView):
     """POST /assistant/subscription/import — link from the LOCAL CLI login
     the provider already holds on this machine (the demo fallback: the

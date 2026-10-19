@@ -12,6 +12,7 @@ import {
   type AssistantModelsResult,
   type AssistantSubscriptionStart,
   type SubscriptionProvider,
+  unlinkAssistantSubscription,
 } from "../../app/assistantApi";
 
 /**
@@ -187,6 +188,21 @@ export default function SubscriptionPanel({ config, provider, applyWrite, onChan
     }
   }, [applyWrite, config.base_url, config.model, t, onChanged]);
 
+  /* End the link without starting another one: the panel already says a new link
+     replaces the old, so the user needs the other half of that sentence. */
+  const unlink = useCallback(async () => {
+    setProblem(null);
+    setSavingModel(true);
+    try {
+      const next = await unlinkAssistantSubscription(locale);
+      onChanged(next);
+    } catch (failure) {
+      setProblem(failureText(failure, t("errorNetwork"), t("signIn")));
+    } finally {
+      setSavingModel(false);
+    }
+  }, [locale, onChanged, t]);
+
   const updateModel = useCallback(async () => {
     setSavingModel(true);
     setProblem(null);
@@ -290,6 +306,9 @@ export default function SubscriptionPanel({ config, provider, applyWrite, onChan
             </button>
             <button type="button" className="btn btn-ghost" onClick={switchBack}>
               {t("assistantModeApi")}
+            </button>
+            <button type="button" className="btn btn-ghost" onClick={unlink} disabled={savingModel}>
+              {t("assistantSubUnlink")}
             </button>
           </div>
         </>

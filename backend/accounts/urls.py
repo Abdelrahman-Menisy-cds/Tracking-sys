@@ -12,6 +12,7 @@ urlpatterns = [
     path("auth/me", views.MeView.as_view(), name="auth-me"),
     path("company", company_views.CompanyProfileView.as_view(), name="company-profile"),
     path("assistant/config", assistant_views.AssistantConfigView.as_view(), name="assistant-config"),
+    path("assistant/subscription/unlink", assistant_views.AssistantSubscriptionUnlinkView.as_view(), name="assistant-subscription-unlink"),
     path("assistant/subscription/import", assistant_views.AssistantSubscriptionImportView.as_view(), name="assistant-subscription-import"),
     path("assistant/subscription/start", assistant_views.AssistantSubscriptionStartView.as_view(), name="assistant-subscription-start"),
     path("assistant/subscription/poll", assistant_views.AssistantSubscriptionPollView.as_view(), name="assistant-subscription-poll"),
