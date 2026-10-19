@@ -48,6 +48,7 @@ import logging
 import os
 import ssl
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 
@@ -193,6 +194,44 @@ CODEX = ProviderSpec(
     device_token_url=_env("ASSISTANT_CODEX_DEVICE_TOKEN_URL", "https://auth.openai.com/api/accounts/deviceauth/token"),
     device_client_id=_env("ASSISTANT_CODEX_DEVICE_CLIENT_ID", "app_EMoamEEZ73f0CkXaXp7hrann"),
 )
+
+# The second half of codex's device login (measured from codex-rs
+# login/src/device_code_auth.rs and the CLI's own binary strings): the device
+# poll hands back an authorization_code + code_verifier, which are then swapped
+# at the standard OAuth token endpoint — as a FORM, with the deviceauth/callback
+# redirect — for the real access/refresh/id tokens.
+_CODEX_OAUTH_TOKEN_URL = _env("ASSISTANT_CODEX_OAUTH_TOKEN_URL", "https://auth.openai.com/oauth/token")
+_CODEX_DEVICE_REDIRECT_URI = "https://auth.openai.com/deviceauth/callback"
+
+
+def _codex_exchange_device_code(spec, code_answer: dict) -> dict:
+    """Swap the device poll's authorization_code for tokens.
+
+    Codex's device answer is not a token answer: it carries authorization_code +
+    code_verifier and expects one more call. Treating it as final made a
+    COMPLETED login look like a provider error ("HTTP 200 but no access_token"),
+    so the panel waited forever on an approval that had already happened.
+    """
+    form = urllib.parse.urlencode({
+        "grant_type": "authorization_code",
+        "code": code_answer.get("authorization_code") if isinstance(code_answer.get("authorization_code"), str) else "",
+        "redirect_uri": _CODEX_DEVICE_REDIRECT_URI,
+        "client_id": spec.device_client_id,
+        "code_verifier": code_answer.get("code_verifier") if isinstance(code_answer.get("code_verifier"), str) else "",
+    }).encode("utf-8")
+    request = urllib.request.Request(
+        _CODEX_OAUTH_TOKEN_URL,
+        data=form,
+        headers={"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        return _http_json(request, timeout=15)
+    except ProviderResponseError as error:
+        raise SubscriptionError("provider_error", f"HTTP {error.status_code}: {error.detail}") from None
+    except ProviderUnreachableError as error:
+        raise SubscriptionError("provider_unreachable", f"{error.url}: {error.raw or 'the connection failed'}") from None
+
 
 PROVIDERS = {spec.slug: spec for spec in (OPENCODE, CODEX)}
 
@@ -1139,6 +1178,12 @@ def poll_device_flow(user, provider_slug: str) -> dict:
         raise SubscriptionError("provider_error", f"HTTP {error.status_code}: {error.detail}") from None
     except ProviderUnreachableError as error:
         raise SubscriptionError("provider_unreachable", f"{error.url}: {error.raw or 'the connection failed'}") from None
+    # codex completes in TWO steps: the device poll answers with an
+    # authorization_code + code_verifier, and only the exchange that follows
+    # carries access_token. Run it before the "no access_token" branch, which
+    # would otherwise call a finished login a provider error.
+    if spec.slug == "codex" and not answer.get("access_token") and answer.get("authorization_code"):
+        answer = _codex_exchange_device_code(spec, answer)
     # The provider can answer the pending states inside a 200 too.
     if not answer.get("access_token"):
         pending = answer.get("error")
