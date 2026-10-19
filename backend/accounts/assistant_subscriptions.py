@@ -654,11 +654,23 @@ def list_models(config) -> dict:
     except ProviderUnreachableError as error:
         raise SubscriptionError("provider_unreachable", f"{error.url}: {error.raw or 'the connection failed'}") from None
     listing = []
+    # Providers disagree on the envelope: opencode answers {"data": [...]},
+    # the codex backend {"models": [...]}. Reading only one silently served an
+    # empty list, which the panel then renders as "nothing to choose".
     raw_list = answer.get("data")
+    if not isinstance(raw_list, list):
+        raw_list = answer.get("models")
     if isinstance(raw_list, list):
         for entry in raw_list:
-            if isinstance(entry, dict) and isinstance(entry.get("id"), str):
-                listing.append(entry["id"])
+            if not isinstance(entry, dict):
+                continue
+            # opencode names the field id, the codex backend names it slug;
+            # reading only one dropped every codex model on the floor.
+            name = entry.get("id")
+            if not isinstance(name, str):
+                name = entry.get("slug")
+            if isinstance(name, str) and name:
+                listing.append(name)
     return {"supported": True, "models": listing, "detail": ""}
 
 

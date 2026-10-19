@@ -313,7 +313,13 @@ class _StubHandler(BaseHTTPRequestHandler):
         # Match on the path alone: a listing may carry a required query
         # (codex's client_version), so endswith on the raw target misses it.
         if self.path.split("?", 1)[0].endswith("/models"):
-            self._json({"data": [{"id": "glm-5.3-flash"}, {"id": "claude-sonnet-4"}]})
+            # Each gateway's OWN envelope: opencode lists ids under data, the
+            # codex backend lists slugs under models. A reader that knows only
+            # one silently serves an empty picker for the other.
+            if "/codex-gateway" in self.path:
+                self._json({"models": [{"slug": "gpt-6.1-sol"}, {"slug": "gpt-5.6-luna"}]})
+            else:
+                self._json({"data": [{"id": "glm-5.3-flash"}, {"id": "claude-sonnet-4"}]})
         else:
             self._json({"error": "not_found"}, status=404)
 
@@ -815,7 +821,7 @@ def test_models_for_codex_listing_carries_the_required_client_version(stub_serve
     # refuses with "The 'X' model is not supported when using Codex with a
     # ChatGPT account", which is exactly how the wrong list reached the user.
     assert data["supported"] is True
-    assert data["models"] == ["glm-5.3-flash", "claude-sonnet-4"]
+    assert data["models"] == ["gpt-6.1-sol", "gpt-5.6-luna"]
     assert data["detail"] == ""
     listing = [path for path in _STATE["posted_paths"] if path.split("?", 1)[0].endswith("/models")]
     assert listing, "the listing call must have gone out"
