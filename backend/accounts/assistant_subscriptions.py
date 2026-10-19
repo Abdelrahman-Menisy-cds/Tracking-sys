@@ -439,6 +439,7 @@ def store_subscription(config, imported: ImportedCredential, provider_slug: str,
     blob = json.dumps(imported.blob, ensure_ascii=False).encode("utf-8")
     with transaction.atomic():
         locked = type(config).objects.select_for_update().get(pk=config.pk)
+        previous_provider = locked.subscription_provider
         locked.subscription_provider = provider_slug
         locked.subscription_ciphertext = encrypt_key(blob.decode("utf-8"))
         locked.subscription_hint = imported.hint
@@ -453,7 +454,12 @@ def store_subscription(config, imported: ImportedCredential, provider_slug: str,
             "subscription_cred_type", "subscription_source", "subscription_expires",
             "api_key_ciphertext", "api_key_hint", "base_url",
         ]
-        if not locked.model:
+        # A model belongs to a provider. Switching providers while keeping the
+        # old slug left the row pointing at a model the new one refuses
+        # ("Model does not support this protocol") — a link that looks fine and
+        # fails on every reply. The switch therefore resets the model; a re-link
+        # of the SAME provider keeps whatever the user chose.
+        if previous_provider != provider_slug or not locked.model:
             locked.model = spec.default_model
             update_fields.append("model")
         locked.save(update_fields=update_fields)

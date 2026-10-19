@@ -128,3 +128,36 @@ def test_chat_headers_carry_the_explicit_user_agent():
         headers = assistant_subscriptions.chat_headers(spec, blob)
         assert headers.get("User-Agent"), spec.slug
         assert "python-urllib" not in headers["User-Agent"].lower(), spec.slug
+
+
+# ---------------------------------------------------------------------------
+# Switching providers resets the model to the new provider's own
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_switching_providers_resets_the_model():
+    """A model belongs to a provider: keeping the old slug after a switch leaves
+    the row pointing at a model the new one refuses («Model does not support this
+    protocol»), so the link looks fine and fails on every reply."""
+    from accounts.assistant_subscriptions import CODEX, OPENCODE, ImportedCredential, store_subscription
+    from accounts.models import AssistantConfig, User
+    from tenants.context import default_company
+
+    user = User.objects.create(
+        email="switch@example.com", full_name="مبدّل", role="EMPLOYEE", company=default_company()
+    )
+    config = AssistantConfig.objects.create(company=default_company(), user=user, model="")
+
+    store_subscription(config, ImportedCredential("oauth", {"access": "t"}, "••••t", None), "codex", "device")
+    assert config.model == CODEX.default_model
+
+    store_subscription(config, ImportedCredential("key", {"key": "k"}, "••••k", None), "opencode", "device")
+    assert config.model == OPENCODE.default_model
+    assert config.model != CODEX.default_model
+
+    # Re-linking the SAME provider keeps whatever the user chose.
+    AssistantConfig.objects.filter(pk=config.pk).update(model="glm-5.2")
+    config.refresh_from_db()
+    store_subscription(config, ImportedCredential("key", {"key": "k"}, "••••k", None), "opencode", "device")
+    assert config.model == "glm-5.2"
