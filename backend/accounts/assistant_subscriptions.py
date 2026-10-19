@@ -792,7 +792,14 @@ def _to_responses_shape(messages: list) -> tuple[str, list]:
                     })
                 inputs.extend(calls)
             else:
-                inputs.append({"type": "message", "role": role, "content": [{"type": "input_text", "text": text}]})
+                # The Responses API validates the content part against the ROLE:
+                # a user turn takes input_text, the assistant's OWN reply takes
+                # output_text (or refusal). Sending input_text for an assistant
+                # message is a 400 — which is exactly why a codex link answered
+                # the FIRST message and then failed on every one after it: only
+                # from the second turn does the history carry a reply.
+                part = "output_text" if role == "assistant" else "input_text"
+                inputs.append({"type": "message", "role": role, "content": [{"type": part, "text": text}]})
     return instructions, inputs
 
 

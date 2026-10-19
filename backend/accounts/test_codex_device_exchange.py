@@ -161,3 +161,30 @@ def test_switching_providers_resets_the_model():
     config.refresh_from_db()
     store_subscription(config, ImportedCredential("key", {"key": "k"}, "••••k", None), "opencode", "device")
     assert config.model == "glm-5.2"
+
+
+# ---------------------------------------------------------------------------
+# The responses translation validates each part against its role
+# ---------------------------------------------------------------------------
+
+
+def test_assistant_turns_use_output_text_and_users_input_text():
+    """The Responses API refuses input_text on an assistant message (measured
+    live: 400 «Invalid value: 'input_text'. Supported values are: 'output_text'
+    and 'refusal'»). Sending it is why a codex link answered the FIRST message and
+    failed on every one after it — only from the second turn does the history
+    carry a reply."""
+    _instructions, inputs = assistant_subscriptions._to_responses_shape(
+        [
+            {"role": "system", "content": "نظام"},
+            {"role": "user", "content": "سؤال"},
+            {"role": "assistant", "content": "رد"},
+            {"role": "user", "content": "سؤال تاني"},
+        ]
+    )
+    parts = [(item["role"], item["content"][0]["type"]) for item in inputs]
+    assert parts == [
+        ("user", "input_text"),
+        ("assistant", "output_text"),
+        ("user", "input_text"),
+    ]
