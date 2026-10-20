@@ -1,3 +1,4 @@
+import json
 """Story 1.3 tests: HR employee administration and reporting lines.
 
 Covers: HR create/update with audit, deactivate + session revocation,
@@ -442,3 +443,40 @@ def test_duplicate_department_code_within_one_company_is_rejected(db):
     with pytest.raises(IntegrityError):
         with transaction.atomic():
             Department.objects.create(company=default_company(), code="HR", name_ar="مكرر")
+
+
+@pytest.mark.django_db
+def test_changing_a_department_is_audited_by_key_not_by_object():
+    """The audit row is JSON, so a relation must be recorded by its key.
+
+    Writing the Department object itself raised «Object of type Department is not
+    JSON serializable», which turned EVERY department change into a 500 — the
+    employee's file simply could not be moved between departments.
+    """
+    from accounts.models import AuditEvent, Department
+    from django.test import Client
+    from django.contrib.auth import get_user_model
+    from tenants.context import default_company
+
+    company = default_company()
+    User = get_user_model()
+    hr = User.objects.create(email="dept.hr@example.com", full_name="HR", company=company, role="HR")
+    employee = User.objects.create(
+        email="dept.move@example.com", full_name="نقل قسم", company=company, role="EMPLOYEE"
+    )
+    department = Department.objects.create(company=company, code="MOV", name_ar="النقل")
+
+    client = Client(SERVER_NAME="localhost")
+    client.force_login(hr)
+    response = client.patch(
+        f"/api/v1/employees/{employee.pk}",
+        data=json.dumps({"department": department.pk}),
+        content_type="application/json",
+    )
+    assert response.status_code == 200, response.content[:300]
+    assert response.json()["data"]["department_id"] == department.pk
+
+    event = AuditEvent.objects.filter(subject=employee, action="employee.updated").first()
+    assert event is not None, "the change must be audited"
+    assert event.after["department"] == department.pk
+    assert isinstance(event.after["department"], int)

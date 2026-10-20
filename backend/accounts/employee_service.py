@@ -307,7 +307,11 @@ def update_employee(*, actor, user, validated_data):
             profile.manager = manager
         for field, value in profile_fields.items():
             if getattr(profile, field) != value:
-                audit_changes[field] = value
+                # The audit row is stored as JSON, so a relation is recorded by
+                # its key: writing the Department object itself raised
+                # «Object of type Department is not JSON serializable» and turned
+                # EVERY department change into a 500.
+                audit_changes[field] = value.pk if field == "department" else value
             setattr(profile, field, value)
         profile.save()
 
